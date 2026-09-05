@@ -34,6 +34,20 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* ── LIGHT THEME OVERRIDES ──────────────────────────────────────── */
+html[data-theme="light"] {
+  --color-app: #f4f6fa;
+  --color-panel: #ffffff;
+  --color-card: #ffffff;
+  --color-card-2: #f7f9fc;
+  --color-card-hover: #edf1f7;
+  --color-line: #e0e6ef;
+  --color-line-soft: rgba(15, 23, 42, 0.06);
+  --color-fg: #0f172a;
+  --color-fg-muted: #475569;
+  --color-fg-dim: #64748b;
+}
+
 html,
 body {
   background: var(--color-app);
@@ -55,7 +69,7 @@ body {
   border-radius: 4px;
 }
 
-/* Custom scrollbar (dark, discrete) */
+/* Custom scrollbar (dark) */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -67,8 +81,14 @@ body {
   background: rgba(255, 255, 255, 0.08);
   border-radius: 4px;
 }
+html[data-theme="light"] ::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 42, 0.15);
+}
 ::-webkit-scrollbar-thumb:hover {
   background: rgba(255, 255, 255, 0.14);
+}
+html[data-theme="light"] ::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 42, 0.25);
 }
 
 /* Selection */
@@ -77,13 +97,20 @@ body {
   color: var(--color-fg);
 }
 
-/* Recharts overrides — dark theme tooltip + grid */
+/* Recharts overrides */
 .recharts-cartesian-grid line {
   stroke: rgba(255, 255, 255, 0.05) !important;
+}
+html[data-theme="light"] .recharts-cartesian-grid line {
+  stroke: rgba(15, 23, 42, 0.08) !important;
 }
 .recharts-cartesian-axis-line,
 .recharts-cartesian-axis-tick-line {
   stroke: rgba(255, 255, 255, 0.08) !important;
+}
+html[data-theme="light"] .recharts-cartesian-axis-line,
+html[data-theme="light"] .recharts-cartesian-axis-tick-line {
+  stroke: rgba(15, 23, 42, 0.12) !important;
 }
 .recharts-cartesian-axis-tick-value {
   fill: var(--color-fg-dim) !important;
@@ -91,4 +118,42 @@ body {
 }
 .recharts-tooltip-wrapper {
   outline: none !important;
+}
+
+/* ── ANIMATIONS OFF ─────────────────────────────────────────────── */
+html[data-animations-off] *,
+html[data-animations-off] *::before,
+html[data-animations-off] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── FOCUS MODE ─────────────────────────────────────────────────── */
+html[data-focus-mode] [data-non-essential] {
+  opacity: 0.35;
+  filter: grayscale(0.4);
+  transition: opacity 200ms;
+}
+html[data-focus-mode] [data-non-essential]:hover {
+  opacity: 1;
+  filter: none;
+}
+
+/* ── DENSITY ────────────────────────────────────────────────────── */
+html[data-density="compact"] {
+  --density-y: 6px;
+}
+html[data-density="aerisit"] {
+  --density-y: 16px;
 }

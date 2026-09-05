@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   ArrowRight, Bell, ChevronRight, Crown, KeyRound, Laptop,
   Languages, Palette, ShieldOff, Trash2,
@@ -8,9 +9,9 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 import { useSession } from "@/lib/rbac/session";
 import { useProfile } from "@/lib/profile/context";
-import { Dialog, DialogFooter } from "@/components/ui/Dialog";
 import { ChangePasswordDialog } from "./dialogs/ChangePasswordDialog";
 import { DeleteAccountDialog } from "./dialogs/DeleteAccountDialog";
+import { PlanDialog } from "./dialogs/PlanDialog";
 import type { ProfileTab } from "./ProfileTabs";
 import { cn } from "@/lib/utils/cn";
 
@@ -124,31 +125,34 @@ export function RightColumn({ onOpenTab }: Props) {
         </ul>
       </section>
 
-      {/* DANGER ZONE */}
-      <section className="rounded-2xl border border-rose-500/25 bg-rose-500/[0.04] p-5">
-        <div className="flex items-center gap-2.5">
-          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300">
-            <Trash2 size={15} />
+      {/* DANGER ZONE — link către Recycle Bin */}
+      <Link
+        href="/profil/recycle-bin"
+        className="block rounded-2xl border border-rose-500/25 bg-rose-500/[0.04] p-4 transition-colors hover:bg-rose-500/[0.07]"
+      >
+        <div className="flex items-center gap-3">
+          <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300">
+            <Trash2 size={16} />
           </span>
-          <div>
+          <div className="min-w-0 flex-1">
             <div className="text-[10.5px] font-semibold uppercase tracking-wider text-rose-300/80">
               Zonă periculoasă
             </div>
-            <div className="text-[15px] font-bold text-fg">Șterge contul</div>
+            <div className="text-[13.5px] font-bold text-fg">Șterge contul</div>
+            <div className="mt-0.5 text-[11.5px] text-fg-muted">
+              Această acțiune nu poate fi anulată.
+            </div>
           </div>
+          <ChevronRight size={16} className="text-rose-300/70" />
         </div>
-        <p className="mt-3 text-[12px] text-fg-muted">
-          Această acțiune nu poate fi anulată. Toate datele tale personale vor fi șterse.
-        </p>
-        <button
-          type="button"
-          onClick={() => setDelOpen(true)}
-          className="mt-4 inline-flex w-full items-center justify-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-500/10 px-4 py-2.5 text-[12.5px] font-semibold text-rose-200 transition-colors hover:bg-rose-500/20"
-        >
-          <Trash2 size={13} />
-          Șterge contul
-        </button>
-      </section>
+      </Link>
+
+      <button
+        type="button"
+        onClick={() => setDelOpen(true)}
+        className="hidden"
+        aria-hidden
+      />
 
       {/* Dialogs */}
       <PlanDialog
@@ -203,51 +207,4 @@ function QuickRow({
 
 function themeLabel(t: string) {
   return t === "dark" ? "Dark (implicit)" : t === "light" ? "Light" : "System";
-}
-
-function PlanDialog({
-  open,
-  onClose,
-  used,
-  total,
-  label,
-}: {
-  open: boolean;
-  onClose: () => void;
-  used: number;
-  total: number;
-  label: string;
-}) {
-  const pct = Math.min(100, Math.round((used / total) * 100));
-  return (
-    <Dialog open={open} onClose={onClose} title="Detalii plan" description={label}>
-      <div className="space-y-3 text-[13px] text-fg">
-        <div className="flex items-center justify-between">
-          <span className="text-fg-muted">Utilizare curieri</span>
-          <span className="font-mono font-bold">
-            {used} / {total} ({pct}%)
-          </span>
-        </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-white/[0.06]">
-          <div
-            className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-teal-500"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-        <p className="text-[12px] text-fg-muted">
-          Pentru schimbări de plan (upgrade / downgrade / facturare) contactează administratorul
-          global al platformei.
-        </p>
-      </div>
-      <DialogFooter>
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-lg bg-violet-600 px-4 py-2 text-[12.5px] font-semibold text-white hover:bg-violet-500"
-        >
-          Închide
-        </button>
-      </DialogFooter>
-    </Dialog>
-  );
 }

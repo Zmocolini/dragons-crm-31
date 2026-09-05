@@ -1,166 +1,285 @@
 "use client";
 
+import {
+  BarChart3, Calendar, Clock, Focus, Globe, LayoutDashboard,
+  Lightbulb, Mail, Monitor, Palette, Sparkles, Sun,
+} from "lucide-react";
+import type { LucideIcon } from "lucide-react";
+import { useEffect, useState } from "react";
 import { useProfile } from "@/lib/profile/context";
 import { useToast } from "@/components/ui/Toast";
-import { cn } from "@/lib/utils/cn";
+import { Switch } from "@/components/ui/Switch";
 import type {
-  DateFormat,
-  Density,
-  Language,
-  Theme,
-  TimeFormat,
+  DateFormat, Density, Language, ProfileData, Theme, TimeFormat,
 } from "@/lib/profile/types";
+import { cn } from "@/lib/utils/cn";
+
+type Draft = Pick<ProfileData,
+  | "language" | "theme" | "timezone" | "dateFormat" | "timeFormat" | "density"
+  | "reduceMotion" | "focusMode" | "showTips" | "alwaysDashboard"
+>;
+
+const TIMEZONES = [
+  "Europe/Bucharest",
+  "Europe/London",
+  "Europe/Paris",
+  "Europe/Berlin",
+  "Europe/Madrid",
+  "America/New_York",
+  "America/Los_Angeles",
+  "UTC",
+];
 
 export function TabPreferences() {
   const { profile, updateProfile, logActivity } = useProfile();
   const toast = useToast();
 
-  function change<K extends keyof typeof profile>(key: K, value: (typeof profile)[K], label: string) {
-    updateProfile({ [key]: value } as Partial<typeof profile>);
-    logActivity("preferences.update", label);
-    toast.success("Preferință salvată", label);
+  const buildDraft = (p: ProfileData): Draft => ({
+    language: p.language,
+    theme: p.theme,
+    timezone: p.timezone,
+    dateFormat: p.dateFormat,
+    timeFormat: p.timeFormat,
+    density: p.density,
+    reduceMotion: p.reduceMotion,
+    focusMode: p.focusMode,
+    showTips: p.showTips,
+    alwaysDashboard: p.alwaysDashboard,
+  });
+
+  const [draft, setDraft] = useState<Draft>(() => buildDraft(profile));
+
+  useEffect(() => {
+    setDraft(buildDraft(profile));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile.language, profile.theme, profile.timezone, profile.dateFormat, profile.timeFormat, profile.density, profile.reduceMotion, profile.focusMode, profile.showTips, profile.alwaysDashboard]);
+
+  const dirty = JSON.stringify(draft) !== JSON.stringify(buildDraft(profile));
+
+  function reset() {
+    setDraft(buildDraft(profile));
+  }
+
+  function save() {
+    updateProfile(draft);
+    logActivity("preferences.update", "Preferințe personale actualizate");
+    toast.success("Preferințele au fost salvate.", "Setările tale se aplică în toată aplicația.");
   }
 
   return (
     <div className="space-y-5">
-      <section className="rounded-2xl border border-line bg-card p-5">
-        <h3 className="text-[15px] font-semibold text-fg">Preferințe personale</h3>
-        <p className="text-[11.5px] text-fg-muted">
-          Aceste setări afectează doar contul tău, nu setările flotei.
-        </p>
-
-        <div className="mt-5 space-y-6">
-          <Group label="Limbă" description="Limba interfeței și a notificărilor.">
-            <SegmentedControl
-              options={[
-                { value: "ro", label: "Română" },
-                { value: "en", label: "English" },
-              ]}
-              value={profile.language}
-              onChange={(v) => change("language", v as Language, `Limbă: ${v}`)}
-            />
-          </Group>
-
-          <Group label="Temă" description="Mod de afișare al interfeței.">
-            <SegmentedControl
-              options={[
-                { value: "dark",   label: "Dark" },
-                { value: "light",  label: "Light" },
-                { value: "system", label: "System" },
-              ]}
-              value={profile.theme}
-              onChange={(v) => change("theme", v as Theme, `Temă: ${v}`)}
-            />
-          </Group>
-
-          <Group label="Fus orar" description="Timpurile din CRM sunt afișate în acest fus.">
-            <select
-              value={profile.timezone}
-              onChange={(e) => change("timezone", e.target.value, `Timezone: ${e.target.value}`)}
-              className="h-10 w-full max-w-xs rounded-lg border border-line bg-card-2 px-3 text-[13px] text-fg focus:border-violet-500/60 focus:outline-none"
+      <section className="rounded-2xl border border-line bg-card">
+        <header className="flex items-center justify-between border-b border-line/70 px-5 py-4">
+          <div>
+            <h3 className="text-[15px] font-semibold text-fg">Preferințe personale</h3>
+            <p className="text-[11.5px] text-fg-muted">
+              Configurează modul în care vrei să folosești aplicația.
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {dirty && (
+              <button
+                type="button"
+                onClick={reset}
+                className="rounded-lg border border-line bg-card-2 px-3 py-1.5 text-[12px] font-medium text-fg-muted hover:bg-card-hover hover:text-fg"
+              >
+                Anulează
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={save}
+              disabled={!dirty}
+              className={cn(
+                "rounded-lg px-4 py-1.5 text-[12.5px] font-semibold text-white transition-colors",
+                dirty ? "bg-violet-600 hover:bg-violet-500" : "cursor-not-allowed bg-white/[0.06] text-fg-dim",
+              )}
             >
-              {[
-                "Europe/Bucharest",
-                "Europe/London",
-                "Europe/Paris",
-                "Europe/Berlin",
-                "Europe/Madrid",
-                "America/New_York",
-                "America/Los_Angeles",
-                "UTC",
-              ].map((tz) => (
-                <option key={tz} value={tz}>{tz}</option>
-              ))}
-            </select>
-          </Group>
+              Salvează modificările
+            </button>
+          </div>
+        </header>
 
-          <Group label="Format dată">
-            <SegmentedControl
-              options={[
-                { value: "DD.MM.YYYY", label: "31.12.2026" },
-                { value: "YYYY-MM-DD", label: "2026-12-31" },
-                { value: "MM/DD/YYYY", label: "12/31/2026" },
-              ]}
-              value={profile.dateFormat}
-              onChange={(v) => change("dateFormat", v as DateFormat, `Format dată: ${v}`)}
-            />
-          </Group>
+        <div className="grid gap-3 p-5 md:grid-cols-2">
+          <SelectCard
+            icon={Globe}
+            label="Limbă"
+            description="Alege limba interfeței aplicației."
+            value={draft.language}
+            options={[
+              { value: "ro", label: "🇷🇴 Română" },
+              { value: "en", label: "🇬🇧 English" },
+            ]}
+            onChange={(v) => setDraft({ ...draft, language: v as Language })}
+          />
+          <SelectCard
+            icon={Palette}
+            label="Temă"
+            description="Alege tema aplicației."
+            value={draft.theme}
+            options={[
+              { value: "dark",   label: "Dark (implicit)" },
+              { value: "light",  label: "Light" },
+              { value: "system", label: "System" },
+            ]}
+            onChange={(v) => setDraft({ ...draft, theme: v as Theme })}
+          />
+          <SelectCard
+            icon={Clock}
+            label="Fus orar"
+            description="Setează fusul orar pentru rapoarte."
+            value={draft.timezone}
+            options={TIMEZONES.map((tz) => ({ value: tz, label: tz }))}
+            onChange={(v) => setDraft({ ...draft, timezone: v })}
+          />
+          <SelectCard
+            icon={Calendar}
+            label="Format dată"
+            description="Alege formatul pentru dată."
+            value={draft.dateFormat}
+            options={[
+              { value: "DD.MM.YYYY", label: "DD.MM.YYYY" },
+              { value: "YYYY-MM-DD", label: "YYYY-MM-DD" },
+              { value: "MM/DD/YYYY", label: "MM/DD/YYYY" },
+            ]}
+            onChange={(v) => setDraft({ ...draft, dateFormat: v as DateFormat })}
+          />
+          <SelectCard
+            icon={Clock}
+            label="Format oră"
+            description="Alege formatul pentru oră."
+            value={draft.timeFormat}
+            options={[
+              { value: "24h", label: "24h" },
+              { value: "12h", label: "12h" },
+            ]}
+            onChange={(v) => setDraft({ ...draft, timeFormat: v as TimeFormat })}
+          />
+          <SelectCard
+            icon={Monitor}
+            label="Densitate interfață"
+            description="Personalizează spațiul din interfață."
+            value={draft.density}
+            options={[
+              { value: "compact",     label: "Compactă" },
+              { value: "comfortable", label: "Confortabilă" },
+              { value: "aerisit",     label: "Aerisită" },
+            ]}
+            onChange={(v) => setDraft({ ...draft, density: v as Density })}
+          />
+        </div>
 
-          <Group label="Format oră">
-            <SegmentedControl
-              options={[
-                { value: "24h", label: "14:30" },
-                { value: "12h", label: "2:30 PM" },
-              ]}
-              value={profile.timeFormat}
-              onChange={(v) => change("timeFormat", v as TimeFormat, `Format oră: ${v}`)}
+        <div className="border-t border-line/60 p-5">
+          <h4 className="text-[13px] font-semibold text-fg">Alte preferințe</h4>
+          <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <ToggleCard
+              icon={Sun}
+              label="Redă animații"
+              description="Activează animațiile din interfață."
+              checked={!draft.reduceMotion}
+              onChange={(v) => setDraft({ ...draft, reduceMotion: !v })}
             />
-          </Group>
-
-          <Group label="Densitate interfață" description="Cât de compacte sunt cardurile și tabelele.">
-            <SegmentedControl
-              options={[
-                { value: "compact",     label: "Compact" },
-                { value: "comfortable", label: "Comfortable" },
-              ]}
-              value={profile.density}
-              onChange={(v) => change("density", v as Density, `Densitate: ${v}`)}
+            <ToggleCard
+              icon={Focus}
+              label="Mod focus"
+              description="Ascunde elementele neesențiale."
+              checked={draft.focusMode}
+              onChange={(v) => setDraft({ ...draft, focusMode: v })}
             />
-          </Group>
+            <ToggleCard
+              icon={Lightbulb}
+              label="Sugestii și sfaturi"
+              description="Afișează sugestii utile în aplicație."
+              checked={draft.showTips}
+              onChange={(v) => setDraft({ ...draft, showTips: v })}
+            />
+            <ToggleCard
+              icon={LayoutDashboard}
+              label="Dashboard implicit"
+              description="Deschide direct dashboard-ul la autentificare."
+              checked={draft.alwaysDashboard}
+              onChange={(v) => setDraft({ ...draft, alwaysDashboard: v })}
+            />
+          </div>
         </div>
       </section>
     </div>
   );
 }
 
-function Group({
+function SelectCard({
+  icon: Icon,
   label,
   description,
-  children,
+  value,
+  options,
+  onChange,
 }: {
+  icon: LucideIcon;
   label: string;
-  description?: string;
-  children: React.ReactNode;
+  description: string;
+  value: string;
+  options: { value: string; label: string }[];
+  onChange: (v: string) => void;
 }) {
   return (
-    <div className="grid gap-3 md:grid-cols-[220px_1fr] md:items-start">
-      <div>
-        <div className="text-[13px] font-semibold text-fg">{label}</div>
-        {description && (
-          <p className="mt-0.5 text-[11.5px] text-fg-muted">{description}</p>
-        )}
+    <div className="flex items-center justify-between gap-4 rounded-xl border border-line/60 bg-card-2/40 p-3.5">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-card text-fg-muted">
+          <Icon size={15} />
+        </span>
+        <div className="min-w-0 leading-tight">
+          <div className="text-[13px] font-semibold text-fg">{label}</div>
+          <div className="mt-0.5 text-[11px] text-fg-dim">{description}</div>
+        </div>
       </div>
-      <div>{children}</div>
+      <div className="relative shrink-0">
+        <select
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          className="h-9 max-w-[220px] appearance-none rounded-lg border border-line bg-card px-3 pr-8 text-[12.5px] font-medium text-fg focus:border-violet-500/50 focus:outline-none"
+        >
+          {options.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        <svg
+          aria-hidden
+          className="pointer-events-none absolute right-2 top-1/2 h-3 w-3 -translate-y-1/2 text-fg-dim"
+          viewBox="0 0 12 12"
+        >
+          <path fill="currentColor" d="M6 8L2 4h8z" />
+        </svg>
+      </div>
     </div>
   );
 }
 
-function SegmentedControl<T extends string>({
-  options,
-  value,
+function ToggleCard({
+  icon: Icon,
+  label,
+  description,
+  checked,
   onChange,
 }: {
-  options: { value: T; label: string }[];
-  value: T;
-  onChange: (v: T) => void;
+  icon: LucideIcon;
+  label: string;
+  description: string;
+  checked: boolean;
+  onChange: (v: boolean) => void;
 }) {
   return (
-    <div className="inline-flex flex-wrap gap-1 rounded-xl border border-line bg-card-2/60 p-1">
-      {options.map((o) => (
-        <button
-          key={o.value}
-          type="button"
-          onClick={() => onChange(o.value)}
-          className={cn(
-            "rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors",
-            o.value === value
-              ? "bg-violet-500/20 text-violet-100 ring-1 ring-violet-500/40"
-              : "text-fg-muted hover:bg-white/[0.04] hover:text-fg",
-          )}
-        >
-          {o.label}
-        </button>
-      ))}
+    <div className="flex items-center justify-between gap-4 rounded-xl border border-line/60 bg-card-2/40 p-3.5">
+      <div className="flex min-w-0 items-center gap-3">
+        <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-line bg-card text-fg-muted">
+          <Icon size={15} />
+        </span>
+        <div className="min-w-0 leading-tight">
+          <div className="text-[13px] font-semibold text-fg">{label}</div>
+          <div className="mt-0.5 text-[11px] text-fg-dim">{description}</div>
+        </div>
+      </div>
+      <Switch checked={checked} onChange={onChange} ariaLabel={label} />
     </div>
   );
 }

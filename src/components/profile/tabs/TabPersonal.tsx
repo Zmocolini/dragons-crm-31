@@ -1,6 +1,7 @@
 "use client";
 
-import { Pencil } from "lucide-react";
+import { Briefcase, Clock, Mail, MapPin, Pencil, Phone, User } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { useProfile } from "@/lib/profile/context";
 import { useSession } from "@/lib/rbac/session";
@@ -32,13 +33,13 @@ export function TabPersonal() {
             Editează
           </button>
         </header>
-        <div className="grid gap-x-6 gap-y-4 p-5 sm:grid-cols-2 xl:grid-cols-3">
-          <Info label="Nume complet" value={user.name} />
-          <Info label="Email" value={user.email} />
-          <Info label="Telefon" value={profile.phone || "Necompletat"} muted={!profile.phone} />
-          <Info label="Funcție" value={ROLE_LABELS[user.role]} />
-          <Info label="Locație" value={profile.location || "Necompletat"} muted={!profile.location} />
-          <Info label="Fus orar" value={currentTimezoneLabel(profile.timezone)} />
+        <div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">
+          <FieldCard icon={User}       label="Nume complet" value={user.name} />
+          <FieldCard icon={Mail}       label="Email"        value={user.email} />
+          <FieldCard icon={Phone}      label="Telefon"      value={profile.phone || "Necompletat"} muted={!profile.phone} />
+          <FieldCard icon={Briefcase}  label="Funcție"      value={ROLE_LABELS[user.role]} />
+          <FieldCard icon={MapPin}     label="Locație"      value={profile.location || "Necompletat"} muted={!profile.location} />
+          <FieldCard icon={Clock}      label="Fus orar"     value={currentTimezoneLabel(profile.timezone)} />
         </div>
       </section>
 
@@ -60,11 +61,15 @@ export function TabPersonal() {
           </button>
         </header>
         <div className="p-5">
-          <p className="text-[13px] leading-relaxed text-fg whitespace-pre-wrap">
-            {profile.bio || (
-              <span className="italic text-fg-dim">Nu ai completat bio. Apasă „Editează" pentru a adăuga.</span>
-            )}
-          </p>
+          <div className="rounded-xl border border-line/60 bg-card-2/50 p-4">
+            <p className="text-[13px] leading-relaxed text-fg whitespace-pre-wrap">
+              {profile.bio || (
+                <span className="italic text-fg-dim">
+                  Nu ai completat descrierea. Apasă „Editează" pentru a adăuga.
+                </span>
+              )}
+            </p>
+          </div>
           <div className="mt-2 text-right text-[11px] text-fg-dim">
             {profile.bio.length}/500
           </div>
@@ -81,14 +86,29 @@ export function TabPersonal() {
   );
 }
 
-function Info({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+function FieldCard({
+  icon: Icon,
+  label,
+  value,
+  muted,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+  muted?: boolean;
+}) {
   return (
-    <div className="min-w-0">
+    <div className="rounded-xl border border-line/60 bg-card-2/50 p-3">
       <div className="text-[10.5px] font-semibold uppercase tracking-wider text-fg-dim">
         {label}
       </div>
-      <div className={`mt-1 truncate text-[13px] ${muted ? "italic text-fg-dim" : "text-fg"}`}>
-        {value}
+      <div className="mt-1.5 flex items-center gap-2.5">
+        <Icon size={14} className="shrink-0 text-fg-dim" />
+        <div
+          className={`min-w-0 truncate text-[13px] ${muted ? "italic text-fg-dim" : "text-fg"}`}
+        >
+          {value}
+        </div>
       </div>
     </div>
   );
