@@ -5,10 +5,9 @@ import { ArrowRight, MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 import { Avatar } from "./Avatar";
 import { Badge } from "@/components/ui/Badge";
+import { PlatformChip } from "@/components/ui/PlatformLogo";
 import {
   formatShortDate,
-  PLATFORM_LABEL,
-  PLATFORM_TONE,
   STATUS_LABEL,
   STATUS_TONE,
 } from "./shared";
@@ -202,9 +201,7 @@ function CouriersTable({ rows }: { rows: RecentCourier[] }) {
             <TD className="font-mono text-[12.5px] text-fg-muted">{r.phone}</TD>
             <TD className="text-fg-muted">{r.city}</TD>
             <TD>
-              <Badge tone={PLATFORM_TONE[r.platform]}>
-                {PLATFORM_LABEL[r.platform]}
-              </Badge>
+              <PlatformChip platform={r.platform} />
             </TD>
             <TD>
               <Badge tone={STATUS_TONE[r.status]}>
@@ -291,9 +288,7 @@ function ActivationsTable({ rows }: { rows: RecentActivation[] }) {
               </div>
             </TD>
             <TD>
-              <Badge tone={PLATFORM_TONE[r.platform]}>
-                {PLATFORM_LABEL[r.platform]}
-              </Badge>
+              <PlatformChip platform={r.platform} />
             </TD>
             <TD className="text-fg-muted">{r.city}</TD>
             <TD>
