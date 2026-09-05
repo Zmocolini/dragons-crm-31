@@ -1,17 +1,13 @@
 "use client";
 
-import { Bell, ChevronDown, Menu, Search, Sun } from "lucide-react";
+import { Bell, ChevronDown, Menu, Sun } from "lucide-react";
 import { useSession } from "@/lib/rbac/session";
 import { ROLE_LABELS } from "@/lib/rbac/roles";
-
-function detectModKey(): "⌘" | "Ctrl" {
-  if (typeof navigator === "undefined") return "Ctrl";
-  return /Mac|iPhone|iPad|iPod/.test(navigator.platform) ? "⌘" : "Ctrl";
-}
+import { useUI } from "@/lib/ui/ui-context";
 
 export function Header() {
   const { user } = useSession();
-  const modKey = detectModKey();
+  const { sidebarOpen, toggleSidebar } = useUI();
 
   const initials = user.name
     .split(" ")
@@ -27,32 +23,13 @@ export function Header() {
     >
       <button
         type="button"
-        aria-label="Deschide meniul"
-        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-fg-muted transition-colors hover:bg-white/[0.05] hover:text-fg"
+        onClick={toggleSidebar}
+        aria-label={sidebarOpen ? "Ascunde meniul" : "Arată meniul"}
+        aria-expanded={sidebarOpen}
+        className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-fg-muted transition-colors hover:bg-white/[0.05] hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
       >
         <Menu size={20} />
       </button>
-
-      <div className="relative flex max-w-2xl flex-1 items-center">
-        <Search
-          size={16}
-          className="pointer-events-none absolute left-3.5 text-fg-dim"
-        />
-        <input
-          type="search"
-          placeholder="Caută curier, telefon, oraș, document..."
-          className="h-10 w-full rounded-lg border border-line bg-card pl-10 pr-16 text-[13px] text-fg placeholder:text-fg-dim focus:border-white/15 focus:outline-none focus:ring-0"
-          aria-label="Caută în CRM"
-        />
-        <span className="pointer-events-none absolute right-3 flex items-center gap-1">
-          <kbd className="rounded-md border border-line bg-app px-1.5 py-0.5 font-mono text-[10px] text-fg-muted">
-            {modKey}
-          </kbd>
-          <kbd className="rounded-md border border-line bg-app px-1.5 py-0.5 font-mono text-[10px] text-fg-muted">
-            K
-          </kbd>
-        </span>
-      </div>
 
       <div className="ml-auto flex items-center gap-1.5">
         <button

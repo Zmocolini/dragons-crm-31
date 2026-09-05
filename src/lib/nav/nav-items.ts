@@ -25,6 +25,8 @@ export type NavItem = {
   icon: LucideIcon;
   permission: Permission;
   badge?: "NOU" | "BETA";
+  /** True = arată cerc roșu (pending action). Pentru "/" (Dashboard) e agregat automat din celelalte. */
+  hasAlert?: boolean;
 };
 
 export const NAV_ITEMS: NavItem[] = [
@@ -35,6 +37,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Candidați (Leaduri)",
     icon: UserPlus,
     permission: "candidates.view",
+    hasAlert: true,
   },
   { href: "/interviuri", label: "Interviuri", icon: Users, permission: "interviews.view" },
   {
@@ -42,10 +45,11 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Activări",
     icon: ShieldCheck,
     permission: "activations.view",
+    hasAlert: true,
   },
-  { href: "/plati", label: "Plăți", icon: Wallet, permission: "payments.view" },
+  { href: "/plati", label: "Plăți", icon: Wallet, permission: "payments.view", hasAlert: true },
   { href: "/rapoarte", label: "Rapoarte", icon: BarChart3, permission: "reports.view" },
-  { href: "/documente", label: "Documente", icon: FileText, permission: "documents.view" },
+  { href: "/documente", label: "Documente", icon: FileText, permission: "documents.view", hasAlert: true },
   { href: "/vehicule", label: "Vehicule", icon: Car, permission: "vehicles.view" },
   { href: "/cazari", label: "Cazări", icon: Hotel, permission: "cazari.view" },
   {
@@ -60,6 +64,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: "Probleme / Suport",
     icon: LifeBuoy,
     permission: "issues.view",
+    hasAlert: true,
   },
   { href: "/calendar", label: "Calendar", icon: CalendarDays, permission: "calendar.view" },
   {
