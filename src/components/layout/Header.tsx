@@ -1,20 +1,11 @@
 "use client";
 
-import { Bell, ChevronDown, Menu, Sun } from "lucide-react";
-import { useSession } from "@/lib/rbac/session";
-import { ROLE_LABELS } from "@/lib/rbac/roles";
+import { Bell, Menu, Sun } from "lucide-react";
 import { useUI } from "@/lib/ui/ui-context";
+import { UserMenu } from "./UserMenu";
 
 export function Header() {
-  const { user } = useSession();
   const { sidebarOpen, toggleSidebar } = useUI();
-
-  const initials = user.name
-    .split(" ")
-    .map((n) => n[0])
-    .slice(0, 2)
-    .join("")
-    .toUpperCase();
 
   return (
     <header
@@ -51,23 +42,9 @@ export function Header() {
           </span>
         </button>
 
-        <button
-          type="button"
-          className="ml-2 flex items-center gap-2.5 rounded-xl border border-line bg-card px-2 py-1.5 text-left transition-colors hover:bg-card-hover"
-        >
-          <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-[11px] font-bold text-white">
-            {initials}
-          </span>
-          <span className="leading-tight">
-            <span className="block text-[12.5px] font-semibold text-fg">
-              {user.name}
-            </span>
-            <span className="block text-[10.5px] text-fg-dim">
-              {ROLE_LABELS[user.role]}
-            </span>
-          </span>
-          <ChevronDown size={14} className="text-fg-dim" />
-        </button>
+        <div className="ml-2">
+          <UserMenu />
+        </div>
       </div>
     </header>
   );
