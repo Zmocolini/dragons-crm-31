@@ -90,7 +90,7 @@ export function UserMenu() {
           {/* Items */}
           <div className="py-1.5">
             <MenuItem
-              href="/setari?tab=profil"
+              href="/profil"
               icon={<User size={16} />}
               iconTone="text-fg-muted"
               title="Profilul meu"
