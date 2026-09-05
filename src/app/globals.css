@@ -1,26 +1,94 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  /* Layout surfaces */
+  --color-app: #070b10;
+  --color-panel: #070a0f;
+  --color-card: #10161f;
+  --color-card-2: #151d27;
+  --color-card-hover: #131b26;
+  --color-line: #1d2733;
+  --color-line-soft: rgba(255, 255, 255, 0.06);
+
+  /* Text */
+  --color-fg: #f8fafc;
+  --color-fg-muted: #9aa4b2;
+  --color-fg-dim: #64748b;
+
+  /* Brand accents */
+  --color-accent: #8b5cf6;
+  --color-accent-2: #7c3aed;
+  --color-accent-3: #a78bfa;
+  --color-info: #3b82f6;
+  --color-info-2: #2563eb;
+  --color-success: #22c55e;
+  --color-success-2: #10b981;
+  --color-warn: #f59e0b;
+  --color-warn-2: #f97316;
+  --color-danger: #ef4444;
+  --color-bolt: #34d399;
+  --color-wolt: #38bdf8;
+  --color-glovo: #facc15;
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html,
+body {
+  background: var(--color-app);
+  color: var(--color-fg);
+  font-family: var(--font-sans), Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+*,
+*::before,
+*::after {
+  border-color: var(--color-line);
+}
+
+/* Focus rings */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Custom scrollbar (dark, discrete) */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* Selection */
+::selection {
+  background: color-mix(in oklab, var(--color-accent) 40%, transparent);
+  color: var(--color-fg);
+}
+
+/* Recharts overrides — dark theme tooltip + grid */
+.recharts-cartesian-grid line {
+  stroke: rgba(255, 255, 255, 0.05) !important;
+}
+.recharts-cartesian-axis-line,
+.recharts-cartesian-axis-tick-line {
+  stroke: rgba(255, 255, 255, 0.08) !important;
+}
+.recharts-cartesian-axis-tick-value {
+  fill: var(--color-fg-dim) !important;
+  font-size: 11px !important;
+}
+.recharts-tooltip-wrapper {
+  outline: none !important;
 }
