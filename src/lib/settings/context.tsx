@@ -6,13 +6,17 @@ import {
 } from "react";
 import {
   DEFAULT_SETTINGS,
+  type AccessConfig,
   type City,
   type IntegrationStatus,
   type IntegrationsState,
+  type Invitation,
   type ModuleKey,
   type NotificationChannelKey,
   type PlatformKey,
   type SettingsState,
+  type TeamMember,
+  type TeamRoleKey,
 } from "./types";
 
 // TODO(real-users): server actions + tabelele tenant_settings, tenant_modules, tenant_fleet,
@@ -37,6 +41,13 @@ type SettingsContextValue = {
   updateIntegrationPlatform: (key: PlatformKey, patch: Partial<{ status: IntegrationStatus; lastSyncIso: string | null; account: string | null }>) => void;
   updateCalendar: (patch: Partial<IntegrationsState["calendar"]>) => void;
   toggleNotificationChannel: (key: NotificationChannelKey, next: boolean) => void;
+  // Team
+  addTeamMember: (data: { name: string; email: string; role: TeamRoleKey; workspace: string; sendInvite: boolean }) => void;
+  updateTeamMember: (id: string, patch: Partial<Pick<TeamMember, "role" | "workspace" | "status">>) => void;
+  removeTeamMember: (id: string) => void;
+  resendInvitation: (id: string) => void;
+  cancelInvitation: (id: string) => void;
+  updateAccessConfig: (patch: Partial<AccessConfig>) => void;
   hydrated: boolean;
 };
 
@@ -66,6 +77,11 @@ function safeRead(): SettingsState {
         platforms: parsed.integrations?.platforms ?? DEFAULT_SETTINGS.integrations.platforms,
         calendar:  { ...DEFAULT_SETTINGS.integrations.calendar,  ...(parsed.integrations?.calendar ?? {}) },
         channels:  { ...DEFAULT_SETTINGS.integrations.channels,  ...(parsed.integrations?.channels ?? {}) },
+      },
+      team: {
+        members:     parsed.team?.members     ?? DEFAULT_SETTINGS.team.members,
+        invitations: parsed.team?.invitations ?? DEFAULT_SETTINGS.team.invitations,
+        access:      { ...DEFAULT_SETTINGS.team.access, ...(parsed.team?.access ?? {}) },
       },
     };
   } catch {
@@ -119,6 +135,74 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       integrations: { ...prev.integrations, channels: { ...prev.integrations.channels, [key]: next } },
     })), []);
 
+  const addTeamMember = useCallback(
+    (data: { name: string; email: string; role: TeamRoleKey; workspace: string; sendInvite: boolean }) => {
+      const id = `u_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+      const nowIso = new Date().toISOString();
+      const member: TeamMember = {
+        id,
+        name: data.name,
+        email: data.email,
+        avatarUrl: null,
+        role: data.role,
+        workspace: data.workspace,
+        workspaceAll: data.role === "global_owner",
+        lastActiveIso: null,
+        status: data.sendInvite ? "invited" : "active",
+        invitedAtIso: data.sendInvite ? nowIso : null,
+      };
+      const invitation: Invitation | null = data.sendInvite
+        ? { id: `inv_${Date.now()}`, email: data.email, role: data.role, workspace: data.workspace, sentAtIso: nowIso, status: "sent" }
+        : null;
+      setSettings((prev) => ({
+        ...prev,
+        team: {
+          ...prev.team,
+          members: [member, ...prev.team.members],
+          invitations: invitation ? [invitation, ...prev.team.invitations] : prev.team.invitations,
+        },
+      }));
+    },
+    [],
+  );
+
+  const updateTeamMember = useCallback((id: string, patch: Partial<Pick<TeamMember, "role" | "workspace" | "status">>) =>
+    setSettings((prev) => ({
+      ...prev,
+      team: { ...prev.team, members: prev.team.members.map((m) => m.id === id ? { ...m, ...patch, workspaceAll: (patch.role ?? m.role) === "global_owner" || m.workspaceAll } : m) },
+    })), []);
+
+  const removeTeamMember = useCallback((id: string) =>
+    setSettings((prev) => ({
+      ...prev,
+      team: { ...prev.team, members: prev.team.members.filter((m) => m.id !== id) },
+    })), []);
+
+  const resendInvitation = useCallback((invId: string) =>
+    setSettings((prev) => ({
+      ...prev,
+      team: {
+        ...prev.team,
+        invitations: prev.team.invitations.map((i) => i.id === invId ? { ...i, sentAtIso: new Date().toISOString(), status: "sent" as const } : i),
+      },
+    })), []);
+
+  const cancelInvitation = useCallback((invId: string) =>
+    setSettings((prev) => {
+      const inv = prev.team.invitations.find((i) => i.id === invId);
+      return {
+        ...prev,
+        team: {
+          ...prev.team,
+          invitations: prev.team.invitations.map((i) => i.id === invId ? { ...i, status: "cancelled" as const } : i),
+          members:     inv ? prev.team.members.filter((m) => !(m.email === inv.email && m.status === "invited")) : prev.team.members,
+        },
+      };
+    }), []);
+
+  const updateAccessConfig = useCallback((patch: Partial<AccessConfig>) =>
+    setSettings((prev) => ({ ...prev, team: { ...prev.team, access: { ...prev.team.access, ...patch } } })), []);
+
   const value = useMemo<SettingsContextValue>(
     () => ({
       settings, updateSettings, updateOrganization, updatePlatform,
@@ -126,10 +210,22 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       addCity, removeCity, updateCityStatus, togglePlatform,
       isModuleEnabled,
       updateIntegrationPlatform, updateCalendar, toggleNotificationChannel,
+      addTeamMember, updateTeamMember, removeTeamMember,
+      resendInvitation, cancelInvitation, updateAccessConfig,
       hydrated,
     }),
-    [settings, hydrated, updateSettings, updateOrganization, updatePlatform, toggleModule, updateFleet, toggleVehicleType, addCity, removeCity, updateCityStatus, togglePlatform, isModuleEnabled, updateIntegrationPlatform, updateCalendar, toggleNotificationChannel],
+    [
+      settings, hydrated,
+      updateSettings, updateOrganization, updatePlatform,
+      toggleModule, updateFleet, toggleVehicleType,
+      addCity, removeCity, updateCityStatus, togglePlatform,
+      isModuleEnabled,
+      updateIntegrationPlatform, updateCalendar, toggleNotificationChannel,
+      addTeamMember, updateTeamMember, removeTeamMember,
+      resendInvitation, cancelInvitation, updateAccessConfig,
+    ],
   );
+
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;
 }

@@ -112,6 +112,227 @@ export const CHANNEL_DESC: Record<NotificationChannelKey, string> = {
   whatsapp: "Primește notificări pe WhatsApp.",
 };
 
+/* ─── TEAM & ACCESS ─── */
+export type TeamRoleKey =
+  | "global_owner"
+  | "fleet_admin"
+  | "subcontractor_admin"
+  | "hr"
+  | "payments"
+  | "viewer";
+
+export const TEAM_ROLE_LABEL: Record<TeamRoleKey, string> = {
+  global_owner:         "Global Owner",
+  fleet_admin:          "Admin flotă",
+  subcontractor_admin:  "Subcontractor Admin",
+  hr:                   "HR / Recrutare",
+  payments:             "Operator plăți",
+  viewer:               "Viewer",
+};
+
+export const TEAM_ROLE_DESC: Record<TeamRoleKey, string> = {
+  global_owner:         "Acces complet la toate modulele și setările.",
+  fleet_admin:          "Gestionează flota, utilizatorii și operațiunile.",
+  subcontractor_admin:  "Gestionează subcontractorii și colaboratorii proprii.",
+  hr:                   "Acces la candidați, interviuri și activări.",
+  payments:             "Acces la plăți, facturi și documente financiare.",
+  viewer:               "Acces doar în citire la datele permise.",
+};
+
+export type TeamMemberStatus = "active" | "invited" | "suspended" | "expired";
+
+export type TeamMember = {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl: string | null;
+  role: TeamRoleKey;
+  workspace: string;     // "Toate flotele" sau nume flotă
+  workspaceAll: boolean; // true pentru Global Owner
+  lastActiveIso: string | null;
+  status: TeamMemberStatus;
+  invitedAtIso: string | null;
+};
+
+export type InvitationStatus = "sent" | "accepted" | "expired" | "cancelled";
+
+export type Invitation = {
+  id: string;
+  email: string;
+  role: TeamRoleKey;
+  workspace: string;
+  sentAtIso: string;
+  status: InvitationStatus;
+};
+
+export type AccessConfig = {
+  allowedDomains: string[];
+  disableOnLeave: boolean;
+};
+
+export type TeamState = {
+  members: TeamMember[];
+  invitations: Invitation[];
+  access: AccessConfig;
+};
+
+export const DEFAULT_TEAM: TeamState = {
+  members: [
+    {
+      id: "u_ioan",
+      name: "Ioan Varga",
+      email: "ioan.varga@dragondelivery.ro",
+      avatarUrl: null,
+      role: "global_owner",
+      workspace: "Toate flotele",
+      workspaceAll: true,
+      lastActiveIso: new Date().toISOString(),
+      status: "active",
+      invitedAtIso: null,
+    },
+    {
+      id: "u_andrei",
+      name: "Andrei Manea",
+      email: "andrei.manea@dragondelivery.ro",
+      avatarUrl: null,
+      role: "fleet_admin",
+      workspace: "Dragon Delivery",
+      workspaceAll: false,
+      lastActiveIso: new Date(Date.now() - 45 * 60_000).toISOString(),
+      status: "active",
+      invitedAtIso: null,
+    },
+    {
+      id: "u_maria",
+      name: "Maria Popescu",
+      email: "maria.popescu@dragondelivery.ro",
+      avatarUrl: null,
+      role: "hr",
+      workspace: "Dragon Delivery",
+      workspaceAll: false,
+      lastActiveIso: new Date(Date.now() - 3 * 3600_000).toISOString(),
+      status: "active",
+      invitedAtIso: null,
+    },
+    {
+      id: "u_stefan",
+      name: "Ștefan Ionescu",
+      email: "stefan.ionescu@dragondelivery.ro",
+      avatarUrl: null,
+      role: "payments",
+      workspace: "Dragon Delivery",
+      workspaceAll: false,
+      lastActiveIso: null,
+      status: "invited",
+      invitedAtIso: new Date(Date.now() - 2 * 86_400_000).toISOString(),
+    },
+    {
+      id: "u_alex",
+      name: "Alexandra Radu",
+      email: "alex.radu@dragondelivery.ro",
+      avatarUrl: null,
+      role: "fleet_admin",
+      workspace: "Dragon Delivery",
+      workspaceAll: false,
+      lastActiveIso: new Date(Date.now() - 26 * 3600_000).toISOString(),
+      status: "active",
+      invitedAtIso: null,
+    },
+    {
+      id: "u_cristi",
+      name: "Cristian Ene",
+      email: "cristian.ene@dragondelivery.ro",
+      avatarUrl: null,
+      role: "hr",
+      workspace: "Dragon Delivery",
+      workspaceAll: false,
+      lastActiveIso: new Date(Date.now() - 5 * 86_400_000).toISOString(),
+      status: "active",
+      invitedAtIso: null,
+    },
+    {
+      id: "u_dana",
+      name: "Dana Voicu",
+      email: "dana.voicu@dragondelivery.ro",
+      avatarUrl: null,
+      role: "payments",
+      workspace: "Dragon Delivery",
+      workspaceAll: false,
+      lastActiveIso: new Date(Date.now() - 12 * 3600_000).toISOString(),
+      status: "active",
+      invitedAtIso: null,
+    },
+    {
+      id: "u_george",
+      name: "George Dumitru",
+      email: "george.dumitru@dragondelivery.ro",
+      avatarUrl: null,
+      role: "subcontractor_admin",
+      workspace: "Dragon Delivery",
+      workspaceAll: false,
+      lastActiveIso: new Date(Date.now() - 4 * 86_400_000).toISOString(),
+      status: "active",
+      invitedAtIso: null,
+    },
+    {
+      id: "u_laura",
+      name: "Laura Pop",
+      email: "laura.pop@dragondelivery.ro",
+      avatarUrl: null,
+      role: "viewer",
+      workspace: "Dragon Delivery",
+      workspaceAll: false,
+      lastActiveIso: new Date(Date.now() - 60 * 60_000).toISOString(),
+      status: "active",
+      invitedAtIso: null,
+    },
+    {
+      id: "u_mihai",
+      name: "Mihai Constantin",
+      email: "mihai.constantin@dragondelivery.ro",
+      avatarUrl: null,
+      role: "viewer",
+      workspace: "Dragon Delivery",
+      workspaceAll: false,
+      lastActiveIso: new Date(Date.now() - 8 * 86_400_000).toISOString(),
+      status: "suspended",
+      invitedAtIso: null,
+    },
+    {
+      id: "u_raluca",
+      name: "Raluca Ștefănescu",
+      email: "raluca.stefanescu@dragondelivery.ro",
+      avatarUrl: null,
+      role: "hr",
+      workspace: "Dragon Delivery",
+      workspaceAll: false,
+      lastActiveIso: null,
+      status: "invited",
+      invitedAtIso: new Date(Date.now() - 5 * 86_400_000).toISOString(),
+    },
+    {
+      id: "u_bogdan",
+      name: "Bogdan Marin",
+      email: "bogdan.marin@dragondelivery.ro",
+      avatarUrl: null,
+      role: "fleet_admin",
+      workspace: "Dragon Delivery",
+      workspaceAll: false,
+      lastActiveIso: new Date(Date.now() - 90 * 60_000).toISOString(),
+      status: "active",
+      invitedAtIso: null,
+    },
+  ],
+  invitations: [
+    { id: "inv_1", email: "stefan.ionescu@dragondelivery.ro", role: "payments", workspace: "Dragon Delivery", sentAtIso: new Date(Date.now() - 2 * 86_400_000).toISOString(), status: "sent" },
+    { id: "inv_2", email: "raluca.stefanescu@dragondelivery.ro", role: "hr",       workspace: "Dragon Delivery", sentAtIso: new Date(Date.now() - 5 * 86_400_000).toISOString(), status: "sent" },
+  ],
+  access: {
+    allowedDomains: ["dragondelivery.ro"],
+    disableOnLeave: true,
+  },
+};
+
 export type SettingsState = {
   organization: OrganizationInfo;
   platform: PlatformDefaults;
@@ -120,6 +341,7 @@ export type SettingsState = {
   cities: City[];
   platforms: PlatformActive;
   integrations: IntegrationsState;
+  team: TeamState;
 };
 
 export const DEFAULT_ORG: OrganizationInfo = {
@@ -185,6 +407,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   cities: DEFAULT_CITIES,
   platforms: DEFAULT_PLATFORMS,
   integrations: DEFAULT_INTEGRATIONS,
+  team: DEFAULT_TEAM,
 };
 
 export const MODULE_LABEL: Record<ModuleKey, string> = {

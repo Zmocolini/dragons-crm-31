@@ -11,6 +11,7 @@ import { TabFlota } from "@/components/settings/tabs/TabFlota";
 import { TabGeneral } from "@/components/settings/tabs/TabGeneral";
 import { TabIntegrari } from "@/components/settings/tabs/TabIntegrari";
 import { TabPlaceholder } from "@/components/settings/tabs/TabPlaceholder";
+import { TabUtilizatori } from "@/components/settings/tabs/TabUtilizatori";
 
 const VALID: SettingsTab[] = ["general", "flota", "integrari", "utilizatori", "notificari", "securitate", "facturare", "personalizare"];
 
@@ -69,21 +70,7 @@ function SetariPageInner() {
           {tab === "general"       && <TabGeneral />}
           {tab === "flota"         && <TabFlota />}
           {tab === "integrari"     && <TabIntegrari />}
-          {tab === "utilizatori"   && (
-            <TabPlaceholder
-              icon={Users}
-              title="Utilizatori și acces"
-              description="Gestionează echipa care are acces la CRM: adăugare, roluri, permisiuni granulare, invitații."
-              planned={[
-                "Adăugare / suspendare utilizatori",
-                "Roluri custom",
-                "Overrides pe permisiuni (module)",
-                "Invitații prin email",
-                "Sesiuni active per user",
-                "Audit modificări permisiuni",
-              ]}
-            />
-          )}
+          {tab === "utilizatori"   && <TabUtilizatori />}
           {tab === "notificari"    && (
             <TabPlaceholder
               icon={Bell}
