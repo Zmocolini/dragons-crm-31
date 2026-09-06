@@ -13,6 +13,7 @@ import { PlatformLogo } from "@/components/ui/PlatformLogo";
 import { useToast } from "@/components/ui/Toast";
 import { useProfile } from "@/lib/profile/context";
 import { useSession } from "@/lib/rbac/session";
+import { FleetSwitcherDialog } from "@/components/layout/FleetSwitcherDialog";
 import { useSettings } from "@/lib/settings/context";
 import {
   MODULE_DESCRIPTION, MODULE_LABEL, PLATFORM_LABEL, VEHICLE_LABEL, VEHICLE_TYPES,
@@ -119,7 +120,7 @@ function FleetHeaderCard() {
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-4">
           <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-orange-500 to-red-600 text-[14px] font-black text-white">
-            {user.activeTenant.name.charAt(0)}
+            {user.activeTenant.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase()}
           </span>
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-wider text-fg-dim">Configurare flotă</div>
@@ -144,72 +145,8 @@ function FleetHeaderCard() {
         </button>
       </div>
 
-      <FleetSwitchDialog open={open} onClose={() => setOpen(false)} />
+      <FleetSwitcherDialog open={open} onClose={() => setOpen(false)} />
     </section>
-  );
-}
-
-function FleetSwitchDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { user } = useSession();
-  const toast = useToast();
-  const { logActivity } = useProfile();
-  const [selected, setSelected] = useState<string>(user.activeTenant.id);
-
-  const tenants = [
-    { id: user.activeTenant.id, name: user.activeTenant.name, active: true },
-  ];
-
-  function apply() {
-    // TODO(real-users): server action switchTenant(id) + revalidate session + refresh dashboard.
-    logActivity("tenant.switch", user.activeTenant.name, "Flotă");
-    toast.success("Flotă activă setată.", `${user.activeTenant.name} rămâne flota curentă.`);
-    onClose();
-  }
-
-  return (
-    <Dialog open={open} onClose={onClose} title="Schimbă flota" size="md">
-      <p className="mb-4 rounded-lg border border-sky-500/25 bg-sky-500/10 px-3 py-2 text-[12px] text-sky-100">
-        <Info size={12} className="mr-1 inline align-[-2px]" />
-        Flota selectată va fi setată ca flotă activă pentru această sesiune. Poți reveni oricând și
-        schimba.
-      </p>
-      <ul className="space-y-1.5">
-        {tenants.map((t) => (
-          <li key={t.id}>
-            <button
-              type="button"
-              onClick={() => setSelected(t.id)}
-              className={cn(
-                "flex w-full items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors",
-                selected === t.id
-                  ? "border-violet-500/50 bg-violet-500/10"
-                  : "border-line bg-card-2/40 hover:bg-card-hover",
-              )}
-            >
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-red-600 text-[13px] font-black text-white">
-                {t.name.charAt(0)}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-semibold text-fg">{t.name}</div>
-                <div className="text-[11px] text-fg-dim">
-                  {t.active ? "Flotă curentă" : "Alte flote disponibile"}
-                </div>
-              </div>
-              {selected === t.id && <CheckCircle2 size={16} className="text-violet-300" />}
-            </button>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-3 text-[11px] text-fg-dim">
-        Alte flote apar aici odată ce contul tău e adăugat ca membru.
-      </p>
-      <DialogFooter>
-        <button type="button" onClick={onClose} className="rounded-lg border border-line bg-card-2 px-4 py-2 text-[12.5px] font-medium text-fg-muted hover:bg-card-hover">Anulează</button>
-        <button type="button" onClick={apply} className="rounded-lg bg-violet-600 px-4 py-2 text-[12.5px] font-semibold text-white hover:bg-violet-500">
-          Setează flotă activă
-        </button>
-      </DialogFooter>
-    </Dialog>
   );
 }
 
