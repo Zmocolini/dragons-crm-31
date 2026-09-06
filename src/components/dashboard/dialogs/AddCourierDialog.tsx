@@ -14,9 +14,10 @@ import type { Nationality } from "@/lib/candidates/types";
 import { NATIONALITY_LABEL } from "@/lib/candidates/types";
 import { useCouriers } from "@/lib/couriers/context";
 import {
-  COLLABORATION_LABEL, COURIER_STATUS_LABEL, VEHICLE_OWNERSHIP_LABEL, VEHICLE_TYPE_LABEL,
+  COLLABORATION_LABEL, COURIER_STATUS_LABEL, INCOMPLETE_FIELD_LABEL,
+  VEHICLE_OWNERSHIP_LABEL, VEHICLE_TYPE_LABEL,
   type CollaborationType, type Courier, type CourierDuplicateMatch, type CourierStatus,
-  type VehicleOwnership, type VehicleType,
+  type IncompleteFieldKey, type VehicleOwnership, type VehicleType,
 } from "@/lib/couriers/types";
 import type { PlatformKey } from "@/lib/dashboard/types";
 import { useProfile } from "@/lib/profile/context";
@@ -138,32 +139,53 @@ export function AddCourierDialog({
     else onClose();
   }
 
-  function validate(draft = false): boolean {
-    const err: Record<string, string> = {};
-    if (!form.fullName.trim()) err.fullName = "Numele este obligatoriu.";
-    else if (form.fullName.trim().split(/\s+/).length < 2) err.fullName = "Introdu prenume + nume.";
+  /**
+   * Detectează câmpurile lipsă/incomplete + erorile HARD (format greșit — email invalid).
+   * Câmpurile required cu asterisc NU blochează salvarea; se marchează pentru completare ulterioară.
+   */
+  function analyzeForm(): { hardErrors: Record<string, string>; incomplete: IncompleteFieldKey[] } {
+    const hardErrors: Record<string, string> = {};
+    const incomplete: IncompleteFieldKey[] = [];
 
-    const phoneDigits = form.phone.replace(/\D/g, "");
-    if (phoneDigits.length < 9) err.phone = "Telefon incomplet.";
-
-    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) err.email = "Format email invalid.";
-
-    if (!draft) {
-      if (!form.city) err.city = "Alege un oraș activ.";
-      if (form.platforms.length === 0) err.platforms = "Alege cel puțin o platformă.";
+    if (!form.fullName.trim()) incomplete.push("fullName");
+    else if (form.fullName.trim().split(/\s+/).length < 2) {
+      incomplete.push("fullName");
     }
 
-    setErrors(err);
-    return Object.keys(err).length === 0;
+    const phoneDigits = form.phone.replace(/\D/g, "");
+    if (phoneDigits.length < 9) incomplete.push("phone");
+
+    // Email este OPȚIONAL. Doar formatul valid este cerut dacă e completat.
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
+      hardErrors.email = "Format email invalid.";
+    }
+
+    if (!form.city) incomplete.push("city");
+    if (form.platforms.length === 0) incomplete.push("platforms");
+
+    return { hardErrors, incomplete };
   }
 
   function submit(asDraft: boolean) {
-    if (!validate(asDraft)) {
-      toast.error("Verifică datele", "Câteva câmpuri au erori.");
+    const { hardErrors, incomplete } = analyzeForm();
+
+    // Cel puțin nume SAU telefon trebuie completat ca să existe identificator util
+    if (incomplete.includes("fullName") && incomplete.includes("phone")) {
+      setErrors({ fullName: "Completează cel puțin numele sau telefonul." });
+      toast.error("Nu pot salva", "Introdu cel puțin numele sau telefonul curierului.");
       return;
     }
+
+    // Erori HARD (format invalid) — blochează pentru a nu polua DB
+    if (Object.keys(hardErrors).length > 0) {
+      setErrors(hardErrors);
+      toast.error("Corectează câmpurile cu erori", "Formatul unor câmpuri este invalid.");
+      return;
+    }
+    setErrors({});
+
     const courier = addCourier({
-      fullName: form.fullName.trim(),
+      fullName: form.fullName.trim() || "Curier nou (fără nume)",
       phone: form.phone.trim(),
       email: form.email.trim() || null,
       nationality: form.nationality,
@@ -173,21 +195,37 @@ export function AddCourierDialog({
       vehicleOwnership: form.vehicleOwnership,
       collaboration: form.collaboration,
       status: asDraft ? "draft" : form.status,
+      incompleteFields: incomplete,
       createdBy: user.id,
       tenantId: user.activeTenant.id,
     });
+
     logActivity(
       "candidate.create",
-      `Curier nou: ${courier.fullName} (${courier.phone})${asDraft ? " — draft" : ""}`,
+      `Curier nou: ${courier.fullName} (${courier.phone || "—"})${asDraft ? " — draft" : ""}${incomplete.length ? ` · ${incomplete.length} câmpuri lipsă` : ""}`,
       "Curieri",
     );
-    toast.success(
-      asDraft ? "Curier salvat ca draft." : "Curier creat.",
-      `${courier.fullName} · ${VEHICLE_TYPE_LABEL[courier.vehicleType]}`,
-    );
+
+    if (incomplete.length > 0) {
+      toast.success(
+        asDraft ? "Draft salvat." : "Curier creat cu date parțiale.",
+        `${courier.fullName} · ${incomplete.length} câmpuri de completat: ${incomplete.slice(0, 3).map((k) => INCOMPLETE_FIELD_LABEL[k]).join(", ")}${incomplete.length > 3 ? "..." : ""}`,
+      );
+    } else {
+      toast.success(
+        asDraft ? "Draft salvat." : "Curier creat.",
+        `${courier.fullName} · ${VEHICLE_TYPE_LABEL[courier.vehicleType]}`,
+      );
+    }
+
     onCreated?.(courier);
     onClose();
   }
+
+  // Live warnings — soft, nu blochează
+  const liveIncomplete = useMemo(() => analyzeForm().incomplete, [form]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const isIncomplete = (key: IncompleteFieldKey) => liveIncomplete.includes(key);
 
   function togglePlatform(p: PlatformKey) {
     setForm((prev) => ({
@@ -251,9 +289,19 @@ export function AddCourierDialog({
             <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-sky-500/20 text-sky-200">
               <Info size={13} />
             </span>
-            <p className="text-[12.5px] text-sky-100/95">
-              Salvează acum, iar datele lipsă vor fi marcate pentru completare.
-            </p>
+            <div className="flex-1 text-[12.5px] text-sky-100/95">
+              <div>Salvează acum, iar datele lipsă vor fi marcate pentru completare.</div>
+              {liveIncomplete.length > 0 && (
+                <div className="mt-1 text-[11.5px] text-amber-200/90">
+                  <strong>{liveIncomplete.length}</strong>{" "}
+                  {liveIncomplete.length === 1 ? "câmp incomplet" : "câmpuri incomplete"} vor fi
+                  marcate pe fișa curierului:{" "}
+                  <span className="font-semibold text-amber-100">
+                    {liveIncomplete.map((k) => INCOMPLETE_FIELD_LABEL[k]).join(", ")}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
 
           {duplicates.length > 0 && <DuplicatesBanner matches={duplicates} />}
@@ -261,7 +309,7 @@ export function AddCourierDialog({
           <div className="grid gap-4 md:grid-cols-2">
             {/* Date curier */}
             <FormCard title="Date curier" icon={UserPlus}>
-              <Field label="Nume complet" required error={errors.fullName}>
+              <Field label="Nume complet" required incomplete={isIncomplete("fullName")} error={errors.fullName}>
                 <input
                   type="text"
                   value={form.fullName}
@@ -271,7 +319,7 @@ export function AddCourierDialog({
                 />
               </Field>
 
-              <Field label="Telefon" required error={errors.phone}>
+              <Field label="Telefon" required incomplete={isIncomplete("phone")} error={errors.phone}>
                 <div className="flex overflow-hidden rounded-lg border border-line bg-card-2 focus-within:border-violet-500/60">
                   <span className="flex items-center gap-1 border-r border-line bg-card-2 px-2.5 text-[13px]">
                     <span className="text-[14px]">🇷🇴</span>
@@ -315,7 +363,7 @@ export function AddCourierDialog({
 
             {/* Configurare activare */}
             <FormCard title="Configurare activare" icon={Settings}>
-              <Field label="Oraș activare" required error={errors.city}>
+              <Field label="Oraș activare" required incomplete={isIncomplete("city")}>
                 <div className="relative">
                   <Building2 size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-dim" />
                   <select
@@ -331,7 +379,7 @@ export function AddCourierDialog({
                 </div>
               </Field>
 
-              <Field label="Platforme" required error={errors.platforms}>
+              <Field label="Platforme" required incomplete={isIncomplete("platforms")}>
                 <div className="flex min-h-[40px] flex-wrap items-center gap-1.5 rounded-lg border border-line bg-card-2 px-2 py-1.5">
                   {form.platforms.length === 0 && (
                     <span className="px-1 text-[11.5px] italic text-fg-dim">
@@ -593,12 +641,14 @@ function FormCard({
 }
 
 function Field({
-  label, required, hint, error, children,
+  label, required, hint, error, incomplete, children,
 }: {
   label: string;
   required?: boolean;
   hint?: string;
   error?: string;
+  /** Soft warning — câmp important dar nu blochează salvarea */
+  incomplete?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -607,7 +657,12 @@ function Field({
         <label className="text-[10.5px] font-semibold uppercase tracking-wider text-fg-dim">
           {label} {required && <span className="text-rose-400">*</span>}
         </label>
-        {hint && (
+        {incomplete && !error && (
+          <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wider text-amber-300">
+            Va fi marcat
+          </span>
+        )}
+        {hint && !incomplete && !error && (
           <span className="rounded-md bg-white/[0.05] px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wider text-fg-dim">
             {hint}
           </span>
@@ -615,6 +670,11 @@ function Field({
       </div>
       {children}
       {error && <span className="text-[11px] text-rose-400">{error}</span>}
+      {incomplete && !error && (
+        <span className="text-[11px] text-amber-400/85">
+          Poți salva acum; îl completezi mai târziu.
+        </span>
+      )}
     </div>
   );
 }

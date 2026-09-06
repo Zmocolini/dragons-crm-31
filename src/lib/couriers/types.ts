@@ -32,6 +32,24 @@ export const COURIER_STATUS_LABEL: Record<CourierStatus, string> = {
   stopped:        "Oprit",
 };
 
+/** Câmpuri cheie tracked pentru checklist „completează mai târziu". */
+export type IncompleteFieldKey =
+  | "fullName" | "phone" | "email" | "nationality"
+  | "city" | "platforms" | "vehicleType" | "vehicleOwnership"
+  | "collaboration";
+
+export const INCOMPLETE_FIELD_LABEL: Record<IncompleteFieldKey, string> = {
+  fullName:          "Nume complet",
+  phone:             "Telefon",
+  email:             "E-mail",
+  nationality:       "Naționalitate",
+  city:              "Oraș activare",
+  platforms:         "Platforme",
+  vehicleType:       "Vehicul",
+  vehicleOwnership:  "Tip vehicul",
+  collaboration:     "Tip colaborare",
+};
+
 export type Courier = {
   id: string;
   fullName: string;
@@ -44,6 +62,7 @@ export type Courier = {
   vehicleOwnership: VehicleOwnership;
   collaboration: CollaborationType;
   status: CourierStatus;
+  incompleteFields: IncompleteFieldKey[];
   createdAtIso: string;
   createdBy: string;
   tenantId: string;
