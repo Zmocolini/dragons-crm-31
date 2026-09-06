@@ -7,7 +7,11 @@ import {
 import {
   DEFAULT_SETTINGS,
   type City,
+  type IntegrationStatus,
+  type IntegrationsState,
   type ModuleKey,
+  type NotificationChannelKey,
+  type PlatformKey,
   type SettingsState,
 } from "./types";
 
@@ -29,6 +33,10 @@ type SettingsContextValue = {
   updateCityStatus: (id: string, status: City["status"]) => void;
   togglePlatform: (key: keyof SettingsState["platforms"], next: boolean) => void;
   isModuleEnabled: (key: ModuleKey) => boolean;
+  // Integrations
+  updateIntegrationPlatform: (key: PlatformKey, patch: Partial<{ status: IntegrationStatus; lastSyncIso: string | null; account: string | null }>) => void;
+  updateCalendar: (patch: Partial<IntegrationsState["calendar"]>) => void;
+  toggleNotificationChannel: (key: NotificationChannelKey, next: boolean) => void;
   hydrated: boolean;
 };
 
@@ -54,6 +62,11 @@ function safeRead(): SettingsState {
       },
       cities:    parsed.cities    ?? DEFAULT_SETTINGS.cities,
       platforms: { ...DEFAULT_SETTINGS.platforms, ...(parsed.platforms ?? {}) },
+      integrations: {
+        platforms: parsed.integrations?.platforms ?? DEFAULT_SETTINGS.integrations.platforms,
+        calendar:  { ...DEFAULT_SETTINGS.integrations.calendar,  ...(parsed.integrations?.calendar ?? {}) },
+        channels:  { ...DEFAULT_SETTINGS.integrations.channels,  ...(parsed.integrations?.channels ?? {}) },
+      },
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -87,15 +100,35 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const updateCityStatus     = useCallback((id: string, status: City["status"]) => setSettings((prev) => ({ ...prev, cities: prev.cities.map((c) => c.id === id ? { ...c, status } : c) })), []);
   const togglePlatform       = useCallback((key: keyof SettingsState["platforms"], next: boolean) => setSettings((prev) => ({ ...prev, platforms: { ...prev.platforms, [key]: next ? "active" : "inactive" } })), []);
   const isModuleEnabled      = useCallback((key: ModuleKey) => settings.modules[key], [settings.modules]);
+  const updateIntegrationPlatform = useCallback((key: PlatformKey, patch: Partial<{ status: IntegrationStatus; lastSyncIso: string | null; account: string | null }>) =>
+    setSettings((prev) => ({
+      ...prev,
+      integrations: {
+        ...prev.integrations,
+        platforms: prev.integrations.platforms.map((p) => p.key === key ? { ...p, ...patch } : p),
+      },
+    })), []);
+  const updateCalendar        = useCallback((patch: Partial<IntegrationsState["calendar"]>) =>
+    setSettings((prev) => ({
+      ...prev,
+      integrations: { ...prev.integrations, calendar: { ...prev.integrations.calendar, ...patch } },
+    })), []);
+  const toggleNotificationChannel = useCallback((key: NotificationChannelKey, next: boolean) =>
+    setSettings((prev) => ({
+      ...prev,
+      integrations: { ...prev.integrations, channels: { ...prev.integrations.channels, [key]: next } },
+    })), []);
 
   const value = useMemo<SettingsContextValue>(
     () => ({
       settings, updateSettings, updateOrganization, updatePlatform,
       toggleModule, updateFleet, toggleVehicleType,
       addCity, removeCity, updateCityStatus, togglePlatform,
-      isModuleEnabled, hydrated,
+      isModuleEnabled,
+      updateIntegrationPlatform, updateCalendar, toggleNotificationChannel,
+      hydrated,
     }),
-    [settings, hydrated, updateSettings, updateOrganization, updatePlatform, toggleModule, updateFleet, toggleVehicleType, addCity, removeCity, updateCityStatus, togglePlatform, isModuleEnabled],
+    [settings, hydrated, updateSettings, updateOrganization, updatePlatform, toggleModule, updateFleet, toggleVehicleType, addCity, removeCity, updateCityStatus, togglePlatform, isModuleEnabled, updateIntegrationPlatform, updateCalendar, toggleNotificationChannel],
   );
 
   return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>;

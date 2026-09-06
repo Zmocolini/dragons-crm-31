@@ -52,6 +52,66 @@ export type PlatformKey = "bolt" | "wolt" | "glovo";
 export type PlatformStatus = "active" | "inactive";
 export type PlatformActive = Record<PlatformKey, PlatformStatus>;
 
+export type IntegrationStatus = "connected" | "verifying" | "disconnected";
+
+export type IntegrationPlatform = {
+  key: PlatformKey;
+  status: IntegrationStatus;
+  lastSyncIso: string | null;
+  account: string | null; // ex: "office@dragondelivery.ro" (afișare, fără tokens)
+};
+
+export type CalendarConfig = {
+  internalEnabled: boolean;
+  googleConnected: boolean;
+  googleAccount: string | null;
+};
+
+export type NotificationChannelKey = "in_app" | "email" | "whatsapp";
+export type NotificationChannels = Record<NotificationChannelKey, boolean>;
+
+export type IntegrationsState = {
+  platforms: IntegrationPlatform[];
+  calendar: CalendarConfig;
+  channels: NotificationChannels;
+};
+
+export const DEFAULT_INTEGRATIONS: IntegrationsState = {
+  platforms: [
+    { key: "bolt",  status: "connected",    lastSyncIso: new Date().toISOString(),                            account: "fleet@dragondelivery.ro" },
+    { key: "wolt",  status: "verifying",    lastSyncIso: new Date(Date.now() - 27 * 3600e3).toISOString(),    account: "fleet@dragondelivery.ro" },
+    { key: "glovo", status: "disconnected", lastSyncIso: null,                                                account: null },
+  ],
+  calendar: {
+    internalEnabled: true,
+    googleConnected: false,
+    googleAccount: null,
+  },
+  channels: {
+    in_app:   true,
+    email:    true,
+    whatsapp: false,
+  },
+};
+
+export const STATUS_LABEL: Record<IntegrationStatus, string> = {
+  connected:    "Conectat",
+  verifying:    "În verificare",
+  disconnected: "Neconectat",
+};
+
+export const CHANNEL_LABEL: Record<NotificationChannelKey, string> = {
+  in_app:   "Notificări în aplicație",
+  email:    "E-mail",
+  whatsapp: "WhatsApp",
+};
+
+export const CHANNEL_DESC: Record<NotificationChannelKey, string> = {
+  in_app:   "Primește notificări în CRM.",
+  email:    "Primește detalii pe e-mail.",
+  whatsapp: "Primește notificări pe WhatsApp.",
+};
+
 export type SettingsState = {
   organization: OrganizationInfo;
   platform: PlatformDefaults;
@@ -59,6 +119,7 @@ export type SettingsState = {
   fleet: FleetConfig;
   cities: City[];
   platforms: PlatformActive;
+  integrations: IntegrationsState;
 };
 
 export const DEFAULT_ORG: OrganizationInfo = {
@@ -123,6 +184,7 @@ export const DEFAULT_SETTINGS: SettingsState = {
   fleet: DEFAULT_FLEET,
   cities: DEFAULT_CITIES,
   platforms: DEFAULT_PLATFORMS,
+  integrations: DEFAULT_INTEGRATIONS,
 };
 
 export const MODULE_LABEL: Record<ModuleKey, string> = {

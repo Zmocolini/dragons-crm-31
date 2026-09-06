@@ -9,6 +9,7 @@ import { RightRail } from "@/components/settings/RightRail";
 import { SettingsTabs, type SettingsTab } from "@/components/settings/SettingsTabs";
 import { TabFlota } from "@/components/settings/tabs/TabFlota";
 import { TabGeneral } from "@/components/settings/tabs/TabGeneral";
+import { TabIntegrari } from "@/components/settings/tabs/TabIntegrari";
 import { TabPlaceholder } from "@/components/settings/tabs/TabPlaceholder";
 
 const VALID: SettingsTab[] = ["general", "flota", "integrari", "utilizatori", "notificari", "securitate", "facturare", "personalizare"];
@@ -67,23 +68,7 @@ function SetariPageInner() {
         <div className="min-w-0">
           {tab === "general"       && <TabGeneral />}
           {tab === "flota"         && <TabFlota />}
-          {tab === "integrari"     && (
-            <TabPlaceholder
-              icon={Plug}
-              title="Integrări"
-              description="Conectează CRM-ul la Bolt Fleet, Wolt Partners, Glovo Partners, Slack, Google Calendar, webhook-uri și alte servicii."
-              planned={[
-                "OAuth Bolt Fleet",
-                "OAuth Wolt Partners",
-                "OAuth Glovo Partners",
-                "Slack notificări echipă",
-                "Google Calendar interviuri",
-                "Webhook-uri pentru evenimente CRM",
-                "Import/export CSV",
-                "API tokens per aplicație",
-              ]}
-            />
-          )}
+          {tab === "integrari"     && <TabIntegrari />}
           {tab === "utilizatori"   && (
             <TabPlaceholder
               icon={Users}
