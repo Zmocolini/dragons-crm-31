@@ -2,6 +2,7 @@
 
 import { Building2, Check, MapPin, Search, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/Toast";
 import { useProfile } from "@/lib/profile/context";
 import { useSession, type FleetTenant, type PlanTier } from "@/lib/rbac/session";
@@ -54,7 +55,7 @@ export function FleetSwitcherDialog({
     );
   }, [fleets, query]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
   function apply() {
     if (selected === activeFleetId) {
@@ -70,12 +71,12 @@ export function FleetSwitcherDialog({
     onClose();
   }
 
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="fleet-switcher-title"
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -175,7 +176,8 @@ export function FleetSwitcherDialog({
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 

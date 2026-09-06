@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ChevronDown, Building2, LogOut, Settings, User, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { ROLE_LABELS } from "@/lib/rbac/roles";
 import { useSession } from "@/lib/rbac/session";
 import { useProfile } from "@/lib/profile/context";
@@ -221,12 +222,14 @@ function LogoutDialog({ onClose }: { onClose: () => void }) {
     };
   }, [onClose]);
 
+  if (typeof document === "undefined") return null;
+
   // TODO(real-users): apelează signOut() Better-Auth + router.push('/login').
-  return (
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -263,6 +266,7 @@ function LogoutDialog({ onClose }: { onClose: () => void }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

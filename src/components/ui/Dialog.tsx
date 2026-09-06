@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
@@ -31,17 +32,19 @@ export function Dialog({
     };
   }, [open, onClose]);
 
-  if (!open) return null;
+  if (!open || typeof document === "undefined") return null;
 
   const width =
     size === "sm" ? "max-w-sm" : size === "lg" ? "max-w-2xl" : "max-w-lg";
 
-  return (
+  // Portal la document.body ca dialog-ul să scape din stacking contexts
+  // create de parents cu backdrop-blur / transform / filter (ex: Header sticky).
+  return createPortal(
     <div
       role="dialog"
       aria-modal="true"
       aria-labelledby="dialog-title"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -67,7 +70,8 @@ export function Dialog({
         </div>
         <div className="mt-4">{children}</div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
