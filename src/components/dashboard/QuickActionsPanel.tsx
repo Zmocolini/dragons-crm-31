@@ -5,6 +5,7 @@ import { ChevronRight, FileText, Plus, Sparkles, UserPlus, Wallet } from "lucide
 import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { AddCandidateDialog } from "./dialogs/AddCandidateDialog";
+import { AddCourierDialog } from "./dialogs/AddCourierDialog";
 import { useSession } from "@/lib/rbac/session";
 import type { Permission } from "@/lib/rbac/roles";
 
@@ -22,15 +23,17 @@ const SECONDARY_ACTIONS: SecondaryAction[] = [
 export function QuickActionsPanel() {
   const { can } = useSession();
   const [addCandidateOpen, setAddCandidateOpen] = useState(false);
+  const [addCourierOpen, setAddCourierOpen]     = useState(false);
 
   const visibleSecondary = SECONDARY_ACTIONS.filter((a) => can(a.permission));
 
   return (
     <div className="space-y-2">
       {can("couriers.create") && (
-        <Link
-          href="/curieri/nou"
-          className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-4 py-3 text-[13.5px] font-semibold text-white shadow-[0_8px_24px_-8px_rgba(99,102,241,0.5)] transition-all hover:shadow-[0_10px_28px_-6px_rgba(99,102,241,0.6)]"
+        <button
+          type="button"
+          onClick={() => setAddCourierOpen(true)}
+          className="group relative flex w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-4 py-3 text-[13.5px] font-semibold text-white shadow-[0_8px_24px_-8px_rgba(99,102,241,0.5)] transition-all hover:shadow-[0_10px_28px_-6px_rgba(99,102,241,0.6)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/30"
         >
           <span
             aria-hidden
@@ -38,7 +41,7 @@ export function QuickActionsPanel() {
           />
           <Plus size={16} className="relative" strokeWidth={2.5} />
           <span className="relative">Curier nou</span>
-        </Link>
+        </button>
       )}
 
       {visibleSecondary.map((action) => {
@@ -71,6 +74,7 @@ export function QuickActionsPanel() {
       })}
 
       <AddCandidateDialog open={addCandidateOpen} onClose={() => setAddCandidateOpen(false)} />
+      <AddCourierDialog open={addCourierOpen} onClose={() => setAddCourierOpen(false)} />
     </div>
   );
 }

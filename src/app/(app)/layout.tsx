@@ -5,6 +5,7 @@ import { UIProvider } from "@/lib/ui/ui-context";
 import { ProfileProvider } from "@/lib/profile/context";
 import { SettingsProvider } from "@/lib/settings/context";
 import { CandidatesProvider } from "@/lib/candidates/context";
+import { CouriersProvider } from "@/lib/couriers/context";
 import { ToastProvider } from "@/components/ui/Toast";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -13,11 +14,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <ProfileProvider>
         <SettingsProvider>
           <CandidatesProvider>
-            <UIProvider>
-              <ToastProvider>
-                <AppShell>{children}</AppShell>
-              </ToastProvider>
-            </UIProvider>
+            <CouriersProvider>
+              <UIProvider>
+                <ToastProvider>
+                  <AppShell>{children}</AppShell>
+                </ToastProvider>
+              </UIProvider>
+            </CouriersProvider>
           </CandidatesProvider>
         </SettingsProvider>
       </ProfileProvider>
