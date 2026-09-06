@@ -6,19 +6,30 @@ import { X } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/nav/nav-items";
 import { useSession } from "@/lib/rbac/session";
 import { useUI } from "@/lib/ui/ui-context";
+import { useSettings } from "@/lib/settings/context";
+import { MODULE_FOR_HREF } from "@/lib/settings/types";
 import { cn } from "@/lib/utils/cn";
 
 export function SidebarNav() {
   const pathname = usePathname();
   const { can } = useSession();
   const { manageNav, isHidden, toggleHiddenHref } = useUI();
+  const { isModuleEnabled } = useSettings();
+
+  // Filtru modul dezactivat din Setări → Flotă și operațiuni
+  const isModuleActive = (href: string) => {
+    const mod = MODULE_FOR_HREF[href];
+    if (!mod) return true;
+    return isModuleEnabled(mod);
+  };
 
   // Dashboard = agregat alerte din celelalte items
   const anyOtherAlert = NAV_ITEMS.some((n) => n.href !== "/" && n.hasAlert && can(n.permission));
 
-  const items = NAV_ITEMS.filter((item) => can(item.permission)).filter((item) =>
-    manageNav ? true : !isHidden(item.href),
-  );
+  const items = NAV_ITEMS
+    .filter((item) => can(item.permission))
+    .filter((item) => manageNav ? true : isModuleActive(item.href))
+    .filter((item) => manageNav ? true : !isHidden(item.href));
 
   return (
     <nav aria-label="Navigare principală" className="flex flex-col gap-0.5 px-3">
