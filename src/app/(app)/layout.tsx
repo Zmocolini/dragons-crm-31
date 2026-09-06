@@ -4,6 +4,7 @@ import { SessionProvider } from "@/lib/rbac/session";
 import { UIProvider } from "@/lib/ui/ui-context";
 import { ProfileProvider } from "@/lib/profile/context";
 import { SettingsProvider } from "@/lib/settings/context";
+import { CandidatesProvider } from "@/lib/candidates/context";
 import { ToastProvider } from "@/components/ui/Toast";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -11,11 +12,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     <SessionProvider>
       <ProfileProvider>
         <SettingsProvider>
-          <UIProvider>
-            <ToastProvider>
-              <AppShell>{children}</AppShell>
-            </ToastProvider>
-          </UIProvider>
+          <CandidatesProvider>
+            <UIProvider>
+              <ToastProvider>
+                <AppShell>{children}</AppShell>
+              </ToastProvider>
+            </UIProvider>
+          </CandidatesProvider>
         </SettingsProvider>
       </ProfileProvider>
     </SessionProvider>

@@ -3,45 +3,26 @@
 import Link from "next/link";
 import { ChevronRight, FileText, Plus, Sparkles, UserPlus, Wallet } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useState } from "react";
+import { AddCandidateDialog } from "./dialogs/AddCandidateDialog";
 import { useSession } from "@/lib/rbac/session";
 import type { Permission } from "@/lib/rbac/roles";
 
-type Action = {
-  label: string;
-  href: string;
-  icon: LucideIcon;
-  permission: Permission;
-};
+type SecondaryAction =
+  | { kind: "link"; label: string; href: string; icon: LucideIcon; permission: Permission }
+  | { kind: "dialog"; id: "add-candidate"; label: string; icon: LucideIcon; permission: Permission };
 
-const SECONDARY_ACTIONS: Action[] = [
-  {
-    label: "Adaugă candidat",
-    href: "/candidati/nou",
-    icon: UserPlus,
-    permission: "candidates.create",
-  },
-  {
-    label: "Încarcă document",
-    href: "/documente/nou",
-    icon: FileText,
-    permission: "documents.upload",
-  },
-  {
-    label: "Înregistrează plată",
-    href: "/plati/nou",
-    icon: Wallet,
-    permission: "payments.create",
-  },
-  {
-    label: "Raport rapid",
-    href: "/rapoarte/rapid",
-    icon: Sparkles,
-    permission: "reports.view",
-  },
+const SECONDARY_ACTIONS: SecondaryAction[] = [
+  { kind: "dialog", id: "add-candidate", label: "Adaugă candidat",     icon: UserPlus, permission: "candidates.create" },
+  { kind: "link",   label: "Încarcă document",   href: "/documente/nou",  icon: FileText, permission: "documents.upload" },
+  { kind: "link",   label: "Înregistrează plată", href: "/plati/nou",     icon: Wallet,   permission: "payments.create" },
+  { kind: "link",   label: "Raport rapid",       href: "/rapoarte/rapid", icon: Sparkles, permission: "reports.view" },
 ];
 
 export function QuickActionsPanel() {
   const { can } = useSession();
+  const [addCandidateOpen, setAddCandidateOpen] = useState(false);
+
   const visibleSecondary = SECONDARY_ACTIONS.filter((a) => can(a.permission));
 
   return (
@@ -62,18 +43,34 @@ export function QuickActionsPanel() {
 
       {visibleSecondary.map((action) => {
         const Icon = action.icon;
+        const cls =
+          "group flex w-full items-center gap-3 rounded-xl border border-line bg-card px-3.5 py-2.5 text-[13px] font-medium text-fg-muted transition-colors hover:bg-card-hover hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40";
+
+        if (action.kind === "dialog") {
+          return (
+            <button
+              key={action.id}
+              type="button"
+              onClick={() => setAddCandidateOpen(true)}
+              className={cls}
+            >
+              <Icon size={15} strokeWidth={2} className="text-fg-dim group-hover:text-fg-muted" />
+              <span className="flex-1 text-left">{action.label}</span>
+              <ChevronRight size={14} className="text-fg-dim" />
+            </button>
+          );
+        }
+
         return (
-          <Link
-            key={action.href}
-            href={action.href}
-            className="group flex items-center gap-3 rounded-xl border border-line bg-card px-3.5 py-2.5 text-[13px] font-medium text-fg-muted transition-colors hover:bg-card-hover hover:text-fg"
-          >
+          <Link key={action.href} href={action.href} className={cls}>
             <Icon size={15} strokeWidth={2} className="text-fg-dim group-hover:text-fg-muted" />
             <span className="flex-1">{action.label}</span>
             <ChevronRight size={14} className="text-fg-dim" />
           </Link>
         );
       })}
+
+      <AddCandidateDialog open={addCandidateOpen} onClose={() => setAddCandidateOpen(false)} />
     </div>
   );
 }
