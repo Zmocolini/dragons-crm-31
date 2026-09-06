@@ -1,16 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { Suspense } from "react";
+import { Suspense, useCallback } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Bell, Brush, ChevronRight, CreditCard, Home, Plug, ShieldCheck, Users } from "lucide-react";
-import { useCallback } from "react";
+import { ChevronRight, Home } from "lucide-react";
 import { RightRail } from "@/components/settings/RightRail";
 import { SettingsTabs, type SettingsTab } from "@/components/settings/SettingsTabs";
+import { TabFacturare } from "@/components/settings/tabs/TabFacturare";
 import { TabFlota } from "@/components/settings/tabs/TabFlota";
 import { TabGeneral } from "@/components/settings/tabs/TabGeneral";
 import { TabIntegrari } from "@/components/settings/tabs/TabIntegrari";
-import { TabPlaceholder } from "@/components/settings/tabs/TabPlaceholder";
+import { TabNotificari } from "@/components/settings/tabs/TabNotificari";
+import { TabPersonalizare } from "@/components/settings/tabs/TabPersonalizare";
+import { TabSecuritate } from "@/components/settings/tabs/TabSecuritate";
 import { TabUtilizatori } from "@/components/settings/tabs/TabUtilizatori";
 
 const VALID: SettingsTab[] = ["general", "flota", "integrari", "utilizatori", "notificari", "securitate", "facturare", "personalizare"];
@@ -71,63 +73,10 @@ function SetariPageInner() {
           {tab === "flota"         && <TabFlota />}
           {tab === "integrari"     && <TabIntegrari />}
           {tab === "utilizatori"   && <TabUtilizatori />}
-          {tab === "notificari"    && (
-            <TabPlaceholder
-              icon={Bell}
-              title="Notificări (nivel organizație)"
-              description="Reguli globale pentru notificările CRM: cine primește, cum, când. Preferințele individuale rămân în Profilul meu → Notificări."
-              planned={[
-                "Reguli globale per categorie",
-                "Escaladare pentru probleme urgente",
-                "Digest zilnic / săptămânal",
-                "Blackout hours (fără notificări pe timp de noapte)",
-              ]}
-            />
-          )}
-          {tab === "securitate"    && (
-            <TabPlaceholder
-              icon={ShieldCheck}
-              title="Securitate organizație"
-              description="Politici de parolă, MFA obligatoriu, SSO, whitelist IP, retenție log-uri."
-              planned={[
-                "Politici parolă (lungime, complexitate)",
-                "2FA obligatoriu pentru roluri sensibile",
-                "SSO (Google Workspace / Microsoft Entra)",
-                "Whitelist IP admin",
-                "Retenție audit logs",
-                "Export GDPR",
-              ]}
-            />
-          )}
-          {tab === "facturare"     && (
-            <TabPlaceholder
-              icon={CreditCard}
-              title="Facturare"
-              description="Planul curent, facturile emise, metode de plată, factori TVA, upgrade."
-              planned={[
-                "Detalii Plan Business",
-                "Metodă de plată",
-                "Istoric facturi (PDF)",
-                "Upgrade / downgrade plan",
-                "Adresă facturare + CUI",
-                "TVA și facturi în lună",
-              ]}
-            />
-          )}
-          {tab === "personalizare" && (
-            <TabPlaceholder
-              icon={Brush}
-              title="Personalizare"
-              description="Culori accent, logo dark/light, semnătură email, template PDF pentru contracte, denumiri custom pentru câmpuri."
-              planned={[
-                "Culoare accent brand",
-                "Logo dark / light variants",
-                "Semnătură email automată",
-                "Template PDF contracte curier",
-                "Câmpuri custom pe profilul curier",
-              ]}
-            />
-          )}
+          {tab === "notificari"    && <TabNotificari />}
+          {tab === "securitate"    && <TabSecuritate />}
+          {tab === "facturare"     && <TabFacturare />}
+          {tab === "personalizare" && <TabPersonalizare />}
         </div>
 
         <aside aria-label="Context Setări" className="min-w-0 xl:sticky xl:top-6 xl:self-start">

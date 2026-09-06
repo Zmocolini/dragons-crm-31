@@ -333,6 +333,164 @@ export const DEFAULT_TEAM: TeamState = {
   },
 };
 
+/* ─── SECURITY ALERTS ─── */
+export type SecurityAlerts = {
+  newLogins: boolean;
+  passwordChanges: boolean;
+  unusualActivity: boolean;
+};
+
+export const DEFAULT_SECURITY_ALERTS: SecurityAlerts = {
+  newLogins:        true,
+  passwordChanges:  true,
+  unusualActivity:  true,
+};
+
+/* ─── NOTIFICATIONS ORG (nivel organizație — distinct de profil user) ─── */
+export type OrgChannelKey = "in_app" | "email" | "push_browser";
+export type OrgChannels = Record<OrgChannelKey, boolean>;
+
+export type OrgCategoryKey =
+  | "payments_couriers"
+  | "activations_blocked"
+  | "docs_expired"
+  | "tasks_followup"
+  | "issues_urgent"
+  | "weekly_reports";
+
+export type OrgCategory = {
+  key: OrgCategoryKey;
+  in_app: boolean;
+  email:  boolean;
+  recipients: string[]; // labels de roluri destinatari
+};
+
+export type PaymentSchedule = {
+  wednesday: boolean; // Încep plățile
+  thursday:  boolean; // Reminder plăți
+  friday:    boolean; // Plăți rămase
+};
+
+export type NotifExtras = {
+  dailyDigest:      boolean;
+  importantOnly:    boolean;
+  urgentSound:      boolean;
+};
+
+export type NotificationsOrg = {
+  channels:   OrgChannels;
+  categories: OrgCategory[];
+  schedule:   PaymentSchedule;
+  extras:     NotifExtras;
+};
+
+export const ORG_CATEGORY_LABEL: Record<OrgCategoryKey, string> = {
+  payments_couriers:    "Plăți curieri",
+  activations_blocked:  "Activări blocate",
+  docs_expired:         "Documente expirate",
+  tasks_followup:       "Task-uri și follow-up",
+  issues_urgent:        "Probleme urgente",
+  weekly_reports:       "Rapoarte săptămânale",
+};
+
+export const DEFAULT_NOTIFICATIONS_ORG: NotificationsOrg = {
+  channels: {
+    in_app:        true,
+    email:         true,
+    push_browser:  false,
+  },
+  categories: [
+    { key: "payments_couriers",    in_app: true,  email: true,  recipients: ["Admin", "Operator plăți", "Subcontractor"] },
+    { key: "activations_blocked",  in_app: true,  email: true,  recipients: ["Responsabil activări", "Subcontractor"] },
+    { key: "docs_expired",         in_app: true,  email: true,  recipients: ["HR", "Manager flotă"] },
+    { key: "tasks_followup",       in_app: true,  email: false, recipients: ["Utilizator asignat"] },
+    { key: "issues_urgent",        in_app: true,  email: true,  recipients: ["Manager flotă", "Owner"] },
+    { key: "weekly_reports",       in_app: false, email: true,  recipients: ["Owner", "Manager flotă"] },
+  ],
+  schedule: {
+    wednesday: true,
+    thursday:  true,
+    friday:    true,
+  },
+  extras: {
+    dailyDigest:    true,
+    importantOnly:  true,
+    urgentSound:    true,
+  },
+};
+
+/* ─── BILLING ─── */
+export type Invoice = {
+  id: string;
+  number: string;
+  dateIso: string;
+  amountRon: number;
+  status: "paid" | "pending" | "overdue";
+};
+
+export type PaymentMethod = {
+  brand: "mastercard" | "visa" | "amex";
+  last4: string;
+  expiresMonth: number;
+  expiresYear: number;
+  holder: string;
+};
+
+export type BillingInfo = {
+  planKey: "starter" | "business" | "enterprise";
+  planLabel: string;
+  planLimit: number;
+  nextBillingIso: string;
+  billingName: string;
+  billingCui: string;
+  billingEmail: string;
+  billingAddress: string;
+  paymentMethod: PaymentMethod;
+  invoices: Invoice[];
+};
+
+export const DEFAULT_BILLING: BillingInfo = {
+  planKey: "business",
+  planLabel: "Plan Business",
+  planLimit: 500,
+  nextBillingIso: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString(),
+  billingName: "Dragon Delivery",
+  billingCui: "RO12345678",
+  billingEmail: "office@dragondelivery.ro",
+  billingAddress: "București, România",
+  paymentMethod: {
+    brand: "mastercard",
+    last4: "4242",
+    expiresMonth: 12,
+    expiresYear: 2028,
+    holder: "Dragon Delivery SRL",
+  },
+  invoices: [
+    { id: "inv_2026_09", number: "DD-2026-09", dateIso: "2026-09-01T09:00:00Z", amountRon: 1990, status: "paid" },
+    { id: "inv_2026_08", number: "DD-2026-08", dateIso: "2026-08-01T09:00:00Z", amountRon: 1990, status: "paid" },
+    { id: "inv_2026_07", number: "DD-2026-07", dateIso: "2026-07-01T09:00:00Z", amountRon: 1990, status: "paid" },
+  ],
+};
+
+/* ─── BRANDING ─── */
+export type BrandingConfig = {
+  primaryColor: string;      // hex
+  accentColor: string;       // hex
+  displayName: string;
+  slogan: string;
+  showSloganInFooter: boolean;
+  sidebarExpandedByDefault: boolean;
+};
+
+export const DEFAULT_BRANDING: BrandingConfig = {
+  primaryColor: "#7c3aed",  // violet-600
+  accentColor:  "#2563eb",  // blue-600
+  displayName:  "Dragon Delivery",
+  slogan:       "MORE THAN DELIVERY",
+  showSloganInFooter: true,
+  sidebarExpandedByDefault: true,
+};
+
 export type SettingsState = {
   organization: OrganizationInfo;
   platform: PlatformDefaults;
@@ -342,6 +500,10 @@ export type SettingsState = {
   platforms: PlatformActive;
   integrations: IntegrationsState;
   team: TeamState;
+  securityAlerts: SecurityAlerts;
+  billing: BillingInfo;
+  branding: BrandingConfig;
+  notificationsOrg: NotificationsOrg;
 };
 
 export const DEFAULT_ORG: OrganizationInfo = {
@@ -408,6 +570,10 @@ export const DEFAULT_SETTINGS: SettingsState = {
   platforms: DEFAULT_PLATFORMS,
   integrations: DEFAULT_INTEGRATIONS,
   team: DEFAULT_TEAM,
+  securityAlerts: DEFAULT_SECURITY_ALERTS,
+  billing: DEFAULT_BILLING,
+  branding: DEFAULT_BRANDING,
+  notificationsOrg: DEFAULT_NOTIFICATIONS_ORG,
 };
 
 export const MODULE_LABEL: Record<ModuleKey, string> = {

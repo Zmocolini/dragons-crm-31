@@ -7,13 +7,19 @@ import {
 import {
   DEFAULT_SETTINGS,
   type AccessConfig,
+  type BillingInfo,
+  type BrandingConfig,
   type City,
   type IntegrationStatus,
   type IntegrationsState,
   type Invitation,
   type ModuleKey,
   type NotificationChannelKey,
+  type NotificationsOrg,
+  type OrgCategoryKey,
   type PlatformKey,
+  type PaymentMethod,
+  type SecurityAlerts,
   type SettingsState,
   type TeamMember,
   type TeamRoleKey,
@@ -48,6 +54,19 @@ type SettingsContextValue = {
   resendInvitation: (id: string) => void;
   cancelInvitation: (id: string) => void;
   updateAccessConfig: (patch: Partial<AccessConfig>) => void;
+  // Security alerts
+  updateSecurityAlerts: (patch: Partial<SecurityAlerts>) => void;
+  // Billing
+  updateBilling: (patch: Partial<BillingInfo>) => void;
+  updatePaymentMethod: (patch: Partial<PaymentMethod>) => void;
+  // Branding
+  updateBranding: (patch: Partial<BrandingConfig>) => void;
+  // Notifications org
+  updateNotificationsOrg: (patch: Partial<NotificationsOrg>) => void;
+  updateOrgChannel: (key: keyof NotificationsOrg["channels"], next: boolean) => void;
+  updateOrgCategory: (key: OrgCategoryKey, patch: { in_app?: boolean; email?: boolean; recipients?: string[] }) => void;
+  updateOrgSchedule: (patch: Partial<NotificationsOrg["schedule"]>) => void;
+  updateOrgExtras: (patch: Partial<NotificationsOrg["extras"]>) => void;
   hydrated: boolean;
 };
 
@@ -82,6 +101,20 @@ function safeRead(): SettingsState {
         members:     parsed.team?.members     ?? DEFAULT_SETTINGS.team.members,
         invitations: parsed.team?.invitations ?? DEFAULT_SETTINGS.team.invitations,
         access:      { ...DEFAULT_SETTINGS.team.access, ...(parsed.team?.access ?? {}) },
+      },
+      securityAlerts: { ...DEFAULT_SETTINGS.securityAlerts, ...(parsed.securityAlerts ?? {}) },
+      billing:        {
+        ...DEFAULT_SETTINGS.billing,
+        ...(parsed.billing ?? {}),
+        paymentMethod: { ...DEFAULT_SETTINGS.billing.paymentMethod, ...(parsed.billing?.paymentMethod ?? {}) },
+        invoices:      parsed.billing?.invoices ?? DEFAULT_SETTINGS.billing.invoices,
+      },
+      branding:       { ...DEFAULT_SETTINGS.branding, ...(parsed.branding ?? {}) },
+      notificationsOrg: {
+        channels:   { ...DEFAULT_SETTINGS.notificationsOrg.channels,   ...(parsed.notificationsOrg?.channels ?? {}) },
+        categories: parsed.notificationsOrg?.categories ?? DEFAULT_SETTINGS.notificationsOrg.categories,
+        schedule:   { ...DEFAULT_SETTINGS.notificationsOrg.schedule,   ...(parsed.notificationsOrg?.schedule ?? {}) },
+        extras:     { ...DEFAULT_SETTINGS.notificationsOrg.extras,     ...(parsed.notificationsOrg?.extras ?? {}) },
       },
     };
   } catch {
@@ -203,6 +236,35 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const updateAccessConfig = useCallback((patch: Partial<AccessConfig>) =>
     setSettings((prev) => ({ ...prev, team: { ...prev.team, access: { ...prev.team.access, ...patch } } })), []);
 
+  const updateSecurityAlerts = useCallback((patch: Partial<SecurityAlerts>) =>
+    setSettings((prev) => ({ ...prev, securityAlerts: { ...prev.securityAlerts, ...patch } })), []);
+
+  const updateBilling = useCallback((patch: Partial<BillingInfo>) =>
+    setSettings((prev) => ({ ...prev, billing: { ...prev.billing, ...patch } })), []);
+
+  const updatePaymentMethod = useCallback((patch: Partial<PaymentMethod>) =>
+    setSettings((prev) => ({ ...prev, billing: { ...prev.billing, paymentMethod: { ...prev.billing.paymentMethod, ...patch } } })), []);
+
+  const updateBranding = useCallback((patch: Partial<BrandingConfig>) =>
+    setSettings((prev) => ({ ...prev, branding: { ...prev.branding, ...patch } })), []);
+
+  const updateNotificationsOrg = useCallback((patch: Partial<NotificationsOrg>) =>
+    setSettings((prev) => ({ ...prev, notificationsOrg: { ...prev.notificationsOrg, ...patch } })), []);
+  const updateOrgChannel = useCallback((key: keyof NotificationsOrg["channels"], next: boolean) =>
+    setSettings((prev) => ({ ...prev, notificationsOrg: { ...prev.notificationsOrg, channels: { ...prev.notificationsOrg.channels, [key]: next } } })), []);
+  const updateOrgCategory = useCallback((key: OrgCategoryKey, patch: { in_app?: boolean; email?: boolean; recipients?: string[] }) =>
+    setSettings((prev) => ({
+      ...prev,
+      notificationsOrg: {
+        ...prev.notificationsOrg,
+        categories: prev.notificationsOrg.categories.map((c) => c.key === key ? { ...c, ...patch } : c),
+      },
+    })), []);
+  const updateOrgSchedule = useCallback((patch: Partial<NotificationsOrg["schedule"]>) =>
+    setSettings((prev) => ({ ...prev, notificationsOrg: { ...prev.notificationsOrg, schedule: { ...prev.notificationsOrg.schedule, ...patch } } })), []);
+  const updateOrgExtras = useCallback((patch: Partial<NotificationsOrg["extras"]>) =>
+    setSettings((prev) => ({ ...prev, notificationsOrg: { ...prev.notificationsOrg, extras: { ...prev.notificationsOrg.extras, ...patch } } })), []);
+
   const value = useMemo<SettingsContextValue>(
     () => ({
       settings, updateSettings, updateOrganization, updatePlatform,
@@ -212,6 +274,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       updateIntegrationPlatform, updateCalendar, toggleNotificationChannel,
       addTeamMember, updateTeamMember, removeTeamMember,
       resendInvitation, cancelInvitation, updateAccessConfig,
+      updateSecurityAlerts, updateBilling, updatePaymentMethod, updateBranding,
+      updateNotificationsOrg, updateOrgChannel, updateOrgCategory, updateOrgSchedule, updateOrgExtras,
       hydrated,
     }),
     [
@@ -223,6 +287,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       updateIntegrationPlatform, updateCalendar, toggleNotificationChannel,
       addTeamMember, updateTeamMember, removeTeamMember,
       resendInvitation, cancelInvitation, updateAccessConfig,
+      updateSecurityAlerts, updateBilling, updatePaymentMethod, updateBranding,
+      updateNotificationsOrg, updateOrgChannel, updateOrgCategory, updateOrgSchedule, updateOrgExtras,
     ],
   );
 
