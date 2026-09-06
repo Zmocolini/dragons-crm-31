@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { ROLE_LABELS } from "@/lib/rbac/roles";
 import { useSession } from "@/lib/rbac/session";
 import { useProfile } from "@/lib/profile/context";
+import { FleetSwitcherDialog } from "./FleetSwitcherDialog";
 import { cn } from "@/lib/utils/cn";
 
 type OpenDialog = null | "tenant" | "logout";
@@ -112,10 +113,11 @@ export function UserMenu() {
               icon={<Building2 size={16} />}
               iconTone="text-amber-300"
               title="Schimbă flota"
-              subtitle="Selectează o altă flotă"
+              subtitle={`Activă: ${user.activeTenant.name}`}
               onClick={() => {
                 closeMenu();
-                setDialog("tenant");
+                // scurt delay ca dropdown-ul să dispară înainte de dialog (evită „artefacte")
+                setTimeout(() => setDialog("tenant"), 50);
               }}
             />
 
@@ -129,19 +131,20 @@ export function UserMenu() {
               danger
               onClick={() => {
                 closeMenu();
-                setDialog("logout");
+                setTimeout(() => setDialog("logout"), 50);
               }}
             />
           </div>
         </div>
       )}
 
-      {dialog === "tenant" && (
-        <TenantDialog current={user.activeTenant.name} onClose={() => setDialog(null)} />
-      )}
-      {dialog === "logout" && (
-        <LogoutDialog onClose={() => setDialog(null)} />
-      )}
+      {/* Fleet switcher — folosim același dialog cu sidebar & Setări */}
+      <FleetSwitcherDialog
+        open={dialog === "tenant"}
+        onClose={() => setDialog(null)}
+      />
+
+      {dialog === "logout" && <LogoutDialog onClose={() => setDialog(null)} />}
     </div>
   );
 }
@@ -206,26 +209,24 @@ function MenuItem({
   );
 }
 
-function DialogShell({
-  title,
-  children,
-  onClose,
-}: {
-  title: string;
-  children: React.ReactNode;
-  onClose: () => void;
-}) {
+function LogoutDialog({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      document.body.style.overflow = prevOverflow;
+    };
   }, [onClose]);
 
+  // TODO(real-users): apelează signOut() Better-Auth + router.push('/login').
   return (
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
@@ -240,79 +241,28 @@ function DialogShell({
         >
           <X size={16} />
         </button>
-        <h2 className="text-[16px] font-bold text-fg">{title}</h2>
-        {children}
+        <h2 className="text-[16px] font-bold text-fg">Deconectare</h2>
+        <p className="mt-3 text-[13px] text-fg-muted">
+          Sigur vrei să te deconectezi din cont?
+        </p>
+        <div className="mt-6 flex items-center justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-line bg-card-2 px-4 py-2 text-[12.5px] font-medium text-fg-muted transition-colors hover:bg-card-hover"
+          >
+            Anulează
+          </button>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-rose-500/90 px-4 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-rose-500"
+          >
+            <LogOut size={13} />
+            Deconectează-mă
+          </button>
+        </div>
       </div>
     </div>
-  );
-}
-
-function TenantDialog({ current, onClose }: { current: string; onClose: () => void }) {
-  // TODO(real-users): fetch listă tenants accesibile + server action pentru switch.
-  const availableTenants = [{ id: "t_dragon", name: current, active: true }];
-
-  return (
-    <DialogShell title="Schimbă flota" onClose={onClose}>
-      <p className="mt-3 text-[13px] text-fg-muted">
-        Selectează flota cu care vrei să lucrezi.
-      </p>
-      <ul className="mt-4 space-y-1.5">
-        {availableTenants.map((t) => (
-          <li key={t.id}>
-            <button
-              type="button"
-              onClick={onClose}
-              className={cn(
-                "flex w-full items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors",
-                t.active
-                  ? "border-violet-500/50 bg-violet-500/10 text-fg"
-                  : "border-line bg-card-2/40 text-fg-muted hover:bg-card-hover",
-              )}
-            >
-              <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-red-600 text-[13px] font-black text-white">
-                {t.name.charAt(0)}
-              </span>
-              <span className="flex-1 text-[13px] font-semibold">{t.name}</span>
-              {t.active && (
-                <span className="text-[10.5px] font-semibold uppercase tracking-wider text-violet-300">
-                  Activă
-                </span>
-              )}
-            </button>
-          </li>
-        ))}
-      </ul>
-      <p className="mt-4 text-[11px] text-fg-dim">
-        Alte flote apar aici odată ce contul tău e adăugat ca membru.
-      </p>
-    </DialogShell>
-  );
-}
-
-function LogoutDialog({ onClose }: { onClose: () => void }) {
-  // TODO(real-users): apelează signOut() Better-Auth + router.push('/login').
-  return (
-    <DialogShell title="Deconectare" onClose={onClose}>
-      <p className="mt-3 text-[13px] text-fg-muted">
-        Sigur vrei să te deconectezi din cont?
-      </p>
-      <div className="mt-6 flex items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-lg border border-line bg-card-2 px-4 py-2 text-[12.5px] font-medium text-fg-muted transition-colors hover:bg-card-hover"
-        >
-          Anulează
-        </button>
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-rose-500/90 px-4 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-rose-500"
-        >
-          <LogOut size={13} />
-          Deconectează-mă
-        </button>
-      </div>
-    </DialogShell>
   );
 }

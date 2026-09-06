@@ -1,10 +1,9 @@
 "use client";
 
 import { Eye, EyeOff } from "lucide-react";
+import { FleetCard } from "./FleetCard";
 import { Logo } from "./Logo";
-import { PlanUsage } from "./PlanUsage";
 import { SidebarNav } from "./SidebarNav";
-import { TenantSwitcher } from "./TenantSwitcher";
 import { useUI } from "@/lib/ui/ui-context";
 import { cn } from "@/lib/utils/cn";
 
@@ -48,12 +47,9 @@ export function Sidebar() {
         <SidebarNav />
       </div>
 
+      {/* Card unic: flotă activă + plan + Schimbă flota. */}
       <div className="border-t border-line/80 px-4 pt-3 pb-2">
-        <TenantSwitcher />
-      </div>
-
-      <div className="px-4 pt-3 pb-2">
-        <PlanUsage />
+        <FleetCard />
       </div>
 
       <div className="px-4 pt-2 pb-3 text-[10px] font-mono text-fg-dim">v3.1.0</div>
