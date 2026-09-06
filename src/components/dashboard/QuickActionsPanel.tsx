@@ -6,6 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { AddCandidateDialog } from "./dialogs/AddCandidateDialog";
 import { AddCourierDialog } from "./dialogs/AddCourierDialog";
+import { QuickReportDialog } from "./dialogs/QuickReportDialog";
 import { RecordPaymentDialog } from "./dialogs/RecordPaymentDialog";
 import { useSession } from "@/lib/rbac/session";
 import type { Permission, Role } from "@/lib/rbac/roles";
@@ -28,7 +29,7 @@ type PrimaryLink = {
 };
 type PrimaryDialog = {
   kind: "dialog";
-  id: "add-candidate" | "record-payment";
+  id: "add-candidate" | "record-payment" | "quick-report";
   label: string;
   icon: LucideIcon;
   permission: Permission;
@@ -47,9 +48,9 @@ const PRIMARY_ACTIONS: PrimaryAction[] = [
     roles: ["global_owner", "subcontractor_owner", "operator_payments"],
   },
   {
-    kind: "link",
+    kind: "dialog",
+    id: "quick-report",
     label: "Raport rapid",
-    href: "/rapoarte/rapid",
     icon: Sparkles,
     permission: "reports.view",
     roles: ["global_owner", "subcontractor_owner"],
@@ -68,6 +69,7 @@ export function QuickActionsPanel() {
   const [addCandidateOpen, setAddCandidateOpen] = useState(false);
   const [addCourierOpen, setAddCourierOpen] = useState(false);
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
+  const [quickReportOpen, setQuickReportOpen] = useState(false);
 
   const visiblePrimary = PRIMARY_ACTIONS.filter((a) => {
     if (!can(a.permission)) return false;
@@ -103,6 +105,7 @@ export function QuickActionsPanel() {
           const onClick = () => {
             if (action.id === "add-candidate") setAddCandidateOpen(true);
             else if (action.id === "record-payment") setRecordPaymentOpen(true);
+            else if (action.id === "quick-report") setQuickReportOpen(true);
           };
           return (
             <button
@@ -149,6 +152,7 @@ export function QuickActionsPanel() {
       <AddCandidateDialog open={addCandidateOpen} onClose={() => setAddCandidateOpen(false)} />
       <AddCourierDialog open={addCourierOpen} onClose={() => setAddCourierOpen(false)} />
       <RecordPaymentDialog open={recordPaymentOpen} onClose={() => setRecordPaymentOpen(false)} />
+      <QuickReportDialog open={quickReportOpen} onClose={() => setQuickReportOpen(false)} />
     </div>
   );
 }
