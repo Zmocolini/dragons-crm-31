@@ -15,6 +15,7 @@ export function TabPersonal() {
   const { profile } = useProfile();
   const [editOpen, setEditOpen] = useState(false);
   const [bioOpen, setBioOpen]   = useState(false);
+  const displayName = profile.displayName ?? user.name;
 
   return (
     <div className="space-y-5">
@@ -34,7 +35,7 @@ export function TabPersonal() {
           </button>
         </header>
         <div className="grid gap-3 p-5 sm:grid-cols-2 xl:grid-cols-3">
-          <FieldCard icon={User}       label="Nume complet" value={user.name} />
+          <FieldCard icon={User}       label="Nume complet" value={displayName} />
           <FieldCard icon={Mail}       label="Email"        value={user.email} />
           <FieldCard icon={Phone}      label="Telefon"      value={profile.phone || "Necompletat"} muted={!profile.phone} />
           <FieldCard icon={Briefcase}  label="Funcție"      value={ROLE_LABELS[user.role]} />
@@ -79,7 +80,7 @@ export function TabPersonal() {
       <EditPersonalDialog
         open={editOpen}
         onClose={() => setEditOpen(false)}
-        initialName={user.name}
+        initialName={displayName}
       />
       <EditBioDialog open={bioOpen} onClose={() => setBioOpen(false)} />
     </div>

@@ -48,7 +48,10 @@ export function SidebarNav() {
             />
             <span className="flex-1 truncate">{item.label}</span>
             {item.badge && (
-              <span className="rounded-md bg-violet-500/20 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-violet-300">
+              <span
+                data-non-essential
+                className="rounded-md bg-violet-500/20 px-1.5 py-0.5 text-[9px] font-bold tracking-wide text-violet-300"
+              >
                 {item.badge}
               </span>
             )}
@@ -98,6 +101,7 @@ export function SidebarNav() {
           <Link
             key={item.href}
             href={item.href}
+            data-density-row
             aria-current={isActive ? "page" : undefined}
             className={cn(
               "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",

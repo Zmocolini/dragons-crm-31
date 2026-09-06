@@ -5,17 +5,20 @@ import { ChevronDown, Building2, LogOut, Settings, User, X } from "lucide-react"
 import { useEffect, useRef, useState } from "react";
 import { ROLE_LABELS } from "@/lib/rbac/roles";
 import { useSession } from "@/lib/rbac/session";
+import { useProfile } from "@/lib/profile/context";
 import { cn } from "@/lib/utils/cn";
 
 type OpenDialog = null | "tenant" | "logout";
 
 export function UserMenu() {
   const { user } = useSession();
+  const { profile } = useProfile();
   const [open, setOpen] = useState(false);
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const initials = user.name
+  const displayName = profile.displayName ?? user.name;
+  const initials = displayName
     .split(" ")
     .map((n) => n[0])
     .slice(0, 2)
@@ -60,7 +63,7 @@ export function UserMenu() {
           {initials}
         </span>
         <span className="leading-tight">
-          <span className="block text-[12.5px] font-semibold text-fg">{user.name}</span>
+          <span className="block text-[12.5px] font-semibold text-fg">{displayName}</span>
           <span className="block text-[10.5px] text-fg-dim">{ROLE_LABELS[user.role]}</span>
         </span>
         <ChevronDown
@@ -81,7 +84,7 @@ export function UserMenu() {
               {initials}
             </span>
             <div className="min-w-0 flex-1 leading-tight">
-              <div className="text-[13.5px] font-semibold text-fg">{user.name}</div>
+              <div className="text-[13.5px] font-semibold text-fg">{displayName}</div>
               <div className="text-[11.5px] text-fg-muted">{ROLE_LABELS[user.role]}</div>
               <div className="mt-0.5 truncate text-[11px] text-fg-dim">{user.email}</div>
             </div>

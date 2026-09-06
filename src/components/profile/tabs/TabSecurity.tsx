@@ -25,23 +25,8 @@ const SEC_LABEL: Record<SecurityEvent["kind"] | "profile.change", string> = {
 
 export function TabSecurity() {
   const [pwOpen, setPwOpen] = useState(false);
-  const [twoFAConfirm, setTwoFAConfirm] = useState(false);
-  const { profile, updateProfile, sessions, revokeSession, revokeAllOtherSessions, securityEvents, addSecurityEvent, logActivity } = useProfile();
+  const { sessions, revokeSession, revokeAllOtherSessions, securityEvents, addSecurityEvent, logActivity } = useProfile();
   const toast = useToast();
-
-  const twoFA = profile.twoFactorEnabled;
-
-  function toggleTwoFA() {
-    // TODO(real-users): setup TOTP flow real (QR + verify code + recovery codes).
-    updateProfile({ twoFactorEnabled: !twoFA });
-    addSecurityEvent(twoFA ? "2fa.disabled" : "2fa.enabled", twoFA ? "2FA dezactivat" : "2FA activat");
-    logActivity("preferences.update", twoFA ? "2FA dezactivat" : "2FA activat", "Securitate");
-    toast.success(
-      twoFA ? "2FA dezactivat" : "2FA marcat ca activ",
-      "Structura este pregătită; flow-ul TOTP real se activează după integrarea backend-ului.",
-    );
-    setTwoFAConfirm(false);
-  }
 
   function revoke(id: string, device: string) {
     revokeSession(id);
@@ -83,10 +68,10 @@ export function TabSecurity() {
         </button>
       </section>
 
-      {/* 2FA compact card */}
+      {/* 2FA — pur informativ, în dezvoltare (fără toggle fake) */}
       <section className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-card p-4">
         <div className="flex items-center gap-3">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-line bg-card-2 text-fg-muted">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-line bg-card-2 text-fg-dim">
             <Shield size={17} />
           </span>
           <div>
@@ -97,26 +82,17 @@ export function TabSecurity() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span
-            className={cn(
-              "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-semibold",
-              twoFA
-                ? "border-emerald-500/40 bg-emerald-500/10 text-emerald-300"
-                : "border-rose-500/40 bg-rose-500/10 text-rose-300",
-            )}
-          >
-            <span className={cn("inline-block h-1.5 w-1.5 rounded-full", twoFA ? "bg-emerald-400" : "bg-rose-400")} />
-            {twoFA ? "Activ" : "Inactiv"}
+          <span className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-semibold text-fg-dim">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-fg-dim/70" />
+            În dezvoltare
           </span>
           <button
             type="button"
-            onClick={() => setTwoFAConfirm(true)}
-            className={cn(
-              "rounded-lg px-3.5 py-2 text-[12.5px] font-semibold text-white",
-              twoFA ? "bg-rose-600 hover:bg-rose-500" : "bg-violet-600 hover:bg-violet-500",
-            )}
+            disabled
+            title="Autentificarea în doi pași va fi disponibilă într-o versiune viitoare."
+            className="cursor-not-allowed rounded-lg border border-line bg-card-2/60 px-3.5 py-2 text-[12.5px] font-semibold text-fg-dim"
           >
-            {twoFA ? "Dezactivează" : "Activează"}
+            Indisponibil
           </button>
         </div>
       </section>
@@ -272,48 +248,6 @@ export function TabSecurity() {
 
       {/* Dialogs */}
       <ChangePasswordDialog open={pwOpen} onClose={() => setPwOpen(false)} />
-
-      {twoFAConfirm && (
-        <div
-          role="dialog"
-          aria-modal
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-          onClick={() => setTwoFAConfirm(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-2xl border border-line bg-card p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-[16px] font-bold text-fg">
-              {twoFA ? "Dezactivezi 2FA?" : "Activezi 2FA?"}
-            </h2>
-            <p className="mt-3 text-[13px] text-fg-muted">
-              {twoFA
-                ? "Contul tău va folosi doar parola pentru autentificare. Recomandăm să păstrezi 2FA activ."
-                : "Vei primi un cod suplimentar la fiecare autentificare. În versiunea demo activarea marchează starea; setup-ul TOTP real se face după integrarea backend-ului."}
-            </p>
-            <div className="mt-6 flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setTwoFAConfirm(false)}
-                className="rounded-lg border border-line bg-card-2 px-4 py-2 text-[12.5px] font-medium text-fg-muted hover:bg-card-hover"
-              >
-                Anulează
-              </button>
-              <button
-                type="button"
-                onClick={toggleTwoFA}
-                className={cn(
-                  "rounded-lg px-4 py-2 text-[12.5px] font-semibold text-white",
-                  twoFA ? "bg-rose-600 hover:bg-rose-500" : "bg-violet-600 hover:bg-violet-500",
-                )}
-              >
-                {twoFA ? "Dezactivează 2FA" : "Activează 2FA"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

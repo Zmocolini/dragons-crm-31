@@ -139,21 +139,39 @@ html[data-animations-off] *::after {
   }
 }
 
-/* ── FOCUS MODE ─────────────────────────────────────────────────── */
+/* ── FOCUS MODE — reduce vizual elementele marcate ────────────────── */
 html[data-focus-mode] [data-non-essential] {
-  opacity: 0.35;
-  filter: grayscale(0.4);
-  transition: opacity 200ms;
+  opacity: 0.25 !important;
+  filter: grayscale(0.7) !important;
+  transition: opacity 200ms, filter 200ms;
 }
 html[data-focus-mode] [data-non-essential]:hover {
-  opacity: 1;
-  filter: none;
+  opacity: 1 !important;
+  filter: none !important;
 }
 
-/* ── DENSITY ────────────────────────────────────────────────────── */
-html[data-density="compact"] {
-  --density-y: 6px;
+/* ── SUGESTII/TIPS — ascunde elementele marcate data-tip când OFF ──── */
+html[data-tips-off] [data-tip] {
+  display: none !important;
 }
-html[data-density="aerisit"] {
-  --density-y: 16px;
+
+/* ── DENSITY — variază padding-uri pe tabele/carduri/nav ──────────── */
+html[data-density="compact"] table td,
+html[data-density="compact"] table th {
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+html[data-density="aerisit"] table td,
+html[data-density="aerisit"] table th {
+  padding-top: 18px !important;
+  padding-bottom: 18px !important;
+}
+
+html[data-density="compact"] [data-density-row] {
+  padding-top: 4px !important;
+  padding-bottom: 4px !important;
+}
+html[data-density="aerisit"] [data-density-row] {
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
 }

@@ -14,7 +14,8 @@ export function ProfileHero() {
   const { profile } = useProfile();
   const [uploadOpen, setUploadOpen] = useState(false);
 
-  const initials = user.name
+  const displayName = profile.displayName ?? user.name;
+  const initials = displayName
     .split(" ")
     .map((n) => n[0])
     .slice(0, 2)
@@ -29,7 +30,7 @@ export function ProfileHero() {
             {profile.avatarDataUrl ? (
               <Image
                 src={profile.avatarDataUrl}
-                alt={user.name}
+                alt={displayName}
                 width={140}
                 height={140}
                 className="h-full w-full object-cover"
@@ -51,7 +52,7 @@ export function ProfileHero() {
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-3">
-            <h2 className="text-[24px] font-bold text-fg">{user.name}</h2>
+            <h2 className="text-[24px] font-bold text-fg">{displayName}</h2>
             <span className="inline-flex items-center gap-1 rounded-md border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-semibold text-emerald-300">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
               Activ

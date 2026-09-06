@@ -81,10 +81,10 @@ export function RightColumn({ onOpenTab }: Props) {
           <QuickRow
             icon={<ShieldOff size={14} />}
             title="Autentificare în doi pași"
-            subtitle="Protejează-ți contul"
+            subtitle="Funcție în dezvoltare"
             trailing={
-              <span className="rounded-md border border-rose-500/30 bg-rose-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-rose-300">
-                Inactiv
+              <span className="rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-fg-dim">
+                Curând
               </span>
             }
             onClick={() => onOpenTab("security")}
@@ -107,7 +107,7 @@ export function RightColumn({ onOpenTab }: Props) {
           <QuickRow
             icon={<Bell size={14} />}
             title="Notificări"
-            subtitle="Gestionează notificările pe email și în aplicație"
+            subtitle="Gestionează notificările în aplicație"
             onClick={() => onOpenTab("notifications")}
           />
           <QuickRow
@@ -125,34 +125,55 @@ export function RightColumn({ onOpenTab }: Props) {
         </ul>
       </section>
 
-      {/* DANGER ZONE — link către Recycle Bin */}
-      <Link
-        href="/profil/recycle-bin"
-        className="block rounded-2xl border border-rose-500/25 bg-rose-500/[0.04] p-4 transition-colors hover:bg-rose-500/[0.07]"
-      >
-        <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300">
-            <Trash2 size={16} />
+      {/* DANGER ZONE — 2 acțiuni distincte per spec: Recycle Bin (entități) + Șterge cont (personal) */}
+      <section className="rounded-2xl border border-rose-500/25 bg-rose-500/[0.04] p-4">
+        <div className="flex items-center gap-2.5">
+          <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-rose-500/30 bg-rose-500/10 text-rose-300">
+            <Trash2 size={15} />
           </span>
-          <div className="min-w-0 flex-1">
+          <div>
             <div className="text-[10.5px] font-semibold uppercase tracking-wider text-rose-300/80">
               Zonă periculoasă
             </div>
-            <div className="text-[13.5px] font-bold text-fg">Șterge contul</div>
-            <div className="mt-0.5 text-[11.5px] text-fg-muted">
-              Această acțiune nu poate fi anulată.
-            </div>
+            <div className="text-[14px] font-bold text-fg">Acțiuni ireversibile</div>
           </div>
-          <ChevronRight size={16} className="text-rose-300/70" />
         </div>
-      </Link>
 
-      <button
-        type="button"
-        onClick={() => setDelOpen(true)}
-        className="hidden"
-        aria-hidden
-      />
+        <div className="mt-3 space-y-2">
+          <Link
+            href="/profil/recycle-bin"
+            className="flex items-center gap-3 rounded-xl border border-line bg-card px-3 py-2.5 transition-colors hover:bg-card-hover"
+          >
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-line bg-card-2 text-fg-muted">
+              <Trash2 size={13} />
+            </span>
+            <span className="min-w-0 flex-1 leading-tight">
+              <span className="block text-[12.5px] font-semibold text-fg">Elemente șterse</span>
+              <span className="mt-0.5 block text-[10.5px] text-fg-dim">
+                Restaurează sau șterge definitiv (curieri, documente, task-uri)
+              </span>
+            </span>
+            <ChevronRight size={13} className="text-fg-dim" />
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => setDelOpen(true)}
+            className="flex w-full items-center gap-3 rounded-xl border border-rose-500/40 bg-rose-500/10 px-3 py-2.5 text-left transition-colors hover:bg-rose-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/40"
+          >
+            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-rose-500/40 bg-rose-500/10 text-rose-300">
+              <Trash2 size={13} />
+            </span>
+            <span className="min-w-0 flex-1 leading-tight">
+              <span className="block text-[12.5px] font-semibold text-rose-200">Șterge contul</span>
+              <span className="mt-0.5 block text-[10.5px] text-rose-300/70">
+                Șterge definitiv contul și toate datele personale
+              </span>
+            </span>
+            <ChevronRight size={13} className="text-rose-300/70" />
+          </button>
+        </div>
+      </section>
 
       {/* Dialogs */}
       <PlanDialog

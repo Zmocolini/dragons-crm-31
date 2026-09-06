@@ -19,6 +19,7 @@ export type NotificationPrefKey =
 export type NotificationPrefs = Record<NotificationPrefKey, Record<NotificationChannel, boolean>>;
 
 export type ProfileData = {
+  displayName: string | null; // override peste session.user.name (mock/demo)
   phone: string;
   location: string;
   bio: string;
@@ -103,6 +104,7 @@ export const DEFAULT_NOTIFICATIONS: NotificationPrefs = {
 };
 
 export const DEFAULT_PROFILE: ProfileData = {
+  displayName: null,
   phone: "+40 722 123 456",
   location: "București, România",
   bio: "Coordonez operațiunile Dragon Delivery și mă asigur că echipa noastră crește sustenabil.\nFocus pe oameni, procese și performanță.",

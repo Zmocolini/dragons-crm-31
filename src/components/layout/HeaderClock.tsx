@@ -104,7 +104,7 @@ export function HeaderClock() {
             </span>
           )}
         </div>
-        <div className="text-[10.5px] text-fg-dim">{date}</div>
+        <div data-non-essential className="text-[10.5px] text-fg-dim">{date}</div>
       </div>
     </div>
   );

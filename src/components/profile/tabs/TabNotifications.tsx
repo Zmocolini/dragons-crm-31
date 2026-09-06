@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  AlertTriangle, Bell, CheckSquare, FileText, Info, Megaphone,
+  AlertTriangle, CheckSquare, FileText, Info, Megaphone,
   ShieldCheck, Users, Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
@@ -11,7 +11,7 @@ import { useSession } from "@/lib/rbac/session";
 import { hasPermission } from "@/lib/rbac/roles";
 import { useToast } from "@/components/ui/Toast";
 import { Switch } from "@/components/ui/Switch";
-import type { NotificationChannel, NotificationPrefKey, NotificationPrefs } from "@/lib/profile/types";
+import type { NotificationPrefKey, NotificationPrefs } from "@/lib/profile/types";
 import type { Permission } from "@/lib/rbac/roles";
 import { cn } from "@/lib/utils/cn";
 
@@ -47,13 +47,16 @@ export function TabNotifications() {
 
   const visible = ROWS.filter((r) => !r.permission || hasPermission(user.role, r.permission));
 
-  function toggle(key: NotificationPrefKey, ch: NotificationChannel, value: boolean) {
-    setDraft((prev) => ({ ...prev, [key]: { ...prev[key], [ch]: value } }));
+  function toggle(key: NotificationPrefKey, value: boolean) {
+    setDraft((prev) => ({
+      ...prev,
+      [key]: { in_app: value, email: false }, // email dezactivat global — vezi TabNotifications
+    }));
   }
 
   function save() {
     updateProfile({ notifications: draft });
-    logActivity("notification_preferences.update", "Actualizare notificări");
+    logActivity("notification_preferences.update", "Actualizare notificări în aplicație");
     toast.success("Preferințele notificări au fost salvate.");
   }
 
@@ -68,7 +71,7 @@ export function TabNotifications() {
           <div>
             <h3 className="text-[15px] font-semibold text-fg">Preferințe notificări</h3>
             <p className="text-[11.5px] text-fg-muted">
-              Alege ce notificări vrei să primești și pe ce canale.
+              Alege ce notificări vrei să primești în aplicație.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -96,18 +99,11 @@ export function TabNotifications() {
         </header>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] border-collapse">
+          <table className="w-full min-w-[640px] border-collapse">
             <thead className="border-b border-line/50">
               <tr>
-                <TH className="w-[240px]">Categorie</TH>
-                <TH className="w-[130px] text-center">
-                  În aplicație
-                  <div className="mt-0.5 text-[9.5px] font-medium text-fg-dim">Notificări în CRM</div>
-                </TH>
-                <TH className="w-[130px] text-center">
-                  Email
-                  <div className="mt-0.5 text-[9.5px] font-medium text-fg-dim">Notificări pe email</div>
-                </TH>
+                <TH className="w-[260px]">Categorie</TH>
+                <TH className="w-[130px] text-center">Activ</TH>
                 <TH>Descriere</TH>
               </tr>
             </thead>
@@ -127,17 +123,8 @@ export function TabNotifications() {
                       <div className="inline-flex">
                         <Switch
                           checked={p.in_app}
-                          onChange={(v) => toggle(r.key, "in_app", v)}
-                          ariaLabel={`${r.label} — în aplicație`}
-                        />
-                      </div>
-                    </TD>
-                    <TD className="text-center">
-                      <div className="inline-flex">
-                        <Switch
-                          checked={p.email}
-                          onChange={(v) => toggle(r.key, "email", v)}
-                          ariaLabel={`${r.label} — email`}
+                          onChange={(v) => toggle(r.key, v)}
+                          ariaLabel={`${r.label} — activ`}
                         />
                       </div>
                     </TD>
@@ -147,7 +134,7 @@ export function TabNotifications() {
               })}
               {visible.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="px-5 py-8 text-center text-[12.5px] text-fg-muted">
+                  <td colSpan={3} className="px-5 py-8 text-center text-[12.5px] text-fg-muted">
                     Rolul tău nu are categorii de notificare disponibile.
                   </td>
                 </tr>
@@ -162,7 +149,8 @@ export function TabNotifications() {
           </span>
           <div>
             <strong className="text-fg">Notă:</strong> Vei primi întotdeauna notificări critice legate de
-            securitatea contului, indiferent de setările de mai sus.
+            securitatea contului, indiferent de setările de mai sus. Notificările prin email nu sunt
+            disponibile momentan.
           </div>
         </div>
       </section>
@@ -186,6 +174,3 @@ function TH({ children, className }: { children: React.ReactNode; className?: st
 function TD({ children, className }: { children: React.ReactNode; className?: string }) {
   return <td className={cn("px-5 py-3 align-middle", className)}>{children}</td>;
 }
-
-// unused imports guard
-void Bell;

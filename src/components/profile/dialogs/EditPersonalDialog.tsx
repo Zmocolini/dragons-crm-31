@@ -48,7 +48,12 @@ export function EditPersonalDialog({
   function save() {
     if (!validate()) return;
     // TODO(real-users): server action updateProfile({ name, phone, location, timezone }) + revalidate session.
-    updateProfile({ phone: phone.trim(), location: location.trim(), timezone });
+    updateProfile({
+      displayName: name.trim(),
+      phone: phone.trim(),
+      location: location.trim(),
+      timezone,
+    });
     logActivity("profile.update", "Detalii personale");
     toast.success("Profilul a fost actualizat.");
     onClose();

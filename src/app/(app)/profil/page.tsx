@@ -1,5 +1,6 @@
 "use client";
 
+import { Lightbulb } from "lucide-react";
 import { useState } from "react";
 import { ProfileBreadcrumb } from "@/components/profile/Breadcrumb";
 import { ProfileHero } from "@/components/profile/ProfileHero";
@@ -30,6 +31,21 @@ export default function ProfilPage() {
         <p className="max-w-sm text-[11.5px] italic text-fg-dim md:text-right">
           „O echipă puternică începe cu oameni bine organizați."
         </p>
+      </div>
+
+      <div
+        data-tip
+        className="mt-4 flex items-start gap-3 rounded-xl border border-violet-500/25 bg-violet-500/[0.05] px-4 py-3 text-[12px] text-violet-100/90"
+      >
+        <span className="mt-0.5 inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-violet-500/20 text-violet-300">
+          <Lightbulb size={12} />
+        </span>
+        <div>
+          <strong className="text-fg">Sugestie:</strong> Setează timezone-ul și formatul orei în{" "}
+          <span className="font-semibold text-violet-200">Preferințe</span> — ceasul din header și
+          activitatea contului se aliniază automat. Dezactivează aceste sugestii din
+          {" "}<span className="font-semibold text-violet-200">Preferințe → Sugestii și sfaturi</span>.
+        </div>
       </div>
 
       <div className="mt-5 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
