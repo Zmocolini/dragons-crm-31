@@ -54,7 +54,9 @@ export type ActivityEventKind =
   | "report.view"
   | "document.download"
   | "candidate.create"
-  | "document.activate";
+  | "document.activate"
+  | "payment.create"
+  | "payment.draft";
 
 export type ActivityEvent = {
   id: string;

@@ -6,6 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import { useState } from "react";
 import { AddCandidateDialog } from "./dialogs/AddCandidateDialog";
 import { AddCourierDialog } from "./dialogs/AddCourierDialog";
+import { RecordPaymentDialog } from "./dialogs/RecordPaymentDialog";
 import { useSession } from "@/lib/rbac/session";
 import type { Permission, Role } from "@/lib/rbac/roles";
 
@@ -27,19 +28,20 @@ type PrimaryLink = {
 };
 type PrimaryDialog = {
   kind: "dialog";
-  id: "add-candidate";
+  id: "add-candidate" | "record-payment";
   label: string;
   icon: LucideIcon;
   permission: Permission;
+  roles?: Role[];
 };
 type PrimaryAction = PrimaryLink | PrimaryDialog;
 
 const PRIMARY_ACTIONS: PrimaryAction[] = [
   { kind: "dialog", id: "add-candidate", label: "Adaugă candidat", icon: UserPlus, permission: "candidates.create" },
   {
-    kind: "link",
+    kind: "dialog",
+    id: "record-payment",
     label: "Înregistrează plată",
-    href: "/plati/nou",
     icon: Wallet,
     permission: "payments.create",
     roles: ["global_owner", "subcontractor_owner", "operator_payments"],
@@ -65,6 +67,7 @@ export function QuickActionsPanel() {
   const { can, user } = useSession();
   const [addCandidateOpen, setAddCandidateOpen] = useState(false);
   const [addCourierOpen, setAddCourierOpen] = useState(false);
+  const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
 
   const visiblePrimary = PRIMARY_ACTIONS.filter((a) => {
     if (!can(a.permission)) return false;
@@ -97,11 +100,15 @@ export function QuickActionsPanel() {
           "group flex w-full items-center gap-3 rounded-xl border border-line bg-card px-3.5 py-2.5 text-[13px] font-medium text-fg-muted transition-colors hover:bg-card-hover hover:text-fg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40";
 
         if (action.kind === "dialog") {
+          const onClick = () => {
+            if (action.id === "add-candidate") setAddCandidateOpen(true);
+            else if (action.id === "record-payment") setRecordPaymentOpen(true);
+          };
           return (
             <button
               key={action.id}
               type="button"
-              onClick={() => setAddCandidateOpen(true)}
+              onClick={onClick}
               className={cls}
             >
               <Icon size={15} strokeWidth={2} className="text-fg-dim group-hover:text-fg-muted" />
@@ -141,6 +148,7 @@ export function QuickActionsPanel() {
 
       <AddCandidateDialog open={addCandidateOpen} onClose={() => setAddCandidateOpen(false)} />
       <AddCourierDialog open={addCourierOpen} onClose={() => setAddCourierOpen(false)} />
+      <RecordPaymentDialog open={recordPaymentOpen} onClose={() => setRecordPaymentOpen(false)} />
     </div>
   );
 }

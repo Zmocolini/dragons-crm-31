@@ -87,6 +87,8 @@ const MODULE_FOR_KIND: Record<ActivityEventKind, string> = {
   "document.download":                 "Documente",
   "candidate.create":                  "Candidați",
   "document.activate":                 "Documente",
+  "payment.create":                    "Plăți",
+  "payment.draft":                     "Plăți",
 };
 
 function detectDevice(): string {

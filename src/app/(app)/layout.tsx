@@ -6,6 +6,7 @@ import { ProfileProvider } from "@/lib/profile/context";
 import { SettingsProvider } from "@/lib/settings/context";
 import { CandidatesProvider } from "@/lib/candidates/context";
 import { CouriersProvider } from "@/lib/couriers/context";
+import { PaymentsProvider } from "@/lib/payments/context";
 import { ToastProvider } from "@/components/ui/Toast";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
@@ -15,11 +16,13 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         <SettingsProvider>
           <CandidatesProvider>
             <CouriersProvider>
-              <UIProvider>
-                <ToastProvider>
-                  <AppShell>{children}</AppShell>
-                </ToastProvider>
-              </UIProvider>
+              <PaymentsProvider>
+                <UIProvider>
+                  <ToastProvider>
+                    <AppShell>{children}</AppShell>
+                  </ToastProvider>
+                </UIProvider>
+              </PaymentsProvider>
             </CouriersProvider>
           </CandidatesProvider>
         </SettingsProvider>

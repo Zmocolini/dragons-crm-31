@@ -32,6 +32,8 @@ const KIND_LABEL: Record<ActivityEventKind, string> = {
   "document.download":                 "Descărcare document",
   "candidate.create":                  "Creare candidat",
   "document.activate":                 "Activare document",
+  "payment.create":                    "Plată înregistrată",
+  "payment.draft":                     "Plată neconfirmată",
 };
 
 const KIND_DOT: Record<ActivityEventKind, string> = {
@@ -49,6 +51,8 @@ const KIND_DOT: Record<ActivityEventKind, string> = {
   "document.download":                 "bg-orange-500",
   "candidate.create":                  "bg-purple-500",
   "document.activate":                 "bg-teal-500",
+  "payment.create":                    "bg-indigo-500",
+  "payment.draft":                     "bg-blue-500",
 };
 
 const MODULE_TONE: Record<string, string> = {
