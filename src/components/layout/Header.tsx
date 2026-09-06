@@ -2,6 +2,7 @@
 
 import { Bell, Menu, Sun } from "lucide-react";
 import { useUI } from "@/lib/ui/ui-context";
+import { HeaderClock } from "./HeaderClock";
 import { UserMenu } from "./UserMenu";
 
 export function Header() {
@@ -23,6 +24,10 @@ export function Header() {
       </button>
 
       <div className="ml-auto flex items-center gap-1.5">
+        <HeaderClock />
+
+        <div className="mx-1 hidden h-6 w-px bg-line md:block" />
+
         <button
           type="button"
           aria-label="Schimbă tema"
