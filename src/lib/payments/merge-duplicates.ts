@@ -38,7 +38,7 @@ function mergeBreakdowns(items: Payment[]): PaymentBreakdown {
 }
 
 function pickStatus(items: Payment[]): Payment["status"] {
-  const order: Payment["status"][] = ["blocked", "issue", "in_review", "processing", "partial", "unpaid", "paid"];
+  const order: Payment["status"][] = ["blocked", "issue", "in_review", "partial", "unpaid", "paid"];
   for (const s of order) if (items.some((p) => p.status === s)) return s;
   return items[0]?.status ?? "in_review";
 }
