@@ -7,10 +7,23 @@ import { Switch } from "@/components/ui/Switch";
 import { Dialog, DialogFooter } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
 import { useSettings } from "@/lib/settings/context";
+import { resizeImageFile } from "@/lib/utils/image";
 import type { DateFormat, Language, TimeFormat } from "@/lib/profile/types";
 import type { OrganizationInfo, PlatformDefaults } from "@/lib/settings/types";
 import { cn } from "@/lib/utils/cn";
 import { useProfile } from "@/lib/profile/context";
+
+// Offset GMT real (DST-aware), aliniat cu ceasul din header.
+function tzOffset(timezone: string): string {
+  try {
+    const tz = new Intl.DateTimeFormat("en", { timeZone: timezone, timeZoneName: "shortOffset" })
+      .formatToParts(new Date())
+      .find((p) => p.type === "timeZoneName")?.value;
+    return tz ?? "GMT";
+  } catch {
+    return "GMT";
+  }
+}
 
 export function TabGeneral() {
   const { settings } = useSettings();
@@ -166,7 +179,7 @@ function PreferencesCard({ defaults }: { defaults: PlatformDefaults }) {
         <Select label="Limbă implicită" value={draft.language}   onChange={(v) => setDraft({ ...draft, language: v as Language })}
           options={[{ value: "ro", label: "🇷🇴 Română" }, { value: "en", label: "🇬🇧 English" }]} />
         <Select label="Fus orar"        value={draft.timezone}   onChange={(v) => setDraft({ ...draft, timezone: v })}
-          options={["Europe/Bucharest","Europe/London","Europe/Berlin","UTC"].map((t) => ({ value: t, label: t + (t === "Europe/Bucharest" ? " (GMT+2)" : "") }))} />
+          options={["Europe/Bucharest","Europe/London","Europe/Berlin","UTC"].map((t) => ({ value: t, label: `${t} (${tzOffset(t)})` }))} />
         <Select label="Format dată"     value={draft.dateFormat} onChange={(v) => setDraft({ ...draft, dateFormat: v as DateFormat })}
           options={[{ value: "DD.MM.YYYY", label: "DD.MM.YYYY" }, { value: "YYYY-MM-DD", label: "YYYY-MM-DD" }, { value: "MM/DD/YYYY", label: "MM/DD/YYYY" }]} />
         <Select label="Format oră"      value={draft.timeFormat} onChange={(v) => setDraft({ ...draft, timeFormat: v as TimeFormat })}
@@ -188,17 +201,27 @@ function PreferencesCard({ defaults }: { defaults: PlatformDefaults }) {
         />
         <ToggleRow
           label="Permite înregistrare noi candidați"
-          desc="Activează formularul public de înscriere."
+          desc="Activează formularul public de înscriere de la /inscriere."
           checked={draft.allowPublicSignup}
           onChange={(v) => setDraft({ ...draft, allowPublicSignup: v })}
         />
-        <ToggleRow
-          label="Activare automată documente"
-          desc="Validează automat documentele la încărcare."
-          checked={draft.autoValidateDocuments}
-          onChange={(v) => setDraft({ ...draft, autoValidateDocuments: v })}
-        />
       </div>
+
+      {draft.showAnnouncements && (
+        <div className="mt-5">
+          <label className="block text-[11px] font-semibold uppercase tracking-wider text-fg-dim">
+            Text anunț
+          </label>
+          <textarea
+            value={draft.announcementText}
+            onChange={(e) => setDraft({ ...draft, announcementText: e.target.value })}
+            rows={2}
+            placeholder="Ex: Marți 15 sept, între 10:00–12:00, sistemul de plăți va fi în mentenanță."
+            className="mt-1.5 w-full rounded-lg border border-line bg-card-2 px-3 py-2 text-[13px] text-fg placeholder:text-fg-dim focus:border-violet-500/60 focus:outline-none"
+          />
+          <p className="mt-1 text-[11px] text-fg-dim">Apare ca banner pe toată aplicația cât timp textul e completat.</p>
+        </div>
+      )}
 
       <div className="mt-5 flex justify-end gap-2">
         {dirty && (
@@ -281,25 +304,32 @@ function LogoIdentityCard({ org }: { org: OrganizationInfo }) {
   const logoInput = useRef<HTMLInputElement>(null);
   const faviInput = useRef<HTMLInputElement>(null);
 
-  function handleUpload(kind: "logo" | "favicon", file?: File) {
+  async function handleUpload(kind: "logo" | "favicon", file?: File) {
     if (!file) return;
     if (!/^image\/(png|jpe?g|webp|x-icon|vnd\.microsoft\.icon)$/.test(file.type)) {
       toast.error("Format neacceptat", "Alege PNG / JPG / WEBP / ICO.");
       return;
     }
-    if (file.size > 2 * 1024 * 1024) {
-      toast.error("Fișier prea mare", "Limita este 2 MB.");
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Fișier prea mare", "Limita e 5 MB (în fișier). Se comprimă automat la salvare.");
       return;
     }
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
+    try {
+      const dataUrl = await resizeImageFile(file, kind === "logo" ? 400 : 128);
+      const listener = () => toast.error(
+        "Salvare eșuată",
+        "Storage-ul browserului e plin. Șterge alte poze sau folosește unele mai mici.",
+      );
+      window.addEventListener("crm31:settings-save-failed", listener, { once: true });
       if (kind === "logo") updateOrganization({ logoDataUrl: dataUrl });
       else updateOrganization({ faviconDataUrl: dataUrl });
+      // curat listener-ul dacă nu a fost declanșat
+      setTimeout(() => window.removeEventListener("crm31:settings-save-failed", listener), 500);
       logActivity("avatar.update", kind === "logo" ? "Logo organizație" : "Favicon", "Setări");
       toast.success(kind === "logo" ? "Logo actualizat." : "Favicon actualizat.");
-    };
-    reader.readAsDataURL(file);
+    } catch (err) {
+      toast.error("Eroare la procesare", err instanceof Error ? err.message : "Neștiut");
+    }
   }
 
   return (

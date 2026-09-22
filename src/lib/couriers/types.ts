@@ -15,12 +15,11 @@ export const VEHICLE_OWNERSHIP_LABEL: Record<VehicleOwnership, string> = {
   rented:   "Închiriat",
 };
 
-export type CollaborationType = "collaboration" | "contract" | "internal" | "subcontractor";
+export type CollaborationType = "collaboration" | "cim_8h" | "cim_4h";
 export const COLLABORATION_LABEL: Record<CollaborationType, string> = {
-  collaboration:  "Colaborare",
-  contract:       "Contract muncă",
-  internal:       "Angajat intern",
-  subcontractor:  "Subcontractor",
+  collaboration:  "Contract colaborare",
+  cim_8h:         "CIM 8h",
+  cim_4h:         "CIM 4h",
 };
 
 export type CourierStatus = "in_activation" | "active" | "paused" | "stopped" | "draft";
@@ -58,9 +57,19 @@ export type Courier = {
   nationality: Nationality;
   city: string;
   platforms: PlatformKey[];
+  /** Platforme pe care curierul vrea să activeze suplimentar; așteaptă loc în orașul lui. */
+  waitlistedPlatforms?: PlatformKey[];
   vehicleType: VehicleType;
   vehicleOwnership: VehicleOwnership;
   collaboration: CollaborationType;
+  /** Comision % perceput de flotă din veniturile brute. Default 10. */
+  commissionPct?: number;
+  /** Taxă săptămânală contract (RON). Default 210. */
+  weeklyContractFeeRon?: number;
+  /** UID Bolt (ex: `U235988`) — folosit pentru match la import raport Bolt. */
+  boltUid?: string;
+  /** IBAN pentru plăți. */
+  iban?: string;
   status: CourierStatus;
   incompleteFields: IncompleteFieldKey[];
   createdAtIso: string;

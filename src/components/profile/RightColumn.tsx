@@ -3,7 +3,7 @@
 import Link from "next/link";
 import {
   ArrowRight, Bell, ChevronRight, Crown, KeyRound, Laptop,
-  Languages, Palette, ShieldOff, Trash2,
+  Languages, Palette, Trash2,
 } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
@@ -77,17 +77,6 @@ export function RightColumn({ onOpenTab }: Props) {
             title="Schimbă parola"
             subtitle="Actualizează parola contului tău"
             onClick={() => setPwOpen(true)}
-          />
-          <QuickRow
-            icon={<ShieldOff size={14} />}
-            title="Autentificare în doi pași"
-            subtitle="Funcție în dezvoltare"
-            trailing={
-              <span className="rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-fg-dim">
-                Curând
-              </span>
-            }
-            onClick={() => onOpenTab("security")}
           />
           <QuickRow
             icon={<Laptop size={14} />}

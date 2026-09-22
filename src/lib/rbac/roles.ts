@@ -26,9 +26,6 @@ export type Permission =
   | "couriers.edit"
   | "candidates.view"
   | "candidates.create"
-  | "interviews.view"
-  | "activations.view"
-  | "activations.create"
   | "payments.view"
   | "payments.create"
   | "reports.view"
@@ -57,9 +54,6 @@ export const ACCESS_MATRIX: Record<Role, ReadonlySet<Permission>> = {
     "couriers.edit",
     "candidates.view",
     "candidates.create",
-    "interviews.view",
-    "activations.view",
-    "activations.create",
     "payments.view",
     "payments.create",
     "reports.view",
@@ -82,9 +76,6 @@ export const ACCESS_MATRIX: Record<Role, ReadonlySet<Permission>> = {
     "couriers.edit",
     "candidates.view",
     "candidates.create",
-    "interviews.view",
-    "activations.view",
-    "activations.create",
     "payments.view",
     "payments.create",
     "reports.view",
@@ -110,9 +101,6 @@ export const ACCESS_MATRIX: Record<Role, ReadonlySet<Permission>> = {
     "dashboard.view",
     "candidates.view",
     "candidates.create",
-    "interviews.view",
-    "activations.view",
-    "activations.create",
     "documents.view",
     "documents.upload",
     "calendar.view",
@@ -122,7 +110,6 @@ export const ACCESS_MATRIX: Record<Role, ReadonlySet<Permission>> = {
     "dashboard.view",
     "couriers.view",
     "candidates.view",
-    "activations.view",
     "reports.view",
     "documents.view",
     "vehicles.view",

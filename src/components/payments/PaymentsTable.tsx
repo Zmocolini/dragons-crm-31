@@ -3,13 +3,17 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowDownUp, Check, CheckCheck, Clock, Download, Edit, Eye, FileDown,
-  History, MoreVertical, Plus, StickyNote, User,
+  History, Minus, MoreVertical, Plus, StickyNote, Trash2, User,
 } from "lucide-react";
 import { PlatformChip } from "@/components/ui/PlatformLogo";
+import { subcontractorFor, subcontractorInitials } from "@/lib/subcontractors/name-map";
+import { useDuplicatePairs } from "@/lib/subcontractors/duplicate-pairs-context";
+import { isMergedPayment } from "@/lib/payments/merge-duplicates";
 import type { Permission } from "@/lib/rbac/roles";
 import {
-  PAYMENT_STATUS_LABEL, PAYMENT_STATUS_STYLE, deductionsTotal, formatMoney,
-  formatPeriodShort, type Currency, type Payment,
+  PAYMENT_SOURCE_LABEL, PAYMENT_SOURCE_STYLE, PAYMENT_STATUS_LABEL, PAYMENT_STATUS_STYLE,
+  deductionsTotal, formatMoney, formatPeriodShort, paymentSource,
+  type Currency, type Payment,
 } from "@/lib/payments/types";
 import { cn } from "@/lib/utils/cn";
 
@@ -17,8 +21,8 @@ export type RowAction =
   | "view" | "edit" | "approve" | "processing" | "paid"
   | "add_deduction" | "add_note" | "download" | "view_courier" | "history";
 
-export type BulkAction = "approve" | "processing" | "paid" | "export";
-export type SortKey = "name" | "orders" | "gross" | "commission" | "net" | "status";
+export type BulkAction = "approve" | "processing" | "paid" | "export" | "delete";
+export type SortKey = "name" | "gross" | "commission" | "net" | "status";
 
 function initials(name: string): string {
   return name.trim().split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
@@ -27,6 +31,7 @@ function initials(name: string): string {
 export function PaymentsTable({
   rows, currency, selectedIds, onToggleRow, onToggleAll,
   selectedPaymentId, onSelect, onRowAction, sort, onSort, can, onBulk, onClearSelection,
+  mergePairs, dupCandidates, onCreatePair, onSplit,
 }: {
   rows: Payment[];
   currency: Currency;
@@ -41,6 +46,14 @@ export function PaymentsTable({
   can: (p: Permission) => boolean;
   onBulk: (action: BulkAction) => void;
   onClearSelection: () => void;
+  /** Perechi manuale de plăți combinate (mutuale). */
+  mergePairs?: Map<string, string>;
+  /** Toți candidații 2× din setul filtrat curent — sursă pentru picker. */
+  dupCandidates?: Payment[];
+  /** Creează o pereche manuală între două plăți. */
+  onCreatePair?: (a: string, b: string) => void;
+  /** Desparte perechea unei plăți. */
+  onSplit?: (paymentId: string) => void;
 }) {
   const pageIds = rows.map((r) => r.id);
   const allChecked = pageIds.length > 0 && pageIds.every((id) => selectedIds.has(id));
@@ -59,13 +72,14 @@ export function PaymentsTable({
             {canFinance && <BulkBtn icon={Clock} label="În proces" onClick={() => onBulk("processing")} />}
             {canFinance && <BulkBtn icon={Check} label="Marchează plătite" tone="emerald" onClick={() => onBulk("paid")} />}
             <BulkBtn icon={Download} label="Exportă selectate" onClick={() => onBulk("export")} />
+            {canFinance && <BulkBtn icon={Trash2} label="Șterge curieri" tone="rose" onClick={() => onBulk("delete")} />}
             <button type="button" onClick={onClearSelection} className="rounded-lg px-2 py-1.5 text-[12px] text-fg-dim hover:text-fg">Anulează</button>
           </div>
         </div>
       )}
 
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[900px] border-collapse text-left">
+        <table className="w-full min-w-[980px] border-collapse text-left">
           <thead>
             <tr className="border-b border-line/60 text-[11px] uppercase tracking-wider text-fg-dim">
               <th className="w-10 px-3 py-2.5">
@@ -81,8 +95,8 @@ export function PaymentsTable({
               <th className="w-10 px-2 py-2.5">#</th>
               <SortableTh label="Curier" k="name" sort={sort} onSort={onSort} />
               <th className="px-3 py-2.5">Platformă</th>
+              <th className="px-3 py-2.5">Sursă</th>
               <th className="px-3 py-2.5">Perioadă</th>
-              <SortableTh label="Comenzi" k="orders" sort={sort} onSort={onSort} align="right" />
               <SortableTh label="Venit brut" k="gross" sort={sort} onSort={onSort} align="right" />
               <SortableTh label="Comision" k="commission" sort={sort} onSort={onSort} align="right" />
               <th className="px-3 py-2.5 text-right">Deduceri</th>
@@ -135,12 +149,34 @@ export function PaymentsTable({
                         {(p.platforms ?? (p.recipient.platform ? [p.recipient.platform] : [])).map((pl) => (
                           <PlatformChip key={pl} platform={pl} size={16} showLabel={false} />
                         ))}
+                        <SubcontractorBadge name={subcontractorFor(p.recipient.name)} />
+                        <DuplicateAccountBadge
+                          payment={p}
+                          candidates={dupCandidates ?? []}
+                          mergePairs={mergePairs}
+                          onCreatePair={onCreatePair}
+                          onSplit={onSplit}
+                        />
                       </div>
                     </td>
+                    <td className="px-3 py-2.5">
+                      {(() => {
+                        const src = paymentSource(p.reference);
+                        return (
+                          <span className={cn("inline-flex items-center rounded border px-1.5 py-0.5 text-[10.5px] font-semibold", PAYMENT_SOURCE_STYLE[src])}>
+                            {PAYMENT_SOURCE_LABEL[src]}
+                          </span>
+                        );
+                      })()}
+                    </td>
                     <td className="whitespace-nowrap px-3 py-2.5 text-fg-muted">{formatPeriodShort(p.periodStartIso, p.periodEndIso)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-fg-muted">{p.ordersCount ?? "—"}</td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-fg">{formatMoney(p.breakdown.grossRevenue, currency)}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-fg-muted">{formatMoney(p.breakdown.fleetCommission, currency)}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums">
+                      <div className="text-fg-muted">{formatMoney(p.breakdown.fleetCommission, currency)}</div>
+                      {p.commissionPercentage != null && p.commissionPercentage > 0 && (
+                        <div className="text-[10px] text-fg-dim">{p.commissionPercentage}%</div>
+                      )}
+                    </td>
                     <td className="px-3 py-2.5 text-right tabular-nums text-fg-muted">{formatMoney(deductionsTotal(p.breakdown), currency)}</td>
                     <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-fg">{formatMoney(p.totalCalculated, currency)}</td>
                     <td className="px-3 py-2.5">
@@ -163,6 +199,147 @@ export function PaymentsTable({
   );
 }
 
+function SubcontractorBadge({ name }: { name: string | null }) {
+  if (!name) return null;
+  return (
+    <span
+      title={`Subcontractor: ${name}`}
+      className="group relative inline-flex h-4 min-w-4 items-center justify-center rounded border border-amber-500/40 bg-amber-500/15 px-1 text-[9.5px] font-bold uppercase leading-none tracking-wider text-amber-200 hover:bg-amber-500/25"
+    >
+      {subcontractorInitials(name)}
+      <span className="pointer-events-none absolute left-1/2 top-full z-30 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-line bg-card px-2 py-1 text-[10.5px] font-semibold text-fg shadow-lg shadow-black/40 group-hover:block">
+        {name}
+      </span>
+    </span>
+  );
+}
+
+function DuplicateAccountBadge({
+  payment, candidates, mergePairs, onCreatePair, onSplit,
+}: {
+  payment: Payment;
+  candidates: Payment[];
+  mergePairs?: Map<string, string>;
+  onCreatePair?: (a: string, b: string) => void;
+  onSplit?: (paymentId: string) => void;
+}) {
+  const { groupFor: duplicateGroupFor } = useDuplicatePairs();
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const wrapRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!pickerOpen) return;
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setPickerOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [pickerOpen]);
+
+  // Un rând sintetic (merged) → arată doar badge-ul „1×" + buton „−" pentru split.
+  const merged = isMergedPayment(payment.id);
+  // Rând obișnuit: verific dacă e într-o pereche manuală.
+  const paired = !merged && !!mergePairs?.has(payment.id);
+  const group = duplicateGroupFor(payment.recipient.name);
+
+  // Un rând care nu-i din grup ȘI nu-i sintetic → fără badge.
+  if (!merged && !group) return null;
+
+  const tooltipTitle = merged
+    ? "Combinate"
+    : group
+      ? `Cont dublu — ${group.personId}: ${group.aliases.map((a) => `${a.name} (${a.platform.toUpperCase()})`).join("  |  ")}`
+      : "";
+
+  // Candidații pentru picker = toate 2× din pagină, mai puțin plata curentă
+  // și cele deja perechizite (ca să nu re-perechizeze).
+  const otherOptions = candidates.filter((c) =>
+    c.id !== payment.id
+    && !(mergePairs?.has(c.id)),
+  );
+
+  return (
+    <span ref={wrapRef} className="relative inline-flex items-center gap-0.5">
+      <span
+        title={tooltipTitle}
+        className={cn(
+          "group relative inline-flex h-4 min-w-4 items-center justify-center rounded border px-1 text-[9.5px] font-bold uppercase leading-none tracking-wider transition-colors",
+          merged || paired
+            ? "border-emerald-500/40 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25"
+            : "border-cyan-500/40 bg-cyan-500/15 text-cyan-200 hover:bg-cyan-500/25",
+        )}
+      >
+        {merged || paired ? "1×" : "2×"}
+        {group && (
+          <span className="pointer-events-none absolute left-1/2 top-full z-30 mt-1 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-line bg-card px-2 py-1 text-[10.5px] font-semibold text-fg shadow-lg shadow-black/40 group-hover:block">
+            <div className={cn("mb-0.5", merged || paired ? "text-emerald-300" : "text-cyan-300")}>
+              {merged || paired ? "Combinate" : "Cont dublu"} — {group.personId}
+            </div>
+            {group.aliases.map((a, i) => (
+              <div key={i} className="text-[10px] text-fg-muted">
+                {a.name} <span className="text-fg-dim">·</span> {a.platform.toUpperCase()}
+              </div>
+            ))}
+          </span>
+        )}
+      </span>
+      {(merged || paired) && onSplit && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); onSplit(payment.id); }}
+          title="Desparte perechea"
+          className="inline-flex h-4 w-4 items-center justify-center rounded border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"
+        >
+          <Minus size={9} />
+        </button>
+      )}
+      {!merged && !paired && onCreatePair && (
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); setPickerOpen((v) => !v); }}
+          title="Alege contul cu care se combină"
+          className="inline-flex h-4 w-4 items-center justify-center rounded border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20"
+        >
+          <Plus size={9} />
+        </button>
+      )}
+      {pickerOpen && !merged && !paired && onCreatePair && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="absolute left-0 top-full z-40 mt-1 max-h-[280px] min-w-[240px] overflow-y-auto rounded-lg border border-line bg-card p-1 shadow-lg shadow-black/40"
+        >
+          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-fg-dim">
+            Combină cu:
+          </div>
+          {otherOptions.length === 0 ? (
+            <div className="px-2 py-1.5 text-[11px] text-fg-muted">Niciun alt cont dublu disponibil</div>
+          ) : (
+            otherOptions.map((c) => {
+              const g = duplicateGroupFor(c.recipient.name);
+              const platform = c.recipient.platform ?? (c.platforms?.[0] ?? "—");
+              return (
+                <button
+                  key={c.id}
+                  type="button"
+                  onClick={() => { setPickerOpen(false); onCreatePair(payment.id, c.id); }}
+                  className="flex w-full items-center justify-between gap-3 rounded px-2 py-1.5 text-left text-[11.5px] text-fg hover:bg-emerald-500/10 hover:text-emerald-100"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate font-medium">{c.recipient.name}</span>
+                    {g && <span className="block text-[9.5px] text-fg-dim">grup: {g.personId}</span>}
+                  </span>
+                  <span className="shrink-0 rounded bg-black/40 px-1.5 py-0.5 text-[9.5px] font-mono uppercase text-fg-dim">
+                    {String(platform)}
+                  </span>
+                </button>
+              );
+            })
+          )}
+        </div>
+      )}
+    </span>
+  );
+}
+
 function SortableTh({
   label, k, sort, onSort, align = "left",
 }: {
@@ -179,16 +356,16 @@ function SortableTh({
   );
 }
 
-function BulkBtn({ icon: Icon, label, onClick, tone }: { icon: typeof Check; label: string; onClick: () => void; tone?: "emerald" }) {
+function BulkBtn({ icon: Icon, label, onClick, tone }: { icon: typeof Check; label: string; onClick: () => void; tone?: "emerald" | "rose" }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
         "inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-medium",
-        tone === "emerald"
-          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20"
-          : "border-line bg-card-hover text-fg hover:bg-white/[0.06]",
+        tone === "emerald" && "border-emerald-500/30 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/20",
+        tone === "rose"    && "border-rose-500/40 bg-rose-500/10 text-rose-200 hover:bg-rose-500/20",
+        !tone              && "border-line bg-card-hover text-fg hover:bg-white/[0.06]",
       )}
     >
       <Icon size={13} />

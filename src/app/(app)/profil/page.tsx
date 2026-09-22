@@ -12,8 +12,14 @@ import { TabPersonal } from "@/components/profile/tabs/TabPersonal";
 import { TabPreferences } from "@/components/profile/tabs/TabPreferences";
 import { TabSecurity } from "@/components/profile/tabs/TabSecurity";
 
+const VALID_TABS: ProfileTab[] = ["personal", "preferences", "security", "notifications", "activity"];
+
 export default function ProfilPage() {
-  const [tab, setTab] = useState<ProfileTab>("personal");
+  const [tab, setTab] = useState<ProfileTab>(() => {
+    if (typeof window === "undefined") return "personal";
+    const q = new URLSearchParams(window.location.search).get("tab") as ProfileTab | null;
+    return q && VALID_TABS.includes(q) ? q : "personal";
+  });
 
   return (
     <div className="mx-auto w-full max-w-[1520px] px-5 pt-5 pb-6 md:px-6">

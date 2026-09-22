@@ -1,7 +1,7 @@
 "use client";
 
 import {
-  AlertTriangle, ChevronRight, Key, Laptop, LogOut, Monitor, Shield,
+  ChevronRight, Key, Laptop, LogOut, Monitor, Shield,
   ShieldAlert, ShieldCheck, Smartphone,
 } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils/cn";
 
 export function TabSecuritate() {
   const {
-    profile, sessions, revokeSession, revokeAllOtherSessions,
+    sessions, revokeSession, revokeAllOtherSessions,
     securityEvents, logActivity,
   } = useProfile();
   const { settings, updateSecurityAlerts } = useSettings();
@@ -24,9 +24,6 @@ export function TabSecuritate() {
 
   const [pwOpen, setPwOpen]         = useState(false);
   const [policyOpen, setPolicyOpen] = useState(false);
-  const [twoFAOpen, setTwoFAOpen]   = useState(false);
-
-  const twoFA = profile.twoFactorEnabled;
 
   // Draft pentru cele 3 toggle-uri de alerte
   const [alerts, setAlerts] = useState(settings.securityAlerts);
@@ -63,31 +60,6 @@ export function TabSecuritate() {
           </p>
         </header>
         <ul className="divide-y divide-line/40">
-          <Row
-            icon={ShieldCheck}
-            title="Autentificare în doi pași"
-            desc="Adaugă un strat suplimentar de siguranță la login."
-            right={
-              <div className="flex items-center gap-2">
-                <span className={cn(
-                  "inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[11px] font-semibold",
-                  twoFA
-                    ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-300"
-                    : "border-rose-500/30 bg-rose-500/10 text-rose-300",
-                )}>
-                  <span className={cn("inline-block h-1.5 w-1.5 rounded-full", twoFA ? "bg-emerald-400" : "bg-rose-400")} />
-                  {twoFA ? "Activă" : "Inactivă"}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setTwoFAOpen(true)}
-                  className="rounded-lg border border-line bg-card-2 px-3.5 py-1.5 text-[12px] font-semibold text-fg-muted hover:bg-card-hover hover:text-fg"
-                >
-                  Gestionează
-                </button>
-              </div>
-            }
-          />
           <Row
             icon={Key}
             title="Schimbă parola"
@@ -273,7 +245,6 @@ export function TabSecuritate() {
 
       <ChangePasswordDialog open={pwOpen} onClose={() => setPwOpen(false)} />
       <PasswordPolicyDialog open={policyOpen} onClose={() => setPolicyOpen(false)} />
-      <TwoFactorDialog open={twoFAOpen} onClose={() => setTwoFAOpen(false)} />
     </div>
   );
 }
@@ -353,50 +324,4 @@ function PolicyItem({ label, value }: { label: string; value: string }) {
   );
 }
 
-function TwoFactorDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
-  const { profile, updateProfile, addSecurityEvent, logActivity } = useProfile();
-  const toast = useToast();
-  const active = profile.twoFactorEnabled;
 
-  function toggle() {
-    const next = !active;
-    updateProfile({ twoFactorEnabled: next });
-    addSecurityEvent(next ? "2fa.enabled" : "2fa.disabled", next ? "2FA activat" : "2FA dezactivat");
-    logActivity("preferences.update", next ? "2FA activat" : "2FA dezactivat", "Securitate");
-    toast.success(next ? "Autentificare în doi pași activată." : "Autentificare în doi pași dezactivată.");
-    onClose();
-  }
-
-  return (
-    <Dialog open={open} onClose={onClose} title="Autentificare în doi pași" description="Un strat suplimentar de siguranță la fiecare login.">
-      <div className="space-y-3">
-        <div className={cn(
-          "flex items-start gap-3 rounded-xl border p-4",
-          active
-            ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-100"
-            : "border-amber-500/25 bg-amber-500/10 text-amber-100",
-        )}>
-          {active ? <ShieldCheck size={18} className="mt-0.5 shrink-0" /> : <AlertTriangle size={18} className="mt-0.5 shrink-0" />}
-          <div className="text-[13px]">
-            {active
-              ? "2FA este activ. Contul tău e protejat printr-un cod suplimentar la fiecare autentificare."
-              : "Setup-ul complet TOTP (Google Authenticator / Authy) se activează după integrarea Better-Auth. Poți marca starea pentru testare."}
-          </div>
-        </div>
-      </div>
-      <DialogFooter>
-        <button type="button" onClick={onClose} className="rounded-lg border border-line bg-card-2 px-4 py-2 text-[12.5px] font-medium text-fg-muted hover:bg-card-hover">Anulează</button>
-        <button
-          type="button"
-          onClick={toggle}
-          className={cn(
-            "rounded-lg px-4 py-2 text-[12.5px] font-semibold text-white",
-            active ? "bg-rose-600 hover:bg-rose-500" : "bg-violet-600 hover:bg-violet-500",
-          )}
-        >
-          {active ? "Dezactivează 2FA" : "Activează 2FA"}
-        </button>
-      </DialogFooter>
-    </Dialog>
-  );
-}

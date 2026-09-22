@@ -1,25 +1,37 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronDown, Building2, LogOut, Settings, User, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useAuth } from "@/lib/auth/context";
 import { ROLE_LABELS } from "@/lib/rbac/roles";
 import { useSession } from "@/lib/rbac/session";
 import { useProfile } from "@/lib/profile/context";
+import { useCouriers } from "@/lib/couriers/context";
+import { useMemo } from "react";
 import { FleetSwitcherDialog } from "./FleetSwitcherDialog";
 import { cn } from "@/lib/utils/cn";
 
 type OpenDialog = null | "tenant" | "logout";
 
 export function UserMenu() {
-  const { user } = useSession();
+  const { user, activeFleetId } = useSession();
   const { profile } = useProfile();
+  const { allRows } = useCouriers();
+  const activeInFleet = useMemo(
+    () => allRows.filter((c) => c.tenantId === activeFleetId && c.status === "active").length,
+    [allRows, activeFleetId],
+  );
   const [open, setOpen] = useState(false);
   const [dialog, setDialog] = useState<OpenDialog>(null);
   const rootRef = useRef<HTMLDivElement>(null);
 
-  const displayName = profile.displayName ?? user.name;
+  // Sursa de adevăr pentru nume = contul logat (session), NU localStorage-ul de profile.
+  // Altfel, când te loghezi pe alt cont, ai vedea în header numele salvat pe alt cont.
+  const displayName = user.name || profile.displayName || "Utilizator";
   const initials = displayName
     .split(" ")
     .map((n) => n[0])
@@ -61,8 +73,12 @@ export function UserMenu() {
           open && "bg-card-hover",
         )}
       >
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-[11px] font-bold text-white">
-          {initials}
+        <span className="relative inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-[11px] font-bold text-white">
+          {profile.avatarDataUrl ? (
+            <Image src={profile.avatarDataUrl} alt={displayName} fill sizes="32px" className="object-cover" unoptimized />
+          ) : (
+            initials
+          )}
         </span>
         <span className="leading-tight">
           <span className="block text-[12.5px] font-semibold text-fg">{displayName}</span>
@@ -82,8 +98,12 @@ export function UserMenu() {
         >
           {/* Header — user info */}
           <div className="flex items-center gap-3 border-b border-line/70 px-4 py-3.5">
-            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-[13px] font-bold text-white ring-1 ring-white/10">
-              {initials}
+            <span className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-[13px] font-bold text-white ring-1 ring-white/10">
+              {profile.avatarDataUrl ? (
+                <Image src={profile.avatarDataUrl} alt={displayName} fill sizes="44px" className="object-cover" unoptimized />
+              ) : (
+                initials
+              )}
             </span>
             <div className="min-w-0 flex-1 leading-tight">
               <div className="text-[13.5px] font-semibold text-fg">{displayName}</div>
@@ -114,7 +134,7 @@ export function UserMenu() {
               icon={<Building2 size={16} />}
               iconTone="text-amber-300"
               title="Schimbă flota"
-              subtitle={`Activă: ${user.activeTenant.name}`}
+              subtitle={`Activă: ${user.activeTenant.name} · ${activeInFleet} ${activeInFleet === 1 ? "curier activ" : "curieri activi"}`}
               onClick={() => {
                 closeMenu();
                 // scurt delay ca dropdown-ul să dispară înainte de dialog (evită „artefacte")
@@ -211,6 +231,9 @@ function MenuItem({
 }
 
 function LogoutDialog({ onClose }: { onClose: () => void }) {
+  const { logout } = useAuth();
+  const router = useRouter();
+
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     document.addEventListener("keydown", onKey);
@@ -224,7 +247,12 @@ function LogoutDialog({ onClose }: { onClose: () => void }) {
 
   if (typeof document === "undefined") return null;
 
-  // TODO(real-users): apelează signOut() Better-Auth + router.push('/login').
+  const handleLogout = () => {
+    logout();
+    onClose();
+    router.replace("/login");
+  };
+
   return createPortal(
     <div
       role="dialog"
@@ -258,7 +286,7 @@ function LogoutDialog({ onClose }: { onClose: () => void }) {
           </button>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleLogout}
             className="inline-flex items-center gap-1.5 rounded-lg bg-rose-500/90 px-4 py-2 text-[12.5px] font-semibold text-white transition-colors hover:bg-rose-500"
           >
             <LogOut size={13} />

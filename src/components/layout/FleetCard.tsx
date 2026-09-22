@@ -3,6 +3,8 @@
 import { ChevronsUpDown } from "lucide-react";
 import { useState } from "react";
 import { useSession } from "@/lib/rbac/session";
+import { useCouriers } from "@/lib/couriers/context";
+import { useMemo } from "react";
 import { FleetSwitcherDialog } from "./FleetSwitcherDialog";
 import { cn } from "@/lib/utils/cn";
 
@@ -11,17 +13,26 @@ import { cn } from "@/lib/utils/cn";
  * Înlocuiește vechile TenantSwitcher + PlanUsage (care duplicau info).
  */
 export function FleetCard() {
-  const { user, can } = useSession();
+  const { user, activeFleetId, can } = useSession();
+  const { allRows } = useCouriers();
   const [open, setOpen] = useState(false);
   const t = user.activeTenant;
   const canSwitch = can("tenant.switch");
 
-  const pct = Math.min(100, Math.max(0, Math.round((t.planUsage.used / t.planUsage.total) * 100)));
+  const activeInFleet = useMemo(
+    () => allRows.filter((c) => c.tenantId === activeFleetId && c.status === "active").length,
+    [allRows, activeFleetId],
+  );
+  const capacity = t.planUsage.total;
+  const pct = capacity > 0 ? Math.min(100, Math.max(0, Math.round((activeInFleet / capacity) * 100))) : 0;
   const initials = t.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
 
   const barTone = pct >= 90 ? "from-rose-500 to-rose-400"
     : pct >= 70 ? "from-amber-500 to-amber-400"
     : "from-emerald-500 to-teal-500";
+
+  const brandColor = t.brandColor ?? "#f97316";
+  const flagOrInitials = t.flagEmoji ?? initials;
 
   return (
     <>
@@ -32,11 +43,28 @@ export function FleetCard() {
         aria-haspopup="dialog"
         aria-expanded={open}
         className="group flex w-full flex-col gap-2.5 rounded-xl border border-line bg-card px-3 py-2.5 text-left transition-colors hover:bg-card-hover disabled:cursor-default disabled:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+        style={{ borderColor: `${brandColor}30` }}
       >
         <div className="flex items-center gap-2.5">
-          <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-red-600 text-[13px] font-black text-white">
-            {initials}
-          </span>
+          {t.logoDataUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={t.logoDataUrl}
+              alt={`${t.name} logo`}
+              className="h-9 w-9 shrink-0 rounded-lg object-cover"
+              style={{ boxShadow: `0 4px 12px -4px ${brandColor}80` }}
+            />
+          ) : (
+            <span
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[16px] font-black text-white"
+              style={{
+                background: `linear-gradient(135deg, ${brandColor} 0%, ${brandColor}cc 100%)`,
+                boxShadow: `0 4px 12px -4px ${brandColor}80`,
+              }}
+            >
+              {flagOrInitials}
+            </span>
+          )}
           <span className="min-w-0 flex-1 leading-tight">
             <span className="block text-[9.5px] font-semibold uppercase tracking-wider text-fg-dim">
               Flotă activă
@@ -54,8 +82,8 @@ export function FleetCard() {
         <div>
           <div className="mb-1 flex items-center justify-between text-[10.5px]">
             <span className="text-fg-muted">
-              <span className="font-mono font-semibold text-fg">{t.planUsage.used}</span>
-              <span className="text-fg-dim"> / {t.planUsage.total}</span> curieri
+              <span className="font-mono font-semibold text-fg">{activeInFleet}</span>
+              <span className="text-fg-dim"> / {capacity}</span> curieri activi
             </span>
             <span className="font-mono font-bold text-fg">{pct}%</span>
           </div>

@@ -13,6 +13,8 @@ import { PlatformLogo } from "@/components/ui/PlatformLogo";
 import { useToast } from "@/components/ui/Toast";
 import { useProfile } from "@/lib/profile/context";
 import { useSession } from "@/lib/rbac/session";
+import { useCouriers } from "@/lib/couriers/context";
+import { useCandidates } from "@/lib/candidates/context";
 import { FleetSwitcherDialog } from "@/components/layout/FleetSwitcherDialog";
 import { useSettings } from "@/lib/settings/context";
 import {
@@ -113,8 +115,15 @@ export function TabFlota() {
 
 /* ─── FLEET HEADER + SWITCH DIALOG ─── */
 function FleetHeaderCard() {
-  const { user } = useSession();
+  const { user, activeFleetId } = useSession();
+  const { allRows } = useCouriers();
+  const { candidates } = useCandidates();
   const [open, setOpen] = useState(false);
+
+  const fleetCouriers = allRows.filter((c) => c.tenantId === activeFleetId);
+  const activeCouriers = fleetCouriers.filter((c) => c.status === "active" || c.status === "in_activation").length;
+  const openCandidates = candidates.length;
+
   return (
     <section className="rounded-2xl border border-line bg-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-4">
@@ -132,7 +141,7 @@ function FleetHeaderCard() {
               </span>
             </div>
             <div className="mt-0.5 text-[12px] text-fg-muted">
-              {user.activeTenant.planUsage.used} curieri activi · Gestionează flota activă și regulile operaționale.
+              {activeCouriers} curieri activi · {openCandidates} candidați
             </div>
           </div>
         </div>
@@ -306,6 +315,12 @@ function CitiesPlatformsCard({
   const [openCity, setOpenCity] = useState<string | null>(null);
   const [addOpen, setAddOpen]   = useState(false);
   const [newCityName, setNewCityName] = useState("");
+  const [cityQuery, setCityQuery] = useState("");
+
+  const filteredCities = cityQuery.trim()
+    ? cities.filter((c) => c.name.toLowerCase().includes(cityQuery.trim().toLowerCase()))
+    : cities;
+  const activeCount = cities.filter((c) => c.status === "active").length;
 
   function submitCity() {
     if (!newCityName.trim()) return;
@@ -326,12 +341,29 @@ function CitiesPlatformsCard({
       <div className="grid gap-5 p-5 md:grid-cols-2">
         {/* ORAȘE */}
         <div>
-          <div className="mb-2 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-fg-dim">
-            <MapPin size={11} />
-            Orașe
+          <div className="mb-2 flex items-center justify-between gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-fg-dim">
+            <span className="inline-flex items-center gap-1.5">
+              <MapPin size={11} />
+              Orașe ({activeCount}/{cities.length})
+            </span>
+            <button
+              type="button"
+              onClick={() => setAddOpen(true)}
+              className="rounded-md border border-dashed border-line px-2 py-0.5 text-[10px] font-semibold text-fg-muted hover:border-violet-500/50 hover:text-violet-200"
+            >
+              + Adaugă
+            </button>
           </div>
+          <input
+            type="text"
+            value={cityQuery}
+            onChange={(e) => setCityQuery(e.target.value)}
+            placeholder="Caută oraș..."
+            className="mb-2 h-8 w-full rounded-lg border border-line bg-card-2 px-3 text-[12px] text-fg placeholder:text-fg-dim focus:border-violet-500/60 focus:outline-none"
+          />
+          <div className="max-h-64 overflow-y-auto rounded-lg border border-line/40 bg-card-2/20 p-2">
           <div className="flex flex-wrap items-center gap-2">
-            {cities.map((c) => (
+            {filteredCities.map((c) => (
               <div key={c.id} className="relative">
                 <button
                   type="button"
@@ -373,13 +405,10 @@ function CitiesPlatformsCard({
                 )}
               </div>
             ))}
-            <button
-              type="button"
-              onClick={() => setAddOpen(true)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-line bg-card-2/40 px-3 py-1.5 text-[12.5px] font-semibold text-fg-muted hover:border-violet-500/50 hover:text-violet-200"
-            >
-              + Adaugă oraș
-            </button>
+            {filteredCities.length === 0 && (
+              <div className="px-2 py-4 text-center text-[11.5px] text-fg-dim">Niciun oraș nu se potrivește căutării.</div>
+            )}
+          </div>
           </div>
         </div>
 

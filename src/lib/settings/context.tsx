@@ -49,7 +49,7 @@ type SettingsContextValue = {
   toggleNotificationChannel: (key: NotificationChannelKey, next: boolean) => void;
   // Team
   addTeamMember: (data: { name: string; email: string; role: TeamRoleKey; workspace: string; sendInvite: boolean }) => void;
-  updateTeamMember: (id: string, patch: Partial<Pick<TeamMember, "role" | "workspace" | "status">>) => void;
+  updateTeamMember: (id: string, patch: Partial<Pick<TeamMember, "name" | "email" | "role" | "workspace" | "status">>) => void;
   removeTeamMember: (id: string) => void;
   resendInvitation: (id: string) => void;
   cancelInvitation: (id: string) => void;
@@ -90,7 +90,8 @@ function safeRead(): SettingsState {
           ...(parsed.fleet?.vehicleTypesAllowed ?? {}),
         },
       },
-      cities:    parsed.cities    ?? DEFAULT_SETTINGS.cities,
+      // Auto-migrate: dacă user-ul are lista veche (<10 orașe), forțăm defaultul cu toate cele 63.
+      cities:    (parsed.cities && parsed.cities.length >= 10) ? parsed.cities : DEFAULT_SETTINGS.cities,
       platforms: { ...DEFAULT_SETTINGS.platforms, ...(parsed.platforms ?? {}) },
       integrations: {
         platforms: parsed.integrations?.platforms ?? DEFAULT_SETTINGS.integrations.platforms,
@@ -98,8 +99,26 @@ function safeRead(): SettingsState {
         channels:  { ...DEFAULT_SETTINGS.integrations.channels,  ...(parsed.integrations?.channels ?? {}) },
       },
       team: {
-        members:     parsed.team?.members     ?? DEFAULT_SETTINGS.team.members,
-        invitations: parsed.team?.invitations ?? DEFAULT_SETTINGS.team.invitations,
+        // Auto-migrate: dacă există seed members vechi (u_andrei, u_maria etc.), forțăm defaultul.
+        // + sanitize role: convertim rolurile RBAC salvate greșit la TeamRoleKey valid.
+        members: (() => {
+          const raw = parsed.team?.members;
+          if (!raw || raw.some((m) => ["u_andrei","u_maria","u_stefan","u_alex","u_cristi","u_dana","u_george","u_laura","u_mihai","u_raluca","u_bogdan"].includes(m.id))) {
+            return DEFAULT_SETTINGS.team.members;
+          }
+          const VALID_TEAM_ROLES = ["global_owner","fleet_admin","subcontractor_admin","hr","payments","viewer"];
+          const RBAC_FIX: Record<string, string> = {
+            subcontractor_owner: "subcontractor_admin",
+            operator_payments:   "payments",
+            operator_recruitment:"hr",
+          };
+          return raw.map((m) => {
+            if (VALID_TEAM_ROLES.includes(m.role)) return m;
+            const fixed = RBAC_FIX[m.role] ?? "viewer";
+            return { ...m, role: fixed };
+          });
+        })(),
+        invitations: (parsed.team?.invitations && !parsed.team.invitations.some((i) => ["inv_1","inv_2"].includes(i.id))) ? parsed.team.invitations : DEFAULT_SETTINGS.team.invitations,
         access:      { ...DEFAULT_SETTINGS.team.access, ...(parsed.team?.access ?? {}) },
       },
       securityAlerts: { ...DEFAULT_SETTINGS.securityAlerts, ...(parsed.securityAlerts ?? {}) },
@@ -112,7 +131,12 @@ function safeRead(): SettingsState {
       branding:       { ...DEFAULT_SETTINGS.branding, ...(parsed.branding ?? {}) },
       notificationsOrg: {
         channels:   { ...DEFAULT_SETTINGS.notificationsOrg.channels,   ...(parsed.notificationsOrg?.channels ?? {}) },
-        categories: parsed.notificationsOrg?.categories ?? DEFAULT_SETTINGS.notificationsOrg.categories,
+        // Merge inteligent: pornim de la DEFAULT (sursa completă de chei) și suprapunem valorile
+        // salvate. Dacă localStorage-ul e vechi/corupt, cade grațios pe defaults.
+        categories: DEFAULT_SETTINGS.notificationsOrg.categories.map((defCat) => {
+          const stored = parsed.notificationsOrg?.categories?.find((c) => c?.key === defCat.key);
+          return stored ? { ...defCat, ...stored } : defCat;
+        }),
         schedule:   { ...DEFAULT_SETTINGS.notificationsOrg.schedule,   ...(parsed.notificationsOrg?.schedule ?? {}) },
         extras:     { ...DEFAULT_SETTINGS.notificationsOrg.extras,     ...(parsed.notificationsOrg?.extras ?? {}) },
       },
@@ -135,7 +159,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     if (!hydrated) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
-    } catch {}
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error("[settings] localStorage save failed:", err);
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("crm31:settings-save-failed"));
+      }
+    }
   }, [settings, hydrated]);
 
   const updateSettings       = useCallback((patch: Partial<SettingsState>) => setSettings((prev) => ({ ...prev, ...patch })), []);
@@ -199,7 +229,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const updateTeamMember = useCallback((id: string, patch: Partial<Pick<TeamMember, "role" | "workspace" | "status">>) =>
+  const updateTeamMember = useCallback((id: string, patch: Partial<Pick<TeamMember, "name" | "email" | "role" | "workspace" | "status">>) =>
     setSettings((prev) => ({
       ...prev,
       team: { ...prev.team, members: prev.team.members.map((m) => m.id === id ? { ...m, ...patch, workspaceAll: (patch.role ?? m.role) === "global_owner" || m.workspaceAll } : m) },

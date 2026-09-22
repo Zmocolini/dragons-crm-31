@@ -12,14 +12,8 @@ import type { Candidate, DuplicateMatch } from "./types";
 
 const STORAGE_KEY = "crm31-candidates";
 
-// Curieri existenți (seed local, doar pentru duplicate detection demo)
-const MOCK_COURIERS: { id: string; name: string; phone: string; email: string | null }[] = [
-  { id: "c_001", name: "Andrei Popescu",   phone: "+40 722 123 456", email: null },
-  { id: "c_002", name: "Mihai Ionescu",    phone: "+40 731 987 654", email: null },
-  { id: "c_003", name: "Ravi Kumar",       phone: "+40 745 111 222", email: null },
-  { id: "c_004", name: "Fatima Ali",       phone: "+40 756 333 444", email: null },
-  { id: "c_005", name: "Carlos Mendes",    phone: "+40 768 555 666", email: null },
-];
+// TODO(real-users): duplicate detection server-side pe couriers table.
+const MOCK_COURIERS: { id: string; name: string; phone: string; email: string | null }[] = [];
 
 type CandidatesContextValue = {
   candidates: Candidate[];

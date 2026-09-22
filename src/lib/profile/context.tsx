@@ -9,6 +9,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useAuth } from "@/lib/auth/context";
 import {
   DEFAULT_PROFILE,
   DEFAULT_RECYCLE,
@@ -91,46 +92,43 @@ const MODULE_FOR_KIND: Record<ActivityEventKind, string> = {
   "payment.draft":                     "Plăți",
 };
 
-function detectDevice(): string {
+function detectOS(): string {
   if (typeof navigator === "undefined") return "—";
   const ua = navigator.userAgent;
-  let os = "Windows";
-  if (/Mac/.test(ua)) os = "macOS";
-  else if (/iPhone|iPad|iPod/.test(ua)) os = "iOS";
-  else if (/Android/.test(ua)) os = "Android";
-  else if (/Linux/.test(ua)) os = "Linux";
-
-  let br = "Browser";
-  if (/Edg\//.test(ua))         br = "Edge";
-  else if (/Chrome\//.test(ua)) br = "Chrome";
-  else if (/Firefox\//.test(ua)) br = "Firefox";
-  else if (/Safari\//.test(ua)) br = "Safari";
-
-  return `${os} · ${br}`;
+  if (/Windows NT 10/.test(ua)) return "Windows 10/11";
+  if (/Windows/.test(ua))       return "Windows";
+  if (/iPhone/.test(ua))        return "iPhone";
+  if (/iPad/.test(ua))          return "iPad";
+  if (/Android/.test(ua))       return "Android";
+  if (/Mac/.test(ua))           return "Mac";
+  if (/Linux/.test(ua))         return "Linux";
+  return "Necunoscut";
 }
 
-function seedActivity(): ActivityEvent[] {
-  // Seed câteva evenimente ca screenshot-ul să aibă conținut. TODO(real-users): drop.
-  const now = Date.now();
-  const day = 86_400_000;
-  const ip  = "79.112.45.210";
-  const device = detectDevice();
-  const seed: Omit<ActivityEvent, "id">[] = [
-    { kind: "login",                   module: "Autentificare", createdAt: new Date(now).toISOString(),              details: "Sesiune nouă",             ip, device },
-    { kind: "report.view",             module: "Rapoarte",      createdAt: new Date(now - 2 * 3600e3).toISOString(),   details: "Raport curieri",           ip, device },
-    { kind: "profile.update",          module: "Profil",        createdAt: new Date(now - 2 * day).toISOString(),      details: "Informații personale",     ip, device },
-    { kind: "tenant.switch",           module: "Flotă",         createdAt: new Date(now - 3 * day).toISOString(),      details: "Dragon Delivery",          ip, device },
-    { kind: "document.download",       module: "Documente",     createdAt: new Date(now - 4 * day).toISOString(),      details: "Contract colaborare",      ip, device },
-    { kind: "preferences.update",      module: "Preferințe",    createdAt: new Date(now - 6 * day).toISOString(),      details: "Preferințe notificări",    ip, device },
-    { kind: "logout",                  module: "Autentificare", createdAt: new Date(now - 8 * day).toISOString(),      details: "Sesiune închisă",          ip, device },
-    { kind: "login",                   module: "Autentificare", createdAt: new Date(now - 8 * day - 2 * 3600e3).toISOString(), details: "Sesiune nouă",       ip, device: "iPhone · Safari" },
-    { kind: "candidate.create",        module: "Candidați",     createdAt: new Date(now - 9 * day).toISOString(),      details: "Candidat nou adăugat",     ip, device },
-    { kind: "document.activate",       module: "Documente",     createdAt: new Date(now - 10 * day).toISOString(),     details: "Document verificat",       ip, device },
-  ];
-  return seed.map((e, i) => ({ id: `seed_${i}`, ...e }));
+function detectBrowser(): string {
+  if (typeof navigator === "undefined") return "—";
+  const ua = navigator.userAgent;
+  let m: RegExpMatchArray | null;
+  if ((m = ua.match(/Edg\/(\d+)/)))                          return `Edge ${m[1]}`;
+  if ((m = ua.match(/OPR\/(\d+)/)))                          return `Opera ${m[1]}`;
+  if ((m = ua.match(/Chrome\/(\d+)/)))                       return `Chrome ${m[1]}`;
+  if ((m = ua.match(/Firefox\/(\d+)/)))                      return `Firefox ${m[1]}`;
+  if ((m = ua.match(/Version\/(\d+)[.\d]*\s+Safari/)))       return `Safari ${m[1]}`;
+  return "Browser";
 }
+
+function detectDevice(): string {
+  return `${detectOS()} · ${detectBrowser()}`;
+}
+
+
 
 export function ProfileProvider({ children }: { children: ReactNode }) {
+  const { current } = useAuth();
+  // Cheia per-user pentru profil — dacă schimbi contul, profilul se schimbă cu el
+  // (nu mai vezi datele contului anterior salvate global).
+  const profileKey = current ? `${KEY_PROFILE}-${current.id}` : KEY_PROFILE;
+
   const [profile, setProfile]                     = useState<ProfileData>(DEFAULT_PROFILE);
   const [activity, setActivity]                   = useState<ActivityEvent[]>([]);
   const [sessions, setSessions]                   = useState<SessionRecord[]>(DEFAULT_SESSIONS);
@@ -138,24 +136,78 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   const [recycle, setRecycle]                     = useState<RecycleItem[]>(DEFAULT_RECYCLE);
   const [hydrated, setHydrated]                   = useState(false);
 
+  // Re-încarcă profilul când user-ul curent se schimbă (login pe alt cont).
   useEffect(() => {
-    const savedActivity = safeRead<ActivityEvent[]>(KEY_ACTIVITY, []);
+    const stored = safeRead<Partial<ProfileData>>(profileKey, {});
     setProfile({
       ...DEFAULT_PROFILE,
-      ...safeRead<Partial<ProfileData>>(KEY_PROFILE, {}),
+      // Dacă user-ul e autentificat, seed nume + email din auth.
+      ...(current ? { displayName: current.name, email: current.email } : {}),
+      // Apoi suprapunem preferințele salvate (dacă există)
+      ...stored,
       notifications: {
         ...DEFAULT_PROFILE.notifications,
-        ...(safeRead<Partial<ProfileData>>(KEY_PROFILE, {}).notifications ?? {}),
+        ...(stored.notifications ?? {}),
       },
     });
-    setActivity(savedActivity.length ? savedActivity : seedActivity());
+    setActivity(safeRead<ActivityEvent[]>(KEY_ACTIVITY, []));
     setSessions(safeRead<SessionRecord[]>(KEY_SESSIONS, DEFAULT_SESSIONS));
     setSecurityEvents(safeRead<SecurityEvent[]>(KEY_SECURITY, DEFAULT_SECURITY_EVENTS));
     setRecycle(safeRead<RecycleItem[]>(KEY_RECYCLE, DEFAULT_RECYCLE));
     setHydrated(true);
-  }, []);
+  }, [profileKey, current]);
 
-  useEffect(() => { if (hydrated) try { localStorage.setItem(KEY_PROFILE,  JSON.stringify(profile)); } catch {} }, [profile, hydrated]);
+  // Sesiune curentă + login event (real, din browser).
+  useEffect(() => {
+    if (!hydrated) return;
+    const os = detectOS();
+    const browser = detectBrowser();
+    const nowIso = new Date().toISOString();
+
+    setSessions((prev) => {
+      const others = prev.filter((s) => s.id !== "s_current" && !s.current);
+      return [
+        {
+          id: "s_current",
+          device: os,
+          browser,
+          location: "Această sesiune",
+          lastActive: nowIso,
+          current: true,
+        },
+        ...others,
+      ];
+    });
+
+    setSecurityEvents((prev) => {
+      const lastLogin = prev.find((e) => e.kind === "login.success");
+      const stale = !lastLogin || (Date.now() - Date.parse(lastLogin.createdAt) > 30 * 60_000);
+      if (!stale) return prev;
+      return [{
+        id: `se_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        kind: "login.success" as SecurityEvent["kind"],
+        createdAt: nowIso,
+        ip: "—",
+        details: `${os} · ${browser}`,
+      } as SecurityEvent, ...prev].slice(0, 200);
+    });
+
+    // Update lastActive când tab-ul devine vizibil sau la 5 min.
+    const bump = () => {
+      setSessions((prev) => prev.map((s) => s.current
+        ? { ...s, lastActive: new Date().toISOString() }
+        : s));
+    };
+    const onVisibility = () => { if (document.visibilityState === "visible") bump(); };
+    document.addEventListener("visibilitychange", onVisibility);
+    const id = window.setInterval(bump, 5 * 60_000);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.clearInterval(id);
+    };
+  }, [hydrated]);
+
+  useEffect(() => { if (hydrated) try { localStorage.setItem(profileKey,  JSON.stringify(profile)); } catch {} }, [profile, hydrated, profileKey]);
   useEffect(() => { if (hydrated) try { localStorage.setItem(KEY_ACTIVITY, JSON.stringify(activity.slice(0, MAX_ACTIVITY))); } catch {} }, [activity, hydrated]);
   useEffect(() => { if (hydrated) try { localStorage.setItem(KEY_SESSIONS, JSON.stringify(sessions)); } catch {} }, [sessions, hydrated]);
   useEffect(() => { if (hydrated) try { localStorage.setItem(KEY_SECURITY, JSON.stringify(securityEvents)); } catch {} }, [securityEvents, hydrated]);

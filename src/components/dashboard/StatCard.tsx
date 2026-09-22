@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { ArrowUp, ArrowDown, Minus } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { IconBox } from "@/components/ui/IconBox";
@@ -16,11 +17,11 @@ const TREND_ICON = {
   flat: Minus,
 } as const;
 
-export function StatCard({ stat, icon }: { stat: Stat; icon: LucideIcon }) {
+export function StatCard({ stat, icon, href }: { stat: Stat; icon: LucideIcon; href?: string }) {
   const Trend = stat.trend ? TREND_ICON[stat.trend.direction] : null;
 
-  return (
-    <div className="group rounded-xl border border-line bg-card p-4 transition-colors hover:bg-card-hover">
+  const inner = (
+    <>
       <div className="flex items-start justify-between gap-3">
         <IconBox icon={icon} tone={stat.tone} size={40} />
       </div>
@@ -44,6 +45,13 @@ export function StatCard({ stat, icon }: { stat: Stat; icon: LucideIcon }) {
         )}
       </div>
       <div className="mt-1.5 text-[11.5px] text-fg-dim">{stat.subtext}</div>
-    </div>
+    </>
   );
+
+  const cls = "group block rounded-xl border border-line bg-card p-4 transition-colors hover:bg-card-hover";
+
+  if (href) {
+    return <Link href={href} className={cls} aria-label={`Deschide ${stat.label}`}>{inner}</Link>;
+  }
+  return <div className={cls}>{inner}</div>;
 }

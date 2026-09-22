@@ -1,6 +1,29 @@
+"use client";
+
+import Image from "next/image";
 import { Flame } from "lucide-react";
+import { useSettings } from "@/lib/settings/context";
 
 export function Logo({ compact = false }: { compact?: boolean }) {
+  const { settings } = useSettings();
+  const logo = settings.organization.logoDataUrl;
+  const name = settings.organization.name || "Dragon Delivery";
+
+  if (logo) {
+    return (
+      <div className="flex items-center gap-3">
+        <span className="relative inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl border border-line bg-card-2">
+          <Image src={logo} alt={name} fill sizes="40px" className="object-contain" unoptimized />
+        </span>
+        {!compact && (
+          <div className="min-w-0 leading-tight">
+            <div className="truncate text-[14px] font-bold tracking-tight text-fg">{name}</div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-3">
       <span className="relative inline-flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl bg-gradient-to-br from-orange-500 via-amber-500 to-red-600 shadow-[0_8px_24px_-6px_rgba(249,115,22,0.55)]">

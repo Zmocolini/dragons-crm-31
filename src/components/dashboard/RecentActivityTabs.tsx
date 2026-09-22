@@ -12,37 +12,11 @@ import {
   STATUS_TONE,
 } from "./shared";
 import type {
-  RecentActivation,
-  RecentCandidate,
   RecentCourier,
   RecentIssue,
   RecentPayment,
 } from "@/lib/dashboard/types";
 import { cn } from "@/lib/utils/cn";
-
-const CANDIDATE_STAGE_LABEL = {
-  nou: "Nou",
-  sunat: "Sunat",
-  interviu: "Interviu",
-  documente: "Documente",
-} as const;
-const CANDIDATE_STAGE_TONE = {
-  nou: "info",
-  sunat: "warn",
-  interviu: "accent",
-  documente: "success",
-} as const;
-
-const ACTIVATION_STATUS_LABEL = {
-  finalizat: "Finalizat",
-  in_proces: "În proces",
-  blocat: "Blocat",
-} as const;
-const ACTIVATION_STATUS_TONE = {
-  finalizat: "success",
-  in_proces: "warn",
-  blocat: "danger",
-} as const;
 
 const PAYMENT_STATUS_LABEL = {
   platit: "Plătit",
@@ -66,20 +40,16 @@ const ISSUE_SEVERITY_TONE = {
   high: "danger",
 } as const;
 
-type Tab = "couriers" | "candidates" | "activations" | "payments" | "issues";
+type Tab = "couriers" | "payments" | "issues";
 
 const TABS: { key: Tab; label: string; href: string }[] = [
   { key: "couriers", label: "Curieri recenți", href: "/curieri" },
-  { key: "candidates", label: "Candidați noi", href: "/candidati" },
-  { key: "activations", label: "Activări", href: "/activari" },
   { key: "payments", label: "Plăți recente", href: "/plati" },
   { key: "issues", label: "Probleme", href: "/probleme" },
 ];
 
 type Props = {
   couriers: RecentCourier[];
-  candidates: RecentCandidate[];
-  activations: RecentActivation[];
   payments: RecentPayment[];
   issues: RecentIssue[];
 };
@@ -130,8 +100,6 @@ export function RecentActivityTabs(props: Props) {
 
       <div className="overflow-x-auto">
         {tab === "couriers" && <CouriersTable rows={props.couriers} />}
-        {tab === "candidates" && <CandidatesTable rows={props.candidates} />}
-        {tab === "activations" && <ActivationsTable rows={props.activations} />}
         {tab === "payments" && <PaymentsTable rows={props.payments} />}
         {tab === "issues" && <IssuesTable rows={props.issues} />}
       </div>
@@ -210,94 +178,6 @@ function CouriersTable({ rows }: { rows: RecentCourier[] }) {
             </TD>
             <TD className="font-mono text-[12.5px] text-fg-muted">
               {formatShortDate(r.registeredAt)}
-            </TD>
-            <TD className="text-right pr-4">
-              <RowActionButton />
-            </TD>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-function CandidatesTable({ rows }: { rows: RecentCandidate[] }) {
-  return (
-    <table className="w-full min-w-[720px] border-collapse">
-      <thead className="border-b border-line/70">
-        <tr>
-          <TH>Nume</TH>
-          <TH>Telefon</TH>
-          <TH>Oraș</TH>
-          <TH>Sursă</TH>
-          <TH>Stadiu</TH>
-          <TH>Adăugat</TH>
-          <TH className="text-right pr-6">Acțiuni</TH>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-line/40">
-        {rows.map((r) => (
-          <tr key={r.id} className="transition-colors hover:bg-white/[0.02]">
-            <TD>
-              <div className="flex items-center gap-3">
-                <Avatar name={r.name} size={30} />
-                <span className="font-medium text-fg">{r.name}</span>
-              </div>
-            </TD>
-            <TD className="font-mono text-[12.5px] text-fg-muted">{r.phone}</TD>
-            <TD className="text-fg-muted">{r.city}</TD>
-            <TD className="text-fg-muted">{r.source}</TD>
-            <TD>
-              <Badge tone={CANDIDATE_STAGE_TONE[r.stage]}>
-                {CANDIDATE_STAGE_LABEL[r.stage]}
-              </Badge>
-            </TD>
-            <TD className="font-mono text-[12.5px] text-fg-muted">
-              {formatShortDate(r.createdAt)}
-            </TD>
-            <TD className="text-right pr-4">
-              <RowActionButton />
-            </TD>
-          </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-function ActivationsTable({ rows }: { rows: RecentActivation[] }) {
-  return (
-    <table className="w-full min-w-[720px] border-collapse">
-      <thead className="border-b border-line/70">
-        <tr>
-          <TH>Curier</TH>
-          <TH>Platformă</TH>
-          <TH>Oraș</TH>
-          <TH>Status</TH>
-          <TH>Finalizat</TH>
-          <TH className="text-right pr-6">Acțiuni</TH>
-        </tr>
-      </thead>
-      <tbody className="divide-y divide-line/40">
-        {rows.map((r) => (
-          <tr key={r.id} className="transition-colors hover:bg-white/[0.02]">
-            <TD>
-              <div className="flex items-center gap-3">
-                <Avatar name={r.courierName} size={30} />
-                <span className="font-medium text-fg">{r.courierName}</span>
-              </div>
-            </TD>
-            <TD>
-              <PlatformChip platform={r.platform} />
-            </TD>
-            <TD className="text-fg-muted">{r.city}</TD>
-            <TD>
-              <Badge tone={ACTIVATION_STATUS_TONE[r.status]}>
-                {ACTIVATION_STATUS_LABEL[r.status]}
-              </Badge>
-            </TD>
-            <TD className="font-mono text-[12.5px] text-fg-muted">
-              {formatShortDate(r.completedAt)}
             </TD>
             <TD className="text-right pr-4">
               <RowActionButton />

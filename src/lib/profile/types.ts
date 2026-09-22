@@ -126,63 +126,8 @@ export const DEFAULT_PROFILE: ProfileData = {
   alwaysDashboard: true,
 };
 
-export const DEFAULT_SESSIONS: SessionRecord[] = [
-  {
-    id: "s_current",
-    device: "Windows 11",
-    browser: "Chrome 128",
-    location: "București, RO",
-    lastActive: new Date().toISOString(),
-    current: true,
-  },
-  {
-    id: "s_iphone",
-    device: "iPhone 14",
-    browser: "Safari 17",
-    location: "Cluj-Napoca, RO",
-    lastActive: new Date(Date.now() - 86_400_000).toISOString(),
-    current: false,
-  },
-  {
-    id: "s_macbook",
-    device: "MacBook Pro",
-    browser: "Safari 17",
-    location: "Timișoara, RO",
-    lastActive: new Date(Date.now() - 3 * 86_400_000).toISOString(),
-    current: false,
-  },
-  {
-    id: "s_android",
-    device: "Android",
-    browser: "Chrome 127",
-    location: "Iași, RO",
-    lastActive: new Date(Date.now() - 7 * 86_400_000).toISOString(),
-    current: false,
-  },
-];
-
-export const DEFAULT_SECURITY_EVENTS: SecurityEvent[] = [
-  {
-    id: "se_1",
-    kind: "login.success",
-    createdAt: new Date().toISOString(),
-    ip: "79.112.45.210",
-    details: "Windows · Chrome",
-  },
-  {
-    id: "se_2",
-    kind: "profile.change" as SecurityEvent["kind"],
-    createdAt: new Date(Date.now() - 2 * 86_400_000).toISOString(),
-    ip: "79.112.45.210",
-    details: "Informații personale",
-  } as SecurityEvent,
-  {
-    id: "se_3",
-    kind: "password.change",
-    createdAt: new Date(Date.now() - 8 * 86_400_000).toISOString(),
-    ip: "79.112.45.210",
-    details: "Parolă actualizată",
-  },
-];
+// Reale, populate din browser în ProfileProvider după hydration.
+export const DEFAULT_SESSIONS: SessionRecord[] = [];
+export const DEFAULT_SECURITY_EVENTS: SecurityEvent[] = [];
 
 export const DEFAULT_RECYCLE: RecycleItem[] = [];

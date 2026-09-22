@@ -1,6 +1,9 @@
 @import "tailwindcss";
 
-@theme inline {
+/* NB: NU folosi `@theme inline` — inline inlineează valorile în utilitare și
+   dezactivează override-urile de temă de mai jos. `@theme` emite var(--color-*)
+   pe :root, ceea ce permite comutarea light/dark la runtime. */
+@theme {
   /* Layout surfaces */
   --color-app: #070b10;
   --color-panel: #070a0f;
@@ -46,6 +49,14 @@ html[data-theme="light"] {
   --color-fg: #0f172a;
   --color-fg-muted: #475569;
   --color-fg-dim: #64748b;
+}
+
+/* color-scheme urmează tema (controlează scrollbar/form controls native) */
+html {
+  color-scheme: dark;
+}
+html[data-theme="light"] {
+  color-scheme: light;
 }
 
 html,

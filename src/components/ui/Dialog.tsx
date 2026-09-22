@@ -49,7 +49,7 @@ export function Dialog({
     >
       <div
         className={cn(
-          "relative w-full rounded-2xl border border-line bg-card p-6 shadow-2xl",
+          "relative w-full max-h-[92dvh] overflow-y-auto rounded-2xl border border-line bg-card p-5 shadow-2xl sm:p-6",
           width,
         )}
         onClick={(e) => e.stopPropagation()}
@@ -76,5 +76,5 @@ export function Dialog({
 }
 
 export function DialogFooter({ children }: { children: ReactNode }) {
-  return <div className="mt-6 flex items-center justify-end gap-2">{children}</div>;
+  return <div className="mt-6 flex flex-wrap items-center justify-end gap-2">{children}</div>;
 }

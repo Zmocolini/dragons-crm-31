@@ -57,7 +57,7 @@ export function RightRail() {
           <h3 className="text-[13.5px] font-semibold text-fg">Informații sistem</h3>
         </header>
         <dl className="divide-y divide-line/40">
-          <InfoRow icon={HardDrive} label="Versiune aplicație" value="v2.0.0" />
+          <InfoRow icon={HardDrive} label="Versiune aplicație" value="v3.1.0" />
           <InfoRow
             icon={Activity}
             label="Ultima actualizare"

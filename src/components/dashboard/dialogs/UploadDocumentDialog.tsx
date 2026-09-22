@@ -22,6 +22,7 @@ import {
 import { useProfile } from "@/lib/profile/context";
 import { useSession } from "@/lib/rbac/session";
 import { cn } from "@/lib/utils/cn";
+import { resizeImageFile } from "@/lib/utils/image";
 
 // TODO(real-users): server action `uploadDocument(subjectId, file, meta)` cu
 // authorize(role, "documents.upload") + upload multipart -> object storage +
@@ -208,11 +209,22 @@ export function UploadDocumentDialog({ open, onClose, prefillSubjectId }: Props)
       toast.error("Fișier prea mare", "Dimensiunea maximă acceptată este 10 MB.");
       return;
     }
-    if (fileUrl) URL.revokeObjectURL(fileUrl);
-    const url = URL.createObjectURL(f);
+    if (fileUrl && fileUrl.startsWith("blob:")) URL.revokeObjectURL(fileUrl);
     setFile(f);
-    setFileUrl(url);
+    setFileUrl(null);
     setUploadState("uploading");
+    // Convertesc la dataURL comprimat (imagini) sau raw (PDF) → persistă în localStorage.
+    const isImage = f.type.startsWith("image/");
+    if (isImage) {
+      resizeImageFile(f, 800, { format: "jpeg", quality: 0.75 })
+        .then((url) => setFileUrl(url))
+        .catch(() => toast.error("Eroare", "Nu s-a putut procesa imaginea."));
+    } else {
+      const reader = new FileReader();
+      reader.onload = () => setFileUrl(reader.result as string);
+      reader.onerror = () => toast.error("Eroare", "Nu s-a putut citi fișierul.");
+      reader.readAsDataURL(f);
+    }
     setUploadProgress(0);
     // Simulare upload (server real ar streama către S3 cu XHR onprogress)
     const start = Date.now();
@@ -285,6 +297,11 @@ export function UploadDocumentDialog({ open, onClose, prefillSubjectId }: Props)
       "Data expirării": noExpiry ? "—" : formatDateShort(expiryIso),
     } : null;
 
+    // Ascult failure event, notific dacă storage e plin.
+    const onSaveFailed = () => toast.error("Storage plin", "Documentul e vizibil acum, dar nu încape în browser storage. Refresh-ul l-a pierde. Șterge alte documente vechi sau folosește imagini mai mici.");
+    if (typeof window !== "undefined") window.addEventListener("crm31-docs-save-failed", onSaveFailed, { once: true });
+    setTimeout(() => { if (typeof window !== "undefined") window.removeEventListener("crm31-docs-save-failed", onSaveFailed); }, 800);
+
     const created = addDocument({
       tenantId: activeFleetId,
       fleetId:  activeFleetId,
@@ -334,7 +351,7 @@ export function UploadDocumentDialog({ open, onClose, prefillSubjectId }: Props)
       role="dialog"
       aria-modal="true"
       aria-labelledby="upload-document-title"
-      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
       onClick={requestClose}
     >
       <div

@@ -8,6 +8,7 @@ import { AddCandidateDialog } from "./dialogs/AddCandidateDialog";
 import { AddCourierDialog } from "./dialogs/AddCourierDialog";
 import { QuickReportDialog } from "./dialogs/QuickReportDialog";
 import { RecordPaymentDialog } from "./dialogs/RecordPaymentDialog";
+import { UploadDocumentDialog } from "./dialogs/UploadDocumentDialog";
 import { useSession } from "@/lib/rbac/session";
 import type { Permission, Role } from "@/lib/rbac/roles";
 
@@ -17,7 +18,6 @@ import type { Permission, Role } from "@/lib/rbac/roles";
 //   Încarcă document    -> secundar; upload rapid ad-hoc (Owner + Manager + HR)
 //   Înregistrează plată -> DOAR Owner + Operator plăți
 //   Raport rapid        -> DOAR Owner + Manager (subcontractor_owner)
-// TODO(real-users): mută restricțiile pe server actions cu authorize(role, permission).
 
 type PrimaryLink = {
   kind: "link";
@@ -59,8 +59,6 @@ const PRIMARY_ACTIONS: PrimaryAction[] = [
 
 const SECONDARY_ACTION = {
   label: "Încarcă document",
-  href: "/documente/nou",
-  icon: FileText,
   permission: "documents.upload" as Permission,
 };
 
@@ -70,6 +68,7 @@ export function QuickActionsPanel() {
   const [addCourierOpen, setAddCourierOpen] = useState(false);
   const [recordPaymentOpen, setRecordPaymentOpen] = useState(false);
   const [quickReportOpen, setQuickReportOpen] = useState(false);
+  const [uploadDocumentOpen, setUploadDocumentOpen] = useState(false);
 
   const visiblePrimary = PRIMARY_ACTIONS.filter((a) => {
     if (!can(a.permission)) return false;
@@ -138,14 +137,15 @@ export function QuickActionsPanel() {
             </span>
             <div className="h-px flex-1 bg-line/60" />
           </div>
-          <Link
-            href={SECONDARY_ACTION.href}
+          <button
+            type="button"
+            onClick={() => setUploadDocumentOpen(true)}
             className="group flex w-full items-center gap-2.5 rounded-lg border border-line/60 bg-transparent px-3 py-2 text-[12px] font-medium text-fg-dim transition-colors hover:bg-card-hover hover:text-fg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
           >
-            <SECONDARY_ACTION.icon size={13.5} strokeWidth={2} className="text-fg-dim/80" />
-            <span className="flex-1">{SECONDARY_ACTION.label}</span>
+            <FileText size={13.5} strokeWidth={2} className="text-fg-dim/80" />
+            <span className="flex-1 text-left">{SECONDARY_ACTION.label}</span>
             <ChevronRight size={12} className="text-fg-dim/70" />
-          </Link>
+          </button>
         </div>
       )}
 
@@ -153,6 +153,7 @@ export function QuickActionsPanel() {
       <AddCourierDialog open={addCourierOpen} onClose={() => setAddCourierOpen(false)} />
       <RecordPaymentDialog open={recordPaymentOpen} onClose={() => setRecordPaymentOpen(false)} />
       <QuickReportDialog open={quickReportOpen} onClose={() => setQuickReportOpen(false)} />
+      <UploadDocumentDialog open={uploadDocumentOpen} onClose={() => setUploadDocumentOpen(false)} />
     </div>
   );
 }

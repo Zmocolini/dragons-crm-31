@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  AlertTriangle, Bell, Calendar, FileText, Info, Mail, Megaphone,
-  MonitorSmartphone, ShieldCheck, Users, Wallet,
+  AlertTriangle, Bell, Calendar, FileText, Info, Megaphone,
+  MonitorSmartphone, Users, Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -17,15 +17,13 @@ import type {
 import { ORG_CATEGORY_LABEL } from "@/lib/settings/types";
 import { cn } from "@/lib/utils/cn";
 
-const CHANNEL_META: Record<OrgChannelKey, { label: string; desc: string; icon: LucideIcon }> = {
+const CHANNEL_META: Partial<Record<OrgChannelKey, { label: string; desc: string; icon: LucideIcon }>> = {
   in_app:       { label: "În aplicație", desc: "Notificări livrate în CRM.",              icon: Bell },
-  email:        { label: "E-mail",       desc: "Livrate pe email-ul de business.",        icon: Mail },
   push_browser: { label: "Push browser", desc: "Notificări browser pentru urgențe.",      icon: MonitorSmartphone },
 };
 
 const CATEGORY_ICON: Record<OrgCategoryKey, LucideIcon> = {
   payments_couriers:    Wallet,
-  activations_blocked:  ShieldCheck,
   docs_expired:         FileText,
   tasks_followup:       AlertTriangle,
   issues_urgent:        AlertTriangle,
@@ -34,11 +32,26 @@ const CATEGORY_ICON: Record<OrgCategoryKey, LucideIcon> = {
 
 const CATEGORY_ICON_TONE: Record<OrgCategoryKey, string> = {
   payments_couriers:    "text-emerald-400",
-  activations_blocked:  "text-sky-400",
   docs_expired:         "text-amber-400",
   tasks_followup:       "text-indigo-400",
   issues_urgent:        "text-rose-400",
   weekly_reports:       "text-fuchsia-400",
+};
+
+const CATEGORY_BG_TONE: Record<OrgCategoryKey, string> = {
+  payments_couriers:    "border-emerald-500/30 bg-emerald-500/[0.05]",
+  docs_expired:         "border-amber-500/30 bg-amber-500/[0.05]",
+  tasks_followup:       "border-indigo-500/30 bg-indigo-500/[0.05]",
+  issues_urgent:        "border-rose-500/30 bg-rose-500/[0.05]",
+  weekly_reports:       "border-fuchsia-500/30 bg-fuchsia-500/[0.05]",
+};
+
+const CATEGORY_DESCRIPTION: Record<OrgCategoryKey, string> = {
+  payments_couriers:    "Când un curier are plata pregătită, când plățile săptămânii sunt procesate sau când există plăți restante.",
+  docs_expired:         "Când documente ale curierilor (CI, permis, ITP, RCA) urmează să expire în 30 de zile sau au expirat deja.",
+  tasks_followup:       "Task-uri asignate ție care necesită acțiune sau follow-up: apel curier, verificare document, aprobare.",
+  issues_urgent:        "Probleme și tichete deschise de curieri care necesită răspuns rapid din partea managerului.",
+  weekly_reports:       "Rezumatul săptămânal cu performanța flotei: curieri activi, venit, plăți, documente, incidente.",
 };
 
 export function TabNotificari() {
@@ -131,9 +144,10 @@ function CanaleCard({
           Alege prin ce canale primești notificările din aplicație.
         </p>
       </header>
-      <ul className="grid gap-3 p-5 md:grid-cols-3">
+      <ul className="grid gap-3 p-5 md:grid-cols-2">
         {(Object.keys(CHANNEL_META) as OrgChannelKey[]).map((k) => {
           const meta = CHANNEL_META[k];
+          if (!meta) return null;
           const Icon = meta.icon;
           const on = channels[k];
           return (
@@ -170,78 +184,87 @@ function CategoriiCard({
   onToggle,
 }: {
   categories: NotificationsOrg["categories"];
-  onToggle: (k: OrgCategoryKey, channel: "in_app" | "email", v: boolean) => void;
+  onToggle: (k: OrgCategoryKey, channel: "in_app", v: boolean) => void;
 }) {
   return (
     <section className="rounded-2xl border border-line bg-card">
       <header className="border-b border-line/70 px-5 py-4">
-        <h3 className="text-[15px] font-semibold text-fg">Categorii de notificări</h3>
-        <p className="text-[11.5px] text-fg-muted">Configurează cine este anunțat și prin ce canal.</p>
+        <h3 className="text-[15px] font-semibold text-fg">Anunțuri în aplicație</h3>
+        <p className="text-[11.5px] text-fg-muted">
+          Alege ce tipuri de anunțuri primești în clopoțelul de sus. Fiecare categorie are propria descriere,
+          culoare și destinatari.
+        </p>
       </header>
 
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[820px] border-collapse">
-          <thead className="border-b border-line/50">
-            <tr>
-              <TH className="w-[240px]">Categorie</TH>
-              <TH className="w-[110px] text-center">În aplicație</TH>
-              <TH className="w-[110px] text-center">E-mail</TH>
-              <TH>Destinatari</TH>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line/40">
-            {categories.map((c) => {
-              const Icon = CATEGORY_ICON[c.key];
-              return (
-                <tr key={c.key} className="text-[12.5px]">
-                  <TD>
-                    <div className="flex items-center gap-2.5">
-                      <Icon size={14} className={cn("shrink-0", CATEGORY_ICON_TONE[c.key])} />
-                      <span className="font-semibold text-fg">{ORG_CATEGORY_LABEL[c.key]}</span>
+      <ul className="flex flex-col gap-3 p-5">
+        {categories.map((c) => {
+          const Icon = CATEGORY_ICON[c.key] ?? Bell;
+          return (
+            <li
+              key={c.key}
+              className={cn(
+                "flex flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-start sm:gap-4 sm:p-5",
+                CATEGORY_BG_TONE[c.key] ?? "border-line bg-card-2/40",
+              )}
+            >
+              {/* Icon mare cu tint */}
+              <span
+                className={cn(
+                  "inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border bg-black/30",
+                  CATEGORY_ICON_TONE[c.key],
+                )}
+              >
+                <Icon size={24} />
+              </span>
+
+              {/* Conținut */}
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="text-[15px] font-bold text-fg">
+                      {ORG_CATEGORY_LABEL[c.key]}
                     </div>
-                  </TD>
-                  <TD className="text-center">
-                    <div className="inline-flex">
-                      <Switch checked={c.in_app} onChange={(v) => onToggle(c.key, "in_app", v)} ariaLabel={`${ORG_CATEGORY_LABEL[c.key]} — în aplicație`} />
-                    </div>
-                  </TD>
-                  <TD className="text-center">
-                    <div className="inline-flex">
-                      <Switch checked={c.email} onChange={(v) => onToggle(c.key, "email", v)} ariaLabel={`${ORG_CATEGORY_LABEL[c.key]} — email`} />
-                    </div>
-                  </TD>
-                  <TD>
-                    <div className="flex flex-wrap gap-1.5">
-                      {c.recipients.map((r) => (
-                        <span key={r} className="inline-flex items-center gap-1 rounded-md border border-line bg-card-2/60 px-2 py-0.5 text-[10.5px] font-semibold text-fg-muted">
-                          <Users size={9} />
-                          {r}
-                        </span>
-                      ))}
-                    </div>
-                  </TD>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+                    <p className="mt-1 text-[12.5px] leading-relaxed text-fg-muted">
+                      {CATEGORY_DESCRIPTION[c.key] ?? ""}
+                    </p>
+                  </div>
+                  {/* Switch mare aliniat cu titlul */}
+                  <div className="flex flex-col items-end gap-1">
+                    <Switch
+                      checked={c.in_app}
+                      onChange={(v) => onToggle(c.key, "in_app", v)}
+                      ariaLabel={`${ORG_CATEGORY_LABEL[c.key]} — în aplicație`}
+                    />
+                    <span className={cn("text-[10px] font-bold uppercase tracking-widest", c.in_app ? "text-emerald-300" : "text-fg-dim")}>
+                      {c.in_app ? "Activ" : "Oprit"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Destinatari — chip-uri mai mari */}
+                {c.recipients.length > 0 && (
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[10.5px] font-bold uppercase tracking-wider text-fg-dim">
+                      Ajunge la:
+                    </span>
+                    {c.recipients.map((r) => (
+                      <span
+                        key={r}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-line bg-card px-2 py-1 text-[11.5px] font-semibold text-fg"
+                      >
+                        <Users size={11} className="text-fg-dim" />
+                        {r}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
     </section>
   );
-}
-
-function TH({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <th
-      scope="col"
-      className={cn("px-5 py-2.5 text-left text-[10.5px] font-semibold uppercase tracking-wider text-fg-dim", className)}
-    >
-      {children}
-    </th>
-  );
-}
-function TD({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <td className={cn("px-5 py-3 align-middle", className)}>{children}</td>;
 }
 
 /* ═══════════ PROGRAM PLĂȚI ═══════════ */
@@ -353,13 +376,7 @@ function PreferinteSuplimentareCard({
         <h3 className="text-[15px] font-semibold text-fg">Preferințe suplimentare</h3>
         <p className="text-[11.5px] text-fg-muted">Fine-tuning pentru livrarea notificărilor.</p>
       </header>
-      <ul className="grid gap-3 p-5 md:grid-cols-3">
-        <ExtraCard
-          label="Rezumat zilnic"
-          desc="Un singur email cu toate notificările zilei."
-          checked={extras.dailyDigest}
-          onChange={(v) => onToggle("dailyDigest", v)}
-        />
+      <ul className="grid gap-3 p-5 md:grid-cols-2">
         <ExtraCard
           label="Notifică doar elementele importante"
           desc="Filtrează notificările low-priority."

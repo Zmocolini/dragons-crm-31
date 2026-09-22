@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  AlertTriangle, Bike, Building2, Car, Check, FileText, Home, Info, Key,
-  Mail, Phone, Settings, UserPlus, X, Zap,
+  AlertTriangle, Bike, Building2, Car, Check, Clock, FileText, Home, Info, Key,
+  Mail, Paperclip, Phone, Settings, Trash2, Upload, UserPlus, X, Zap,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
@@ -13,6 +13,9 @@ import { useCandidates } from "@/lib/candidates/context";
 import type { Nationality } from "@/lib/candidates/types";
 import { NATIONALITY_LABEL } from "@/lib/candidates/types";
 import { useCouriers } from "@/lib/couriers/context";
+import { useDocuments } from "@/lib/documents/context";
+import { resizeImageFile } from "@/lib/utils/image";
+import { DOCUMENT_TYPE_LABEL, type DocumentType } from "@/lib/documents/types";
 import {
   COLLABORATION_LABEL, COURIER_STATUS_LABEL, INCOMPLETE_FIELD_LABEL,
   VEHICLE_OWNERSHIP_LABEL, VEHICLE_TYPE_LABEL,
@@ -38,30 +41,55 @@ const VEHICLE_ICON: Record<VehicleType, LucideIcon> = {
   car:     Car,
 };
 
+const COUNTRY_CODES: { code: string; flag: string; label: string }[] = [
+  { code: "+40",  flag: "🇷🇴", label: "România" },
+  { code: "+373", flag: "🇲🇩", label: "Moldova" },
+  { code: "+359", flag: "🇧🇬", label: "Bulgaria" },
+  { code: "+36",  flag: "🇭🇺", label: "Ungaria" },
+  { code: "+380", flag: "🇺🇦", label: "Ucraina" },
+  { code: "+381", flag: "🇷🇸", label: "Serbia" },
+  { code: "+90",  flag: "🇹🇷", label: "Turcia" },
+  { code: "+44",  flag: "🇬🇧", label: "Marea Britanie" },
+  { code: "+49",  flag: "🇩🇪", label: "Germania" },
+  { code: "+39",  flag: "🇮🇹", label: "Italia" },
+  { code: "+34",  flag: "🇪🇸", label: "Spania" },
+  { code: "+33",  flag: "🇫🇷", label: "Franța" },
+];
+
 type FormState = {
   fullName: string;
+  phoneCode: string;
   phone: string;
   email: string;
   nationality: Nationality;
   city: string;
   platforms: PlatformKey[];
+  waitlistedPlatforms: PlatformKey[];
   vehicleType: VehicleType;
   vehicleOwnership: VehicleOwnership;
   collaboration: CollaborationType;
+  commissionPct: number;
+  weeklyContractFeeRon: number;
+  iban: string;
   status: CourierStatus;
 };
 
 const EMPTY_FORM: FormState = {
   fullName: "",
-  phone: "+40 ",
+  phoneCode: "+40",
+  phone: "",
   email: "",
   nationality: "ro",
   city: "",
   platforms: [],
+  waitlistedPlatforms: [],
   vehicleType: "bike",
   vehicleOwnership: "own",
   collaboration: "collaboration",
-  status: "in_activation",
+  commissionPct: 10,
+  weeklyContractFeeRon: 210,
+  iban: "",
+  status: "active",
 };
 
 type Step = 1 | 2 | 3;
@@ -75,17 +103,22 @@ export function AddCourierDialog({
   onClose: () => void;
   onCreated?: (c: Courier) => void;
 }) {
-  const { user } = useSession();
+  const { user, activeFleetId } = useSession();
   const { settings } = useSettings();
   const { addCourier, findDuplicates } = useCouriers();
   const { candidates } = useCandidates();
   void candidates; // duplicate check e în findDuplicates
+  const { addDocument } = useDocuments();
   const { logActivity } = useProfile();
   const toast = useToast();
+
+  type PendingDoc = { id: string; name: string; size: number; type: string; dataUrl: string };
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [confirmClose, setConfirmClose] = useState(false);
+  const [pendingDocs, setPendingDocs] = useState<PendingDoc[]>([]);
+  const [showCountry, setShowCountry] = useState(false);
   const [step]  = useState<Step>(1);
   // Step 2/3 sunt vizuale (indicator) — form-ul e single-page. TODO(real-users): sub-fluxuri Activare + Documente reale.
 
@@ -95,8 +128,41 @@ export function AddCourierDialog({
       setForm({ ...EMPTY_FORM, city: defaultCity });
       setErrors({});
       setConfirmClose(false);
+      setPendingDocs([]);
     }
   }, [open, settings.cities]);
+
+  async function handlePickDocs(fileList?: FileList | null) {
+    if (!fileList) return;
+    for (const f of Array.from(fileList)) {
+      if (f.size > 10 * 1024 * 1024) {
+        toast.error("Fișier prea mare", `${f.name} depășește 10 MB.`);
+        continue;
+      }
+      try {
+        const isImage = f.type.startsWith("image/");
+        let dataUrl: string;
+        if (isImage) {
+          // Compresie agresivă JPEG 800px q0.75 → 30-100 KB per poză, încape multe în localStorage.
+          dataUrl = await resizeImageFile(f, 800, { format: "jpeg", quality: 0.75 });
+        } else {
+          dataUrl = await new Promise<string>((resolve, reject) => {
+            const r = new FileReader();
+            r.onload = () => resolve(r.result as string);
+            r.onerror = () => reject(new Error("read fail"));
+            r.readAsDataURL(f);
+          });
+        }
+        setPendingDocs((prev) => [...prev, {
+          id: `pdoc_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          name: f.name, size: f.size, type: f.type || "application/octet-stream",
+          dataUrl,
+        }]);
+      } catch {
+        toast.error("Eroare", `Nu s-a putut citi ${f.name}.`);
+      }
+    }
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -113,7 +179,7 @@ export function AddCourierDialog({
 
   const dirty = useMemo(() =>
     form.fullName.trim() !== "" ||
-    form.phone.trim() !== EMPTY_FORM.phone.trim() ||
+    form.phone.trim() !== "" ||
     form.email.trim() !== "" ||
     form.platforms.length > 0,
   [form]);
@@ -131,8 +197,8 @@ export function AddCourierDialog({
     const phoneDigits = form.phone.replace(/\D/g, "");
     const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email);
     if (phoneDigits.length < 6 && !emailOk) return [];
-    return findDuplicates(form.phone, emailOk ? form.email : null);
-  }, [form.phone, form.email, findDuplicates]);
+    return findDuplicates(`${form.phoneCode} ${form.phone}`, emailOk ? form.email : null);
+  }, [form.phoneCode, form.phone, form.email, findDuplicates]);
 
   function requestClose() {
     if (dirty) setConfirmClose(true);
@@ -153,7 +219,7 @@ export function AddCourierDialog({
     }
 
     const phoneDigits = form.phone.replace(/\D/g, "");
-    if (phoneDigits.length < 9) incomplete.push("phone");
+    if (phoneDigits.length < 6) incomplete.push("phone");
 
     // Email este OPȚIONAL. Doar formatul valid este cerut dacă e completat.
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
@@ -167,37 +233,39 @@ export function AddCourierDialog({
   }
 
   function submit(asDraft: boolean) {
-    const { hardErrors, incomplete } = analyzeForm();
-
-    // Cel puțin nume SAU telefon trebuie completat ca să existe identificator util
-    if (incomplete.includes("fullName") && incomplete.includes("phone")) {
-      setErrors({ fullName: "Completează cel puțin numele sau telefonul." });
-      toast.error("Nu pot salva", "Introdu cel puțin numele sau telefonul curierului.");
-      return;
-    }
-
-    // Erori HARD (format invalid) — blochează pentru a nu polua DB
-    if (Object.keys(hardErrors).length > 0) {
-      setErrors(hardErrors);
-      toast.error("Corectează câmpurile cu erori", "Formatul unor câmpuri este invalid.");
-      return;
-    }
+    const { incomplete } = analyzeForm();
     setErrors({});
 
     const courier = addCourier({
       fullName: form.fullName.trim() || "Curier nou (fără nume)",
-      phone: form.phone.trim(),
+      phone: form.phone.trim() ? `${form.phoneCode} ${form.phone.trim().replace(/^\+?\d{1,3}[\s-]?/, "").replace(/^0+/, "")}` : "",
       email: form.email.trim() || null,
       nationality: form.nationality,
       city: form.city,
       platforms: form.platforms,
+      waitlistedPlatforms: form.waitlistedPlatforms,
       vehicleType: form.vehicleType,
       vehicleOwnership: form.vehicleOwnership,
       collaboration: form.collaboration,
+      commissionPct: form.commissionPct,
+      weeklyContractFeeRon: form.weeklyContractFeeRon,
+      iban: form.iban.trim() || undefined,
       status: asDraft ? "draft" : form.status,
       incompleteFields: incomplete,
       createdBy: user.id,
       tenantId: user.activeTenant.id,
+    });
+
+    // Atașez documentele de curierul nou creat.
+    const subject = { id: courier.id, name: courier.fullName, kind: "courier" as const, city: courier.city, platform: null };
+    pendingDocs.forEach((pd) => {
+      addDocument({
+        tenantId: user.activeTenant.id, fleetId: activeFleetId, subject, type: "other", status: "in_review",
+        expiryIso: null,
+        file: { name: pd.name, size: pd.size, type: pd.type, objectUrl: pd.dataUrl },
+        ocrEnabled: false, ocrProposed: null, verifiedManually: false, notes: null,
+        createdBy: user.name,
+      }, user.name);
     });
 
     logActivity(
@@ -236,6 +304,15 @@ export function AddCourierDialog({
     }));
   }
 
+  function toggleWaitlist(p: PlatformKey) {
+    setForm((prev) => ({
+      ...prev,
+      waitlistedPlatforms: prev.waitlistedPlatforms.includes(p)
+        ? prev.waitlistedPlatforms.filter((x) => x !== p)
+        : [...prev.waitlistedPlatforms, p],
+    }));
+  }
+
   if (!open || typeof document === "undefined") return null;
 
   return createPortal(
@@ -243,7 +320,7 @@ export function AddCourierDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="add-courier-title"
-      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
       onClick={requestClose}
     >
       <div
@@ -271,39 +348,8 @@ export function AddCourierDialog({
           </button>
         </div>
 
-        {/* Wizard steps */}
-        <div className="border-b border-line/60 px-6 py-4">
-          <ol className="flex items-center justify-between gap-4">
-            <WizardStep n={1} label="Date de bază" active={step === 1} done={step > 1} />
-            <div className={cn("h-px flex-1 bg-line/60", step > 1 && "bg-violet-500/50")} />
-            <WizardStep n={2} label="Activare"     active={step === 2} done={step > 2} />
-            <div className={cn("h-px flex-1 bg-line/60", step > 2 && "bg-violet-500/50")} />
-            <WizardStep n={3} label="Documente"    active={step === 3} done={false} />
-          </ol>
-        </div>
-
         {/* Body */}
         <div className="space-y-4 px-6 py-5">
-          {/* Info banner */}
-          <div className="flex items-start gap-3 rounded-xl border border-sky-500/25 bg-sky-500/10 p-3">
-            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-sky-500/20 text-sky-200">
-              <Info size={13} />
-            </span>
-            <div className="flex-1 text-[12.5px] text-sky-100/95">
-              <div>Salvează acum, iar datele lipsă vor fi marcate pentru completare.</div>
-              {liveIncomplete.length > 0 && (
-                <div className="mt-1 text-[11.5px] text-amber-200/90">
-                  <strong>{liveIncomplete.length}</strong>{" "}
-                  {liveIncomplete.length === 1 ? "câmp incomplet" : "câmpuri incomplete"} vor fi
-                  marcate pe fișa curierului:{" "}
-                  <span className="font-semibold text-amber-100">
-                    {liveIncomplete.map((k) => INCOMPLETE_FIELD_LABEL[k]).join(", ")}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-
           {duplicates.length > 0 && <DuplicatesBanner matches={duplicates} />}
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -321,31 +367,62 @@ export function AddCourierDialog({
 
               <Field label="Telefon" required incomplete={isIncomplete("phone")} error={errors.phone}>
                 <div className="flex overflow-hidden rounded-lg border border-line bg-card-2 focus-within:border-violet-500/60">
-                  <span className="flex items-center gap-1 border-r border-line bg-card-2 px-2.5 text-[13px]">
-                    <span className="text-[14px]">🇷🇴</span>
-                    <span className="text-fg-dim text-[11px]">▾</span>
-                  </span>
+                  {showCountry ? (
+                    <select
+                      value={form.phoneCode}
+                      onChange={(e) => { setForm({ ...form, phoneCode: e.target.value }); setShowCountry(false); }}
+                      onBlur={() => setShowCountry(false)}
+                      autoFocus
+                      aria-label="Prefix țară"
+                      className="h-10 shrink-0 border-r border-line bg-card-2 pl-2 pr-1 text-[12.5px] text-fg focus:outline-none"
+                    >
+                      {COUNTRY_CODES.map((c) => (
+                        <option key={c.code} value={c.code}>{c.flag} {c.code}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setShowCountry(true)}
+                      aria-label="Schimbă țara"
+                      title="Schimbă țara"
+                      className="h-10 shrink-0 border-r border-line bg-card-2 px-2 text-[12.5px] font-medium text-fg-muted hover:text-fg focus:outline-none"
+                    >
+                      {COUNTRY_CODES.find((c) => c.code === form.phoneCode)?.flag ?? "🇷🇴"} {form.phoneCode}
+                    </button>
+                  )}
                   <input
                     type="tel"
+                    inputMode="tel"
+                    autoComplete="tel-national"
                     value={form.phone}
-                    onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                    placeholder="+40 7XX XXX XXX"
+                    onChange={(e) => {
+                      const raw = e.target.value;
+                      const m = raw.match(/^\+(\d{1,3})[\s-]?/);
+                      if (m) {
+                        const code = "+" + m[1];
+                        const known = COUNTRY_CODES.find((c) => c.code === code);
+                        if (known) {
+                          setForm({ ...form, phoneCode: code, phone: raw.slice(m[0].length) });
+                          return;
+                        }
+                      }
+                      setForm({ ...form, phone: raw });
+                    }}
+                    placeholder="07XX XXX XXX"
                     className="h-10 min-w-0 flex-1 bg-transparent px-3 text-[13px] text-fg placeholder:text-fg-dim focus:outline-none"
                   />
                 </div>
               </Field>
 
               <Field label="E-mail" hint="Opțional" error={errors.email}>
-                <div className="relative">
-                  <Mail size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-dim" />
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={(e) => setForm({ ...form, email: e.target.value })}
-                    placeholder="ex: andrei.popescu@email.ro"
-                    className="dd-input pl-9"
-                  />
-                </div>
+                <input
+                  type="email"
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  placeholder="ex: andrei.popescu@email.ro"
+                  className="dd-input"
+                />
               </Field>
 
               <Field label="Naționalitate">
@@ -364,19 +441,16 @@ export function AddCourierDialog({
             {/* Configurare activare */}
             <FormCard title="Configurare activare" icon={Settings}>
               <Field label="Oraș activare" required incomplete={isIncomplete("city")}>
-                <div className="relative">
-                  <Building2 size={13} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-fg-dim" />
-                  <select
-                    value={form.city}
-                    onChange={(e) => setForm({ ...form, city: e.target.value })}
-                    className="dd-input pl-9"
-                  >
-                    {activeCities.length === 0 && <option value="">Niciun oraș activ</option>}
-                    {activeCities.map((c) => (
-                      <option key={c.id} value={c.name}>{c.name}</option>
-                    ))}
-                  </select>
-                </div>
+                <select
+                  value={form.city}
+                  onChange={(e) => setForm({ ...form, city: e.target.value })}
+                  className="dd-input"
+                >
+                  {activeCities.length === 0 && <option value="">Niciun oraș activ</option>}
+                  {activeCities.map((c) => (
+                    <option key={c.id} value={c.name}>{c.name}</option>
+                  ))}
+                </select>
               </Field>
 
               <Field label="Platforme" required incomplete={isIncomplete("platforms")}>
@@ -421,9 +495,52 @@ export function AddCourierDialog({
                 </div>
               </Field>
 
+              <Field label="Așteaptă și pe" hint="Opțional">
+                <div className="flex min-h-[40px] flex-wrap items-center gap-1.5 rounded-lg border border-line bg-card-2 px-2 py-1.5">
+                  {form.waitlistedPlatforms.length === 0 && (
+                    <span className="px-1 text-[11.5px] italic text-fg-dim">
+                      Nicio platformă în așteptare
+                    </span>
+                  )}
+                  {form.waitlistedPlatforms.map((p) => (
+                    <span
+                      key={p}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/15 pl-1.5 pr-2 py-0.5 text-[11px] font-semibold text-amber-100"
+                    >
+                      <Clock size={11} className="text-amber-300" />
+                      <PlatformLogo platform={p} size={14} rounded="md" />
+                      {PLATFORM_NAME[p]}
+                      <button
+                        type="button"
+                        onClick={() => toggleWaitlist(p)}
+                        aria-label={`Scoate ${PLATFORM_NAME[p]} din așteptare`}
+                        className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded text-amber-200 hover:bg-amber-500/30"
+                      >
+                        <X size={9} />
+                      </button>
+                    </span>
+                  ))}
+                  <div className="ml-auto flex items-center gap-1">
+                    {activePlatforms.filter((p) => !form.platforms.includes(p) && !form.waitlistedPlatforms.includes(p)).map((p) => (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => toggleWaitlist(p)}
+                        aria-label={`Așteaptă ${PLATFORM_NAME[p]}`}
+                        className="inline-flex items-center gap-1 rounded-md border border-line bg-card px-1.5 py-0.5 text-[10.5px] font-semibold text-fg-muted hover:bg-amber-500/15 hover:text-amber-200"
+                        title={`Așteaptă ${PLATFORM_NAME[p]}`}
+                      >
+                        <PlatformLogo platform={p} size={12} rounded="md" />
+                        +
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Field>
+
               <Field label="Vehicul" required>
                 <div className="grid grid-cols-4 gap-1.5">
-                  {(Object.keys(VEHICLE_TYPE_LABEL) as VehicleType[]).map((v) => {
+                  {(Object.keys(VEHICLE_TYPE_LABEL) as VehicleType[]).filter((v) => settings.fleet.vehicleTypesAllowed[v]).map((v) => {
                     const Icon = VEHICLE_ICON[v];
                     const on = form.vehicleType === v;
                     return (
@@ -449,7 +566,7 @@ export function AddCourierDialog({
 
               <Field label="Tip vehicul" required>
                 <div className="grid grid-cols-2 gap-1.5">
-                  {(Object.keys(VEHICLE_OWNERSHIP_LABEL) as VehicleOwnership[]).map((o) => {
+                  {(Object.keys(VEHICLE_OWNERSHIP_LABEL) as VehicleOwnership[]).filter((o) => (o === "own" ? settings.fleet.allowOwnVehicle : settings.fleet.allowRentedVehicle)).map((o) => {
                     const on = form.vehicleOwnership === o;
                     const Icon = o === "own" ? Home : Key;
                     return (
@@ -475,8 +592,47 @@ export function AddCourierDialog({
             </FormCard>
           </div>
 
-          {/* Contract și statut */}
-          <FormCard title="Contract și statut" icon={FileText}>
+          {/* Documente (opțional) */}
+          <FormCard title="Documente" icon={FileText}>
+            <div className="space-y-2">
+              <label className="flex cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-line bg-card-2/40 py-6 text-[12px] text-fg-muted transition-colors hover:border-violet-500/50 hover:text-violet-200">
+                <Upload size={14} />
+                <span>Adaugă documente</span>
+                <span className="text-[10.5px] text-fg-dim">PDF sau imagini, max 10 MB / fișier</span>
+                <input
+                  type="file"
+                  accept="image/*,.pdf"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => { handlePickDocs(e.target.files); e.target.value = ""; }}
+                />
+              </label>
+              {pendingDocs.length > 0 && (
+                <ul className="space-y-1.5">
+                  {pendingDocs.map((pd) => (
+                    <li key={pd.id} className="flex items-center gap-2 rounded-lg border border-line bg-card-2/50 px-2 py-1.5">
+                      <FileText size={13} className="shrink-0 text-fg-dim" />
+                      <div className="min-w-0 flex-1 leading-tight">
+                        <div className="truncate text-[12px] text-fg">{pd.name}</div>
+                        <div className="text-[10px] text-fg-dim">{(pd.size / 1024).toFixed(0)} KB</div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPendingDocs((prev) => prev.filter((x) => x.id !== pd.id))}
+                        aria-label="Șterge"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md text-fg-dim hover:bg-rose-500/15 hover:text-rose-300"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </FormCard>
+
+          {/* Contract */}
+          <FormCard title="Contract" icon={FileText}>
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Tip colaborare" required>
                 <select
@@ -489,20 +645,43 @@ export function AddCourierDialog({
                   ))}
                 </select>
               </Field>
-              <Field label="Status" required>
-                <select
-                  value={form.status}
-                  onChange={(e) => setForm({ ...form, status: e.target.value as CourierStatus })}
-                  className="dd-input"
-                >
-                  {(Object.keys(COURIER_STATUS_LABEL) as CourierStatus[])
-                    .filter((s) => s !== "draft")
-                    .map((s) => (
-                      <option key={s} value={s}>{COURIER_STATUS_LABEL[s]}</option>
-                    ))}
-                </select>
+              <Field label="Comision flotă (%)" required hint="Prestabilit 10%">
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step={0.5}
+                    value={form.commissionPct}
+                    onChange={(e) => setForm({ ...form, commissionPct: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
+                    className="dd-input pr-8"
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-fg-dim">%</span>
+                </div>
+              </Field>
+              <Field label="Taxă contract săptămânală" required hint="Prestabilit 210 RON — se scade din plată">
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={0}
+                    step={10}
+                    value={form.weeklyContractFeeRon}
+                    onChange={(e) => setForm({ ...form, weeklyContractFeeRon: Math.max(0, Number(e.target.value) || 0) })}
+                    className="dd-input pr-12"
+                  />
+                  <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-fg-dim">RON</span>
+                </div>
               </Field>
             </div>
+            <Field label="IBAN" hint="Opțional">
+              <input
+                type="text"
+                value={form.iban}
+                onChange={(e) => setForm({ ...form, iban: e.target.value.toUpperCase() })}
+                placeholder="RO49 AAAA 1B31 0075 9384 0000"
+                className="dd-input font-mono tracking-wider"
+              />
+            </Field>
           </FormCard>
         </div>
 
@@ -651,18 +830,15 @@ function Field({
   incomplete?: boolean;
   children: React.ReactNode;
 }) {
+  void required;
+  void incomplete;
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between gap-2">
         <label className="text-[10.5px] font-semibold uppercase tracking-wider text-fg-dim">
-          {label} {required && <span className="text-rose-400">*</span>}
+          {label}
         </label>
-        {incomplete && !error && (
-          <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-wider text-amber-300">
-            Va fi marcat
-          </span>
-        )}
-        {hint && !incomplete && !error && (
+        {hint && !error && (
           <span className="rounded-md bg-white/[0.05] px-1.5 py-0.5 text-[9.5px] font-medium uppercase tracking-wider text-fg-dim">
             {hint}
           </span>
@@ -670,11 +846,6 @@ function Field({
       </div>
       {children}
       {error && <span className="text-[11px] text-rose-400">{error}</span>}
-      {incomplete && !error && (
-        <span className="text-[11px] text-amber-400/85">
-          Poți salva acum; îl completezi mai târziu.
-        </span>
-      )}
     </div>
   );
 }
@@ -698,6 +869,63 @@ function DuplicatesBanner({ matches }: { matches: CourierDuplicateMatch[] }) {
           {" "}Verifică înainte să creezi dublură.
         </div>
       </div>
+    </div>
+  );
+}
+
+function SlotUpload({
+  label, hint, slot, accept, onPick, onClear,
+}: {
+  label: string;
+  hint: string;
+  slot: { name: string; size: number; type: string; dataUrl: string } | null;
+  accept: string;
+  onPick: (f?: File) => void;
+  onClear: () => void;
+}) {
+  const inputId = `slot-${label.replace(/\s+/g, "-")}`;
+  const isImage = slot?.type.startsWith("image/");
+  return (
+    <div className="rounded-lg border border-line/60 bg-card p-3">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <div className="leading-tight">
+          <div className="text-[12.5px] font-semibold text-fg">{label}</div>
+          <div className="text-[10.5px] text-fg-dim">{hint}</div>
+        </div>
+        {slot && (
+          <button type="button" onClick={onClear} aria-label="Șterge" className="inline-flex h-6 w-6 items-center justify-center rounded-md text-fg-dim hover:bg-rose-500/15 hover:text-rose-300">
+            <Trash2 size={11} />
+          </button>
+        )}
+      </div>
+      {slot ? (
+        <label htmlFor={inputId} className="flex cursor-pointer items-center gap-2 rounded-md border border-line bg-card-2/50 p-2 hover:bg-card-hover">
+          {isImage ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={slot.dataUrl} alt={slot.name} className="h-10 w-10 shrink-0 rounded object-cover" />
+          ) : (
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded border border-line bg-card text-fg-muted">
+              <FileText size={14} />
+            </span>
+          )}
+          <div className="min-w-0 flex-1 leading-tight">
+            <div className="truncate text-[12px] text-fg">{slot.name}</div>
+            <div className="text-[10px] text-fg-dim">{(slot.size / 1024).toFixed(0)} KB · click pentru înlocuire</div>
+          </div>
+        </label>
+      ) : (
+        <label htmlFor={inputId} className="flex cursor-pointer flex-col items-center gap-1 rounded-md border border-dashed border-line bg-card-2/40 py-4 text-[11.5px] text-fg-muted hover:border-violet-500/50 hover:text-violet-200">
+          <Upload size={13} />
+          <span>Click pentru încărcare</span>
+        </label>
+      )}
+      <input
+        id={inputId}
+        type="file"
+        accept={accept}
+        className="hidden"
+        onChange={(e) => { onPick(e.target.files?.[0]); e.target.value = ""; }}
+      />
     </div>
   );
 }

@@ -367,7 +367,7 @@ export function QuickReportDialog({ open, onClose, prefillType }: Props) {
       role="dialog"
       aria-modal="true"
       aria-labelledby="quick-report-title"
-      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
       onClick={onClose}
     >
       <div

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { X } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/nav/nav-items";
+import { useNavAlerts } from "@/lib/nav/use-nav-alerts";
 import { useSession } from "@/lib/rbac/session";
 import { useUI } from "@/lib/ui/ui-context";
 import { useSettings } from "@/lib/settings/context";
@@ -13,8 +14,15 @@ import { cn } from "@/lib/utils/cn";
 export function SidebarNav() {
   const pathname = usePathname();
   const { can } = useSession();
-  const { manageNav, isHidden, toggleHiddenHref } = useUI();
+  const { manageNav, isHidden, toggleHiddenHref, closeSidebar } = useUI();
   const { isModuleEnabled } = useSettings();
+  const alertHrefs = useNavAlerts();
+
+  const handleNavClick = () => {
+    if (typeof window !== "undefined" && window.innerWidth < 1024) {
+      closeSidebar();
+    }
+  };
 
   // Filtru modul dezactivat din Setări → Flotă și operațiuni
   const isModuleActive = (href: string) => {
@@ -23,8 +31,8 @@ export function SidebarNav() {
     return isModuleEnabled(mod);
   };
 
-  // Dashboard = agregat alerte din celelalte items
-  const anyOtherAlert = NAV_ITEMS.some((n) => n.href !== "/" && n.hasAlert && can(n.permission));
+  // Dashboard = agregat: are alert dacă orice alt item are alert real.
+  const anyOtherAlert = alertHrefs.size > 0;
 
   const items = NAV_ITEMS
     .filter((item) => can(item.permission))
@@ -40,7 +48,7 @@ export function SidebarNav() {
             ? pathname === "/"
             : pathname === item.href || pathname.startsWith(`${item.href}/`);
         const hidden = isHidden(item.href);
-        const hasAlert = item.href === "/" ? anyOtherAlert : !!item.hasAlert;
+        const hasAlert = item.href === "/" ? anyOtherAlert : alertHrefs.has(item.href);
 
         const Row = (
           <>
@@ -112,6 +120,7 @@ export function SidebarNav() {
           <Link
             key={item.href}
             href={item.href}
+            onClick={handleNavClick}
             data-density-row
             aria-current={isActive ? "page" : undefined}
             className={cn(

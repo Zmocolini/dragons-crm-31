@@ -2,7 +2,7 @@
 
 import {
   AlertTriangle, CheckSquare, FileText, Info, Megaphone,
-  ShieldCheck, Users, Wallet,
+  Users, Wallet,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -27,9 +27,7 @@ type Row = {
 const ROWS: Row[] = [
   { key: "payments",            icon: Wallet,        iconTone: "text-emerald-400",  label: "Plăți săptămânale",      description: "Primește notificări când sunt procesate plățile.",         permission: "payments.view" },
   { key: "documents_expired",   icon: FileText,      iconTone: "text-amber-400",    label: "Documente expirate",     description: "Alerte pentru documente care urmează să expire.",           permission: "documents.view" },
-  { key: "activations_blocked", icon: ShieldCheck,   iconTone: "text-sky-400",      label: "Activări blocate",       description: "Notificări pentru activări care necesită atenție.",         permission: "activations.view" },
   { key: "issues_urgent",       icon: AlertTriangle, iconTone: "text-rose-400",     label: "Probleme urgente",       description: "Alerte pentru probleme critice în flotă.",                   permission: "issues.view" },
-  { key: "interviews",          icon: Users,         iconTone: "text-violet-400",   label: "Interviuri",              description: "Notificări pentru interviuri programate.",                  permission: "interviews.view" },
   { key: "tasks",               icon: CheckSquare,   iconTone: "text-indigo-400",   label: "Task-uri",                description: "Memento-uri pentru task-urile tale." },
   { key: "subcontractors",      icon: Users,         iconTone: "text-orange-400",   label: "Subcontractori",         description: "Notificări despre subcontractori și contracte.",            permission: "subcontractors.view" },
   { key: "announcements",       icon: Megaphone,     iconTone: "text-fuchsia-400",  label: "Anunțuri generale",      description: "Informații importante din partea echipei." },

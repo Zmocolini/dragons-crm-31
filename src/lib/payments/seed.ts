@@ -37,9 +37,8 @@ function rng(seed: number): () => number {
 
 const COMMISSION_BY_COLLAB: Record<CollaborationType, number> = {
   collaboration: 12,
-  contract:      10,
-  internal:      8,
-  subcontractor: 15,
+  cim_8h:        10,
+  cim_4h:        10,
 };
 
 function statusFor(r: number): PaymentStatus {
@@ -115,9 +114,10 @@ function buildPayment(courierId: string): Payment {
       city: c.city,
       platform: c.platforms[0] ?? null,
       status: c.status,
-      kind: c.collaboration === "subcontractor" ? "subcontractor" : "courier",
+      kind: "courier",
     },
-    type: c.collaboration === "subcontractor" ? "subcontractor_pay" : "courier_pay",
+    type: "courier_pay",
+
     periodStartIso: PERIOD_START,
     periodEndIso: PERIOD_END,
     paymentDateIso: PERIOD_PAY_DATE,

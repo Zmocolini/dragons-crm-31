@@ -90,6 +90,13 @@ export function TabIntegrari() {
 
   return (
     <div className="space-y-5">
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-500/30 bg-emerald-500/[0.06] px-4 py-2.5">
+        <span className="inline-flex items-center gap-2">
+          <span className="inline-block h-2 w-2 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.7)]" />
+          <span className="text-[11.5px] font-bold uppercase tracking-wider text-emerald-300">BETA · Approve Andrei</span>
+        </span>
+        <span className="text-[11px] text-emerald-200/80">Secțiune în dezvoltare — marcată pentru review.</span>
+      </div>
       <PlatformeLivrareCard />
       <CalendarProgramariCard />
 
@@ -323,7 +330,7 @@ function CalendarProgramariCard() {
       <header className="border-b border-line/70 px-5 py-4">
         <h3 className="text-[15px] font-semibold text-fg">Calendar și programări</h3>
         <p className="text-[11.5px] text-fg-muted">
-          Centralizează interviurile, task-urile și expirările importante.
+                    Centralizează task-urile și expirările importante.
         </p>
       </header>
 
@@ -335,7 +342,7 @@ function CalendarProgramariCard() {
           <div className="min-w-0 flex-1 leading-tight">
             <div className="text-[13.5px] font-semibold text-fg">Calendar intern</div>
             <div className="mt-0.5 text-[11.5px] text-fg-muted">
-              Gestionează interviuri, task-uri și notificări în calendarul aplicației.
+                    Gestionează task-uri și notificări în calendarul aplicației.
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -391,7 +398,7 @@ function CalendarProgramariCard() {
                 <p className="mt-0.5 text-[11.5px] text-fg-muted">
                   {cal.googleConnected
                     ? `Cont conectat: ${cal.googleAccount}`
-                    : "Conectează contul Google pentru a sincroniza interviurile, task-urile și expirările documentelor."}
+                  : "Conectează contul Google pentru a sincroniza task-urile și expirările documentelor."}
                 </p>
               </div>
             </div>
@@ -568,7 +575,6 @@ function ExportBackupCard() {
   const options = useMemo(() => ([
     { key: "couriers", label: "Raport curieri",  desc: "Toți curierii cu status și platforme." },
     { key: "payments", label: "Raport plăți",    desc: "Plăți procesate și în așteptare." },
-    { key: "activ",    label: "Raport activări", desc: "Activări finalizate și în proces." },
     { key: "docs",     label: "Raport documente", desc: "Documente expirate sau care expiră." },
     { key: "backup",   label: "Backup complet",   desc: "Copie de siguranță a tuturor datelor." },
   ]), []);

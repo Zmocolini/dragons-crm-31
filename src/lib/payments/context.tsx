@@ -46,6 +46,8 @@ type PaymentsContextValue = {
   updatePayment: (id: string, patch: Patch, actorName: string) => void;
   addDeduction: (id: string, key: keyof PaymentBreakdown, amount: number, description: string, actorName: string) => void;
   deletePayment: (id: string, actorName: string) => void;
+  /** Verifică dacă un ID de plată e marcat șters (inclusiv pentru sintetice generate live). */
+  isDeleted: (id: string) => boolean;
 
   addNote: (id: string, text: string, actorName: string) => void;
   removeNote: (id: string, noteId: string) => void;
@@ -265,16 +267,20 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
     return [...stored, ...base].sort((a, b) => (a.createdAtIso < b.createdAtIso ? 1 : -1));
   }, [payments, activities]);
 
+  const isDeleted = useCallback((id: string) => deletedIds.has(id), [deletedIds]);
+
   const value = useMemo<PaymentsContextValue>(() => ({
     hydrated,
     payments, fleetPayments,
     addPayment, updatePaymentStatus,
     setStatus, approve, markProcessing, markPaid, updatePayment, addDeduction, deletePayment,
+    isDeleted,
     addNote, removeNote, addDocument,
     notesByPayment, documentsByPayment, getActivities,
   }), [
     hydrated, payments, fleetPayments, addPayment, updatePaymentStatus,
     setStatus, approve, markProcessing, markPaid, updatePayment, addDeduction, deletePayment,
+    isDeleted,
     addNote, removeNote, addDocument, notesByPayment, documentsByPayment, getActivities,
   ]);
 

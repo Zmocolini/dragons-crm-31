@@ -76,7 +76,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div
         aria-live="polite"
         aria-label="Notificări"
-        className="pointer-events-none fixed right-4 top-4 z-[100] flex w-[340px] max-w-[92vw] flex-col gap-2"
+        className="pointer-events-none fixed left-1/2 top-4 z-[100] flex w-[340px] max-w-[92vw] -translate-x-1/2 flex-col items-stretch gap-2"
       >
         {toasts.map((t) => {
           const Icon = TONE_ICON[t.tone];

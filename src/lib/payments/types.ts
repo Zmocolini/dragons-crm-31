@@ -167,6 +167,49 @@ export function round2(n: number): number {
   return Math.round((n + Number.EPSILON) * 100) / 100;
 }
 
+// Sursă de plată — derivată din `reference` care e populat automat la import.
+export type PaymentSource = "ttg" | "gusty" | "manual";
+
+export const PAYMENT_SOURCE_LABEL: Record<PaymentSource, string> = {
+  ttg:    "TTG",
+  gusty:  "Gusty",
+  manual: "Manuală",
+};
+
+export const PAYMENT_SOURCE_STYLE: Record<PaymentSource, string> = {
+  ttg:    "border-violet-500/40 bg-violet-500/15 text-violet-200",
+  gusty:  "border-indigo-500/40 bg-indigo-500/15 text-indigo-200",
+  manual: "border-line bg-white/[0.04] text-fg-dim",
+};
+
+/** Detectează sursa unei plăți din `reference`. Fallback → "manual". */
+export function paymentSource(reference: string | null): PaymentSource {
+  const r = (reference ?? "").toLowerCase();
+  if (r.includes("ttg")) return "ttg";
+  if (r.includes("gusty")) return "gusty";
+  return "manual";
+}
+
+/** Cheie de sursă detaliată — distinge Gusty Bolt/Wolt/Glovo. */
+export type PaymentSourceDetail = "ttg_bolt" | "gusty_bolt" | "gusty_wolt" | "gusty_glovo" | "manual";
+
+export const PAYMENT_SOURCE_DETAIL_LABEL: Record<PaymentSourceDetail, string> = {
+  ttg_bolt:    "TTG Bolt",
+  gusty_bolt:  "Gusty Bolt",
+  gusty_wolt:  "Gusty Wolt",
+  gusty_glovo: "Gusty Glovo",
+  manual:      "Manual",
+};
+
+export function paymentSourceDetail(reference: string | null): PaymentSourceDetail {
+  const r = (reference ?? "").toLowerCase();
+  if (r.includes("ttg"))          return "ttg_bolt";
+  if (r.includes("gusty · wolt")  || r.includes("gusty wolt"))  return "gusty_wolt";
+  if (r.includes("gusty · glovo") || r.includes("gusty glovo")) return "gusty_glovo";
+  if (r.includes("gusty"))        return "gusty_bolt";
+  return "manual";
+}
+
 /** Beneficiarul plății — snapshot la momentul înregistrării. */
 export type PaymentRecipientSnapshot = {
   id: string;

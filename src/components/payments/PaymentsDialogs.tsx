@@ -95,7 +95,7 @@ export function AddPaymentDialog({
       recipient: {
         id: courier.id, name: courier.fullName, city: courier.city,
         platform: courier.platforms[0] ?? null, status: courier.status,
-        kind: courier.collaboration === "subcontractor" ? "subcontractor" : "courier",
+        kind: "courier",
       },
       type: "courier_pay",
       periodStartIso: periodStart, periodEndIso: periodEnd, paymentDateIso: periodEnd,
@@ -473,54 +473,140 @@ export function EditPaymentDialog({
   onCancel: () => void;
   onSave: (id: string, patch: Partial<Payment>) => void;
 }) {
+  // Câmpuri principale
   const [gross, setGross] = useState(payment?.breakdown.grossRevenue ?? 0);
-  const [commission, setCommission] = useState(payment?.breakdown.fleetCommission ?? 0);
+  const [tips, setTips] = useState(payment?.breakdown.tips ?? 0);
+  // Comision cu procent editabil — recalculăm suma automat când se schimbă
+  const [commissionPct, setCommissionPct] = useState<number>(payment?.commissionPercentage ?? 0);
+  const [commissionRon, setCommissionRon] = useState(payment?.breakdown.fleetCommission ?? 0);
+  const [contractFee, setContractFee] = useState(payment?.breakdown.tax ?? 0);
+  const [negBalance, setNegBalance] = useState(payment?.breakdown.deductions ?? 0);
   const [penalty, setPenalty] = useState(payment?.breakdown.penalty ?? 0);
   const [equipment, setEquipment] = useState(payment?.breakdown.equipmentCost ?? 0);
-  const [other, setOther] = useState(payment?.breakdown.deductions ?? 0);
+  // Meta
   const [method, setMethod] = useState<PaymentMethod>(payment?.method ?? "bank_transfer");
+  const [status, setStatus] = useState<PaymentStatus>(payment?.status ?? "unpaid");
+  const [periodStart, setPeriodStart] = useState(payment?.periodStartIso ?? "");
+  const [periodEnd, setPeriodEnd] = useState(payment?.periodEndIso ?? "");
+  const [payDate, setPayDate] = useState(payment?.paymentDateIso ?? "");
   const [notes, setNotes] = useState(payment?.notes ?? "");
-  // Notă: părintele montează acest dialog cu `key={payment.id}`, deci starea inițială
-  // se resincronizează automat la schimbarea plății țintă (remount).
+  // Sincronizare live comision% ↔ comision RON
+  const updateCommissionPct = (pct: number) => {
+    setCommissionPct(pct);
+    setCommissionRon(round2((gross + tips) * pct / 100));
+  };
+  const updateCommissionRon = (ron: number) => {
+    setCommissionRon(ron);
+    const base = gross + tips;
+    if (base > 0) setCommissionPct(round2((ron / base) * 100));
+  };
+  // Când brut sau tips se schimbă, recalculează comision RON pe baza procentului curent
+  const updateGross = (v: number) => {
+    setGross(v);
+    setCommissionRon(round2((v + tips) * commissionPct / 100));
+  };
+  const updateTips = (v: number) => {
+    setTips(v);
+    setCommissionRon(round2((gross + v) * commissionPct / 100));
+  };
 
   if (!payment) return null;
-  const net = round2(gross - commission - penalty - equipment - other);
+  const net = round2(gross + tips - commissionRon - contractFee - negBalance - penalty - equipment);
 
   const save = () => {
     const breakdown: PaymentBreakdown = {
-      ...payment.breakdown, grossRevenue: gross, fleetCommission: commission,
-      penalty, equipmentCost: equipment, deductions: other,
+      ...payment.breakdown,
+      grossRevenue: gross,
+      tips,
+      fleetCommission: commissionRon,
+      tax: contractFee,
+      deductions: negBalance,
+      penalty,
+      equipmentCost: equipment,
     };
-    onSave(payment.id, { breakdown, method, notes: notes.trim() || null });
+    onSave(payment.id, {
+      breakdown, method, status,
+      periodStartIso: periodStart,
+      periodEndIso: periodEnd,
+      paymentDateIso: payDate,
+      commissionPercentage: commissionPct,
+      notes: notes.trim() || null,
+    });
   };
 
   return (
-    <Dialog open={!!payment} onClose={onCancel} title="Editează plata" description="Modificările financiare sunt salvate și auditate." size="lg">
+    <Dialog open={!!payment} onClose={onCancel} title="Editează plata" description={`Toate câmpurile financiare pot fi modificate. ${payment.recipient.name}.`} size="lg">
       <div className="space-y-3">
-        <div className="grid grid-cols-3 gap-3">
-          <Num label="Venit brut" value={gross} onChange={setGross} />
-          <Num label="Comision" value={commission} onChange={setCommission} />
-          <Num label="Penalizări" value={penalty} onChange={setPenalty} />
+        {/* Sume principale */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Num label="Venit brut (fără tips)" value={gross} onChange={updateGross} />
+          <Num label="Bacșiș (tips)" value={tips} onChange={updateTips} />
+          <Num label="Balanță negativă" value={negBalance} onChange={setNegBalance} />
         </div>
-        <div className="grid grid-cols-3 gap-3">
+
+        {/* Comision % + RON (sincronizate) */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Field label="Comision (%)">
+            <div className="relative">
+              <input
+                type="number" min={0} max={100} step={0.5}
+                value={commissionPct}
+                onChange={(e) => updateCommissionPct(Number(e.target.value) || 0)}
+                className={cn(inputCls, "pr-8")}
+              />
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-fg-dim">%</span>
+            </div>
+          </Field>
+          <Num label="Comision (RON)" value={commissionRon} onChange={updateCommissionRon} />
+          <Num label="Taxă contract" value={contractFee} onChange={setContractFee} />
+        </div>
+
+        {/* Alte deduceri */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <Num label="Penalizări" value={penalty} onChange={setPenalty} />
           <Num label="Echipamente" value={equipment} onChange={setEquipment} />
-          <Num label="Alte deduceri" value={other} onChange={setOther} />
           <Field label="Metodă">
             <select value={method} onChange={(e) => setMethod(e.target.value as PaymentMethod)} className={inputCls}>
               {(Object.keys(PAYMENT_METHOD_LABEL) as PaymentMethod[]).map((m) => <option key={m} value={m} className="bg-card">{PAYMENT_METHOD_LABEL[m]}</option>)}
             </select>
           </Field>
         </div>
-        <Field label="Observații"><textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className={cn(inputCls, "resize-y")} /></Field>
+
+        {/* Status + Perioadă + Data plății */}
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <Field label="Status">
+            <select value={status} onChange={(e) => setStatus(e.target.value as PaymentStatus)} className={inputCls}>
+              {(Object.keys(PAYMENT_STATUS_LABEL) as PaymentStatus[]).map((s) => <option key={s} value={s} className="bg-card">{PAYMENT_STATUS_LABEL[s]}</option>)}
+            </select>
+          </Field>
+          <Field label="Perioada start">
+            <input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className={inputCls} />
+          </Field>
+          <Field label="Perioada sfârșit">
+            <input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className={inputCls} />
+          </Field>
+          <Field label="Data plății">
+            <input type="date" value={payDate} onChange={(e) => setPayDate(e.target.value)} className={inputCls} />
+          </Field>
+        </div>
+
+        <Field label="Observații">
+          <textarea rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} className={cn(inputCls, "resize-y")} />
+        </Field>
+
+        {/* NET calculat live */}
         <div className="flex items-center justify-between rounded-lg border border-line/60 bg-card-hover px-3 py-2.5">
           <span className="text-[12.5px] font-semibold text-fg">Sumă de plată</span>
-          <span className={cn("text-[16px] font-bold tabular-nums", net < 0 ? "text-rose-300" : "text-emerald-300")}>{formatMoney(net)}</span>
+          <span className={cn("text-[18px] font-bold tabular-nums", net < 0 ? "text-rose-300" : "text-emerald-300")}>{formatMoney(net)}</span>
         </div>
-        {net < 0 && <p className="text-[11.5px] text-rose-300">Suma nu poate fi negativă.</p>}
+        <div className="text-[10.5px] text-fg-dim">
+          Formulă: (brut + tips) − comision − taxă − balanță neg − penalizări − echipamente
+        </div>
+        {net < 0 && <p className="text-[11.5px] text-rose-300">Atenție: suma calculată e negativă — curierul rămâne dator cu {formatMoney(Math.abs(net))}.</p>}
       </div>
       <DialogFooter>
         <button type="button" onClick={onCancel} className="rounded-lg border border-line bg-card-hover px-3 py-1.5 text-[12.5px] font-medium text-fg hover:bg-white/[0.05]">Anulează</button>
-        <button type="button" disabled={net < 0} onClick={save} className="rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 px-4 py-1.5 text-[12.5px] font-semibold text-white disabled:opacity-40">Salvează modificările</button>
+        <button type="button" onClick={save} className="rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 px-4 py-1.5 text-[12.5px] font-semibold text-white">Salvează modificările</button>
       </DialogFooter>
     </Dialog>
   );

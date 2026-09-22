@@ -5,25 +5,25 @@ import {
   type ReactNode,
 } from "react";
 import type { Courier, CourierDuplicateMatch } from "./types";
+import { SEED_COURIERS, type CourierRow } from "./mock-seed";
 import { useCandidates } from "@/lib/candidates/context";
 
 // TODO(real-users): server actions + Drizzle table `couriers`; duplicate detection
 // pe phone/email normalizat server-side per tenantId.
 
 const STORAGE_KEY = "crm31-couriers";
-
-// Curieri existenți seed (aliniat cu duplicate detection din candidates)
-const MOCK_COURIERS = [
-  { id: "c_001", name: "Andrei Popescu", phone: "+40 722 123 456", email: null },
-  { id: "c_002", name: "Mihai Ionescu",  phone: "+40 731 987 654", email: null },
-  { id: "c_003", name: "Ravi Kumar",     phone: "+40 745 111 222", email: null },
-  { id: "c_004", name: "Fatima Ali",     phone: "+40 756 333 444", email: null },
-  { id: "c_005", name: "Carlos Mendes",  phone: "+40 768 555 666", email: null },
-];
+const DELETED_KEY = "crm31-couriers-deleted";
 
 type CouriersContextValue = {
+  /** Curieri adăugați prin dialog în această sesiune (persistat în localStorage). */
   couriers: Courier[];
+  /** Toți curierii (seed + user-added), gata de afișat în tabel. */
+  allRows: CourierRow[];
   addCourier: (c: Omit<Courier, "id" | "createdAtIso">) => Courier;
+  /** Modifică un curier user-added. */
+  updateCourier: (id: string, patch: Partial<Omit<Courier, "id" | "createdAtIso" | "tenantId">>) => void;
+  /** Șterge un curier (user-added sau seed, ascuns prin deletedIds). */
+  deleteCourier: (id: string) => void;
   findDuplicates: (phone: string, email: string | null) => CourierDuplicateMatch[];
   hydrated: boolean;
 };
@@ -37,15 +37,48 @@ function normalizeEmail(e: string | null): string {
   return (e ?? "").trim().toLowerCase();
 }
 
+const VEHICLE_MODEL_DEFAULT: Record<Courier["vehicleType"], string> = {
+  bike:    "Bicicletă",
+  e_bike:  "E-Bike",
+  scooter: "Scuter",
+  car:     "Autoturism",
+};
+
+/** Curier adăugat prin dialog → CourierRow cu defaulturi conservative pentru câmpurile derivate. */
+function wrapUserCourier(c: Courier): CourierRow {
+  // Defensive: curieri salvați cu shape mai vechi în localStorage pot lipsi câmpuri noi.
+  const incomplete = Array.isArray(c.incompleteFields) ? c.incompleteFields : [];
+  const missing = incomplete.length;
+  const vType = c.vehicleType ?? "bike";
+  return {
+    ...c,
+    incompleteFields: incomplete,
+    vehicleType: vType,
+    avatarUrl: null,
+    vehicleModel: VEHICLE_MODEL_DEFAULT[vType] ?? "Vehicul",
+    lastActivityIso: c.createdAtIso ?? new Date().toISOString(),
+    documentsMissingCount: missing,
+    documentsExpiredCount: 0,
+    hasOpenIssue: false,
+    hasPendingPayment: false,
+    hasBlockedActivation: c.status === "in_activation" && missing > 0,
+    subcontractorName: null,
+  };
+}
+
 export function CouriersProvider({ children }: { children: ReactNode }) {
   const [couriers, setCouriers] = useState<Courier[]>([]);
+  const [deletedIds, setDeletedIds] = useState<string[]>([]);
   const [hydrated, setHydrated] = useState(false);
   const { candidates } = useCandidates();
 
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration from localStorage; codebase-wide pattern in all providers.
       if (raw) setCouriers(JSON.parse(raw) as Courier[]);
+      const rawDel = localStorage.getItem(DELETED_KEY);
+      if (rawDel) setDeletedIds(JSON.parse(rawDel) as string[]);
     } catch {}
     setHydrated(true);
   }, []);
@@ -54,8 +87,9 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
     if (!hydrated) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(couriers));
+      localStorage.setItem(DELETED_KEY, JSON.stringify(deletedIds));
     } catch {}
-  }, [couriers, hydrated]);
+  }, [couriers, deletedIds, hydrated]);
 
   const addCourier = useCallback((c: Omit<Courier, "id" | "createdAtIso">) => {
     const created: Courier = {
@@ -66,6 +100,20 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
     setCouriers((prev) => [created, ...prev]);
     return created;
   }, []);
+
+  const updateCourier = useCallback((id: string, patch: Partial<Omit<Courier, "id" | "createdAtIso" | "tenantId">>) => {
+    setCouriers((prev) => prev.map((c) => c.id === id ? { ...c, ...patch } : c));
+  }, []);
+
+  const deleteCourier = useCallback((id: string) => {
+    setCouriers((prev) => prev.filter((c) => c.id !== id));
+    setDeletedIds((prev) => (prev.includes(id) ? prev : [id, ...prev]));
+  }, []);
+
+  const allRows = useMemo<CourierRow[]>(
+    () => [...couriers.map(wrapUserCourier), ...SEED_COURIERS].filter((c) => !deletedIds.includes(c.id)),
+    [couriers, deletedIds],
+  );
 
   const findDuplicates = useCallback((phone: string, email: string | null): CourierDuplicateMatch[] => {
     const nphone = normalizePhone(phone);
@@ -78,9 +126,9 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
           out.push({ matchType: "phone", entity: "courier", id: c.id, name: c.fullName, detail: c.phone });
         }
       });
-      MOCK_COURIERS.forEach((c) => {
+      SEED_COURIERS.forEach((c) => {
         if (normalizePhone(c.phone) === nphone) {
-          out.push({ matchType: "phone", entity: "courier", id: c.id, name: c.name, detail: c.phone });
+          out.push({ matchType: "phone", entity: "courier", id: c.id, name: c.fullName, detail: c.phone });
         }
       });
       candidates.forEach((c) => {
@@ -96,6 +144,11 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
           out.push({ matchType: "email", entity: "courier", id: c.id, name: c.fullName, detail: c.email });
         }
       });
+      SEED_COURIERS.forEach((c) => {
+        if (c.email && normalizeEmail(c.email) === nemail) {
+          out.push({ matchType: "email", entity: "courier", id: c.id, name: c.fullName, detail: c.email });
+        }
+      });
       candidates.forEach((c) => {
         if (c.email && normalizeEmail(c.email) === nemail) {
           out.push({ matchType: "email", entity: "candidate", id: c.id, name: c.fullName, detail: c.email });
@@ -107,8 +160,8 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
   }, [couriers, candidates]);
 
   const value = useMemo<CouriersContextValue>(
-    () => ({ couriers, addCourier, findDuplicates, hydrated }),
-    [couriers, addCourier, findDuplicates, hydrated],
+    () => ({ couriers, allRows, addCourier, updateCourier, deleteCourier, findDuplicates, hydrated }),
+    [couriers, allRows, addCourier, updateCourier, deleteCourier, findDuplicates, hydrated],
   );
 
   return <CouriersContext.Provider value={value}>{children}</CouriersContext.Provider>;

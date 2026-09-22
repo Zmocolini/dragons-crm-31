@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 type UIContextValue = {
   sidebarOpen: boolean;
   toggleSidebar: () => void;
+  closeSidebar: () => void;
   manageNav: boolean;
   toggleManageNav: () => void;
   hiddenHrefs: Set<string>;
@@ -17,7 +18,9 @@ const UIContext = createContext<UIContextValue | null>(null);
 const STORAGE_KEY = "crm31-hidden-nav";
 
 export function UIProvider({ children }: { children: ReactNode }) {
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  // Sidebar: pe desktop mereu vizibil via CSS. Pe mobil = drawer controlat de această stare.
+  // Default false (închis) — evită flash la mount pe mobil.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [manageNav, setManageNav] = useState(false);
   const [hiddenHrefs, setHiddenHrefs] = useState<Set<string>>(new Set());
 
@@ -29,6 +32,7 @@ export function UIProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggleSidebar = () => setSidebarOpen((v) => !v);
+  const closeSidebar = () => setSidebarOpen(false);
   const toggleManageNav = () => setManageNav((v) => !v);
   const toggleHiddenHref = (href: string) => {
     setHiddenHrefs((prev) => {
@@ -48,6 +52,7 @@ export function UIProvider({ children }: { children: ReactNode }) {
       value={{
         sidebarOpen,
         toggleSidebar,
+        closeSidebar,
         manageNav,
         toggleManageNav,
         hiddenHrefs,

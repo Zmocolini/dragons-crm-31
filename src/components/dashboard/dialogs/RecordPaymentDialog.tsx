@@ -303,7 +303,7 @@ export function RecordPaymentDialog({ open, onClose, prefillRecipientId, onSaved
       role="dialog"
       aria-modal="true"
       aria-labelledby="record-payment-title"
-      className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
       onClick={requestClose}
     >
       <div

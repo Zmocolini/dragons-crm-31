@@ -5,9 +5,7 @@ export type Trend = {
 
 export type StatKey =
   | "active_couriers"
-  | "new_candidates"
   | "processed_payments"
-  | "completed_activations"
   | "open_issues";
 
 export type Stat = {

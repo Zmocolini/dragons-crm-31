@@ -21,16 +21,14 @@ export function DragonsCommunityBanner() {
             Mai mult decât o flotă. O echipă.
           </p>
         </div>
-        {/* TODO(real-users): activează butonul când comunitatea e live; până atunci disabled elegant. */}
-        <button
-          type="button"
-          disabled
-          aria-disabled
-          title="În curând"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-[12.5px] font-semibold text-amber-100/90 transition-colors hover:bg-amber-400/20 disabled:cursor-not-allowed"
+        <a
+          href="https://www.dragonsalliance.eu/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 rounded-lg border border-amber-400/30 bg-amber-400/10 px-4 py-2 text-[12.5px] font-semibold text-amber-100/90 transition-colors hover:bg-amber-400/20"
         >
           Intră în comunitate <ArrowRight size={13} />
-        </button>
+        </a>
       </div>
     </div>
   );

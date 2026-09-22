@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { useAuth } from "@/lib/auth/context";
 import type { Role } from "./roles";
 import { hasPermission, type Permission } from "./roles";
 
@@ -19,6 +20,10 @@ export type FleetTenant = {
     used: number;
     total: number;
   };
+  /** Branding per flotă. */
+  logoDataUrl: string | null;   // data:image/png;base64,... (upload user)
+  flagEmoji: string | null;     // "🇷🇴", "🚀" etc. — fallback vizual când n-ai logo
+  brandColor: string | null;    // hex, ex "#7c3aed" — folosit în FleetCard, header active-fleet
 };
 
 // Alias pentru retro-compatibilitate cu componentele care foloseau Tenant
@@ -36,24 +41,24 @@ export type SessionUser = {
 // TODO(real-users): înlocuiește mock-ul cu useSession() din Better-Auth server-side +
 // tabela user_tenants pentru lista de flote accesibile per user.
 const MOCK_FLEETS: FleetTenant[] = [
-  { id: "t_dragon",  name: "Dragon Delivery", slug: "dragon-delivery", city: "București",    country: "România", cui: "RO12345678", planLabel: "Plan Business",     planTier: "business",     planUsage: { used: 324, total: 500 } },
-  { id: "t_cluj",    name: "DD Cluj",         slug: "dd-cluj",         city: "Cluj-Napoca",  country: "România", cui: "RO87654321", planLabel: "Plan Professional", planTier: "professional", planUsage: { used: 48,  total: 200 } },
-  { id: "t_tm",      name: "DD Timișoara",    slug: "dd-timisoara",    city: "Timișoara",    country: "România", cui: "RO11223344", planLabel: "Plan Business",     planTier: "business",     planUsage: { used: 76,  total: 300 } },
-  { id: "t_iasi",    name: "DD Iași",         slug: "dd-iasi",         city: "Iași",         country: "România", cui: "RO55667788", planLabel: "Plan Start",        planTier: "start",        planUsage: { used: 62,  total: 250 } },
-  { id: "t_ct",      name: "DD Constanța",    slug: "dd-constanta",    city: "Constanța",    country: "România", cui: "RO99887766", planLabel: "Plan Start",        planTier: "start",        planUsage: { used: 41,  total: 150 } },
-  { id: "t_brasov",  name: "DD Brașov",       slug: "dd-brasov",       city: "Brașov",       country: "România", cui: "RO44556677", planLabel: "Plan Trial",        planTier: "trial",        planUsage: { used: 28,  total: 100 } },
+  {
+    id: "t_dragon",
+    name: "Dragon Delivery",
+    slug: "dragon-delivery",
+    city: "București",
+    country: "România",
+    cui: "RO12345678",
+    planLabel: "Plan Business",
+    planTier: "business",
+    planUsage: { used: 0, total: 500 },
+    logoDataUrl: null,
+    flagEmoji: "🐉",
+    brandColor: "#f97316",
+  },
 ];
 
 const DEFAULT_ACTIVE_FLEET_ID = "t_dragon";
 const STORAGE_KEY = "crm31-active-fleet";
-
-const MOCK_SESSION: Omit<SessionUser, "activeTenant"> = {
-  id: "u_ioan",
-  name: "Ioan Varga",
-  email: "cryptoportofolio1@gmail.com",
-  role: "global_owner",
-  avatarUrl: null,
-};
 
 type SessionContextValue = {
   user: SessionUser;
@@ -65,40 +70,75 @@ type SessionContextValue = {
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
+/**
+ * SessionProvider — folosește user-ul din AuthProvider dacă e logat.
+ * Dacă nu, cade pe MOCK_FLEETS[0] + user demo pentru compatibilitate cu paginile publice.
+ * AuthGuard oricum redirecționează la /login când current e null.
+ */
 export function SessionProvider({
   children,
 }: {
   children: ReactNode;
 }) {
+  const { current } = useAuth();
   const [activeFleetId, setActiveFleetId] = useState<string>(DEFAULT_ACTIVE_FLEET_ID);
 
   useEffect(() => {
+    if (current) {
+      setActiveFleetId(current.fleetId);
+      try { localStorage.setItem(STORAGE_KEY, current.fleetId); } catch {}
+      return;
+    }
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
-      if (stored && MOCK_FLEETS.some((f) => f.id === stored)) setActiveFleetId(stored);
+      if (stored) setActiveFleetId(stored);
     } catch {}
-  }, []);
+  }, [current]);
 
   const setActiveFleet = useCallback((id: string) => {
-    if (!MOCK_FLEETS.some((f) => f.id === id)) return;
     setActiveFleetId(id);
     try { localStorage.setItem(STORAGE_KEY, id); } catch {}
   }, []);
 
-  const activeTenant = useMemo(
-    () => MOCK_FLEETS.find((f) => f.id === activeFleetId) ?? MOCK_FLEETS[0],
-    [activeFleetId],
+  const allFleets = useMemo<FleetTenant[]>(() => {
+    return current ? [current.fleet] : MOCK_FLEETS;
+  }, [current]);
+
+  const activeTenant = useMemo<FleetTenant>(
+    () => allFleets.find((f) => f.id === activeFleetId) ?? allFleets[0] ?? MOCK_FLEETS[0],
+    [allFleets, activeFleetId],
   );
+
+  const sessionUser = useMemo<SessionUser>(() => {
+    if (current) {
+      return {
+        id: current.id,
+        name: current.name,
+        email: current.email,
+        role: current.role,
+        avatarUrl: current.avatarDataUrl,
+        activeTenant,
+      };
+    }
+    return {
+      id: "guest",
+      name: "Guest",
+      email: "",
+      role: "viewer",
+      avatarUrl: null,
+      activeTenant,
+    };
+  }, [current, activeTenant]);
 
   const value = useMemo<SessionContextValue>(
     () => ({
-      user: { ...MOCK_SESSION, activeTenant },
-      can: (permission) => hasPermission(MOCK_SESSION.role, permission),
-      fleets: MOCK_FLEETS,
-      activeFleetId,
+      user: sessionUser,
+      can: (permission) => hasPermission(sessionUser.role, permission),
+      fleets: allFleets,
+      activeFleetId: activeTenant.id,
       setActiveFleet,
     }),
-    [activeTenant, activeFleetId, setActiveFleet],
+    [sessionUser, allFleets, activeTenant, setActiveFleet],
   );
 
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

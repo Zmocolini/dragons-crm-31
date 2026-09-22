@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  BarChart3, Calendar, Clock, Focus, Globe, LayoutDashboard,
-  Lightbulb, Mail, Monitor, Palette, Sparkles, Sun,
+  BarChart3, Calendar, Clock, Globe, LayoutDashboard,
+  Mail, Monitor, Palette, Sparkles, Sun,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils/cn";
 
 type Draft = Pick<ProfileData,
   | "language" | "theme" | "timezone" | "dateFormat" | "timeFormat" | "density"
-  | "reduceMotion" | "focusMode" | "showTips" | "alwaysDashboard"
+  | "reduceMotion" | "alwaysDashboard"
 >;
 
 const TIMEZONES = [
@@ -42,8 +42,6 @@ export function TabPreferences() {
     timeFormat: p.timeFormat,
     density: p.density,
     reduceMotion: p.reduceMotion,
-    focusMode: p.focusMode,
-    showTips: p.showTips,
     alwaysDashboard: p.alwaysDashboard,
   });
 
@@ -52,7 +50,7 @@ export function TabPreferences() {
   useEffect(() => {
     setDraft(buildDraft(profile));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile.language, profile.theme, profile.timezone, profile.dateFormat, profile.timeFormat, profile.density, profile.reduceMotion, profile.focusMode, profile.showTips, profile.alwaysDashboard]);
+  }, [profile.language, profile.theme, profile.timezone, profile.dateFormat, profile.timeFormat, profile.density, profile.reduceMotion, profile.alwaysDashboard]);
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(buildDraft(profile));
 
@@ -178,20 +176,6 @@ export function TabPreferences() {
               description="Activează animațiile din interfață."
               checked={!draft.reduceMotion}
               onChange={(v) => setDraft({ ...draft, reduceMotion: !v })}
-            />
-            <ToggleCard
-              icon={Focus}
-              label="Mod focus"
-              description="Ascunde elementele neesențiale."
-              checked={draft.focusMode}
-              onChange={(v) => setDraft({ ...draft, focusMode: v })}
-            />
-            <ToggleCard
-              icon={Lightbulb}
-              label="Sugestii și sfaturi"
-              description="Afișează sugestii utile în aplicație."
-              checked={draft.showTips}
-              onChange={(v) => setDraft({ ...draft, showTips: v })}
             />
             <ToggleCard
               icon={LayoutDashboard}

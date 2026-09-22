@@ -1,0 +1,127 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { CheckCircle2, CloudUpload, History, Loader2, RotateCcw } from "lucide-react";
+import { useBackup, type BackupInfo } from "@/lib/backup/context";
+import { cn } from "@/lib/utils/cn";
+
+/** Indicator + acțiuni de backup (colț AppShell). */
+export function BackupBadge() {
+  const { state, backupNow, listBackups, restoreBackup } = useBackup();
+  const [open, setOpen] = useState(false);
+  const [backups, setBackups] = useState<BackupInfo[]>([]);
+  const [loading, setLoading] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setLoading(true);
+    listBackups().then((b) => { setBackups(b); setLoading(false); });
+    const onDoc = (e: MouseEvent) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, [open, listBackups]);
+
+  const label = state.lastBackupIso
+    ? `acum ${timeAgo(state.lastBackupIso)}`
+    : "fără backup încă";
+
+  return (
+    <div ref={wrapRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        title="Backup automat CRM"
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
+          state.error
+            ? "border-rose-500/40 bg-rose-500/10 text-rose-200"
+            : state.busy
+              ? "border-amber-500/40 bg-amber-500/10 text-amber-200"
+              : "border-emerald-500/40 bg-emerald-500/10 text-emerald-200 hover:bg-emerald-500/15",
+        )}
+      >
+        {state.busy
+          ? <Loader2 size={11} className="animate-spin" />
+          : state.error
+            ? <CloudUpload size={11} />
+            : <CheckCircle2 size={11} />}
+        Backup · {label}
+      </button>
+
+      {open && (
+        <div className="absolute right-0 top-full z-50 mt-1.5 min-w-[320px] overflow-hidden rounded-lg border border-line bg-card p-2 shadow-lg shadow-black/40">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-fg-dim">Backup CRM</div>
+            <button
+              type="button"
+              onClick={() => backupNow()}
+              disabled={state.busy}
+              className="inline-flex items-center gap-1 rounded border border-violet-500/40 bg-violet-500/10 px-2 py-0.5 text-[11px] font-semibold text-violet-200 hover:bg-violet-500/15 disabled:opacity-50"
+            >
+              <CloudUpload size={10} /> Backup acum
+            </button>
+          </div>
+          {state.error && (
+            <div className="mb-2 rounded border border-rose-500/40 bg-rose-500/10 p-1.5 text-[10.5px] text-rose-200">
+              Eroare: {state.error}
+            </div>
+          )}
+          <div className="mb-1 flex items-center gap-1 text-[10px] text-fg-dim">
+            <History size={9} /> Backup-uri disponibile ({backups.length})
+          </div>
+          <div className="max-h-[260px] overflow-y-auto">
+            {loading ? (
+              <div className="px-2 py-3 text-center text-[11px] text-fg-muted">Se încarcă…</div>
+            ) : backups.length === 0 ? (
+              <div className="px-2 py-3 text-center text-[11px] text-fg-muted">Fără backup-uri</div>
+            ) : (
+              backups.map((b) => (
+                <div key={b.filename} className="flex items-center justify-between gap-2 rounded px-1.5 py-1 text-[10.5px] hover:bg-white/[0.03]">
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-fg">{formatDate(b.mtime)}</div>
+                    <div className="text-fg-dim">{Math.round(b.size / 1024)} KB</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      if (!confirm(`Restaurezi backup-ul din ${formatDate(b.mtime)}? Datele curente vor fi înlocuite.`)) return;
+                      const ok = await restoreBackup(b.filename);
+                      if (ok) window.location.reload();
+                      else alert("Nu s-a putut restaura backup-ul.");
+                    }}
+                    title="Restaurează acest backup"
+                    className="inline-flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-200 hover:bg-amber-500/15"
+                  >
+                    <RotateCcw size={9} /> Restore
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="mt-1.5 text-[9.5px] text-fg-dim">
+            Auto-backup la fiecare modificare + înainte de închiderea browserului. Auto-restore dacă localStorage e gol.
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function timeAgo(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime();
+  const s = Math.floor(diff / 1000);
+  if (s < 60) return `${s}s`;
+  const m = Math.floor(s / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h`;
+  return `${Math.floor(h / 24)}z`;
+}
+
+function formatDate(iso: string): string {
+  const d = new Date(iso);
+  return d.toLocaleString("ro-RO", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}

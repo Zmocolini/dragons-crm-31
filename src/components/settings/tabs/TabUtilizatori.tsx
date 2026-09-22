@@ -13,6 +13,8 @@ import { Switch } from "@/components/ui/Switch";
 import { useToast } from "@/components/ui/Toast";
 import { useProfile } from "@/lib/profile/context";
 import { useSession } from "@/lib/rbac/session";
+import { ACCESS_MATRIX, ROLE_LABELS as RBAC_ROLE_LABELS, type Permission, type Role } from "@/lib/rbac/roles";
+import { NAV_ITEMS } from "@/lib/nav/nav-items";
 import { useSettings } from "@/lib/settings/context";
 import {
   TEAM_ROLE_DESC, TEAM_ROLE_LABEL,
@@ -76,15 +78,7 @@ export function TabUtilizatori() {
     <div className="space-y-5">
       <MembriiEchipeiCard />
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <RoluriPermisiuniCard />
-        <AccesInvitatiiCard />
-      </div>
-
-      {/* Save modificări — placeholder de commit către backend */}
-      <div className="flex justify-end">
-        <SaveButton />
-      </div>
+      <RoluriPermisiuniCard />
     </div>
   );
 }
@@ -184,7 +178,11 @@ function MemberRow({
   const { user } = useSession();
   const { resendInvitation, settings, cancelInvitation } = useSettings();
   const toast = useToast();
-  const RoleIcon = ROLE_ICON[member.role];
+  // Fallback defensiv: dacă role e un TeamRoleKey necunoscut (legacy sau salvat greșit
+  // dintr-un flow care a folosit rol RBAC), afișăm ca Viewer în loc să crashe.
+  const RoleIcon = ROLE_ICON[member.role] ?? ROLE_ICON.viewer;
+  const roleTone = ROLE_TONE[member.role] ?? ROLE_TONE.viewer;
+  const roleLabel = TEAM_ROLE_LABEL[member.role] ?? `Rol necunoscut (${member.role})`;
 
   const isSelf = member.email.toLowerCase() === user.email.toLowerCase();
   const isProtectedGO = member.role === "global_owner" && !isSelf;
@@ -221,9 +219,9 @@ function MemberRow({
         </div>
       </TD>
       <TD>
-        <span className={cn("inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[10.5px] font-semibold", ROLE_TONE[member.role])}>
+        <span className={cn("inline-flex items-center gap-1.5 rounded-md border px-2 py-0.5 text-[10.5px] font-semibold", roleTone)}>
           <RoleIcon size={11} />
-          {TEAM_ROLE_LABEL[member.role]}
+          {roleLabel}
         </span>
       </TD>
       <TD className="text-fg-muted">
@@ -576,41 +574,125 @@ function ConfirmActionDialog({
 
 /* ═══════════ ROLURI ȘI PERMISIUNI ═══════════ */
 
+// Mapare rol team → rol RBAC (pentru citirea permisiunilor din ACCESS_MATRIX).
+const TEAM_TO_RBAC: Record<TeamRoleKey, Role> = {
+  global_owner:        "global_owner",
+  fleet_admin:         "subcontractor_owner",
+  subcontractor_admin: "subcontractor_owner",
+  hr:                  "operator_recruitment",
+  payments:            "operator_payments",
+  viewer:              "viewer",
+};
+
+// Etichete prietenoase pentru permisiuni.
+const PERMISSION_LABEL: Partial<Record<Permission, string>> = {
+  "dashboard.view":       "Vede Dashboard",
+  "couriers.view":        "Vede curieri",
+  "couriers.create":      "Adaugă curieri",
+  "couriers.edit":        "Editează curieri",
+  "candidates.view":      "Vede candidați",
+  "candidates.create":    "Adaugă candidați",
+  "payments.view":        "Vede plăți",
+  "payments.create":      "Înregistrează plăți",
+  "reports.view":         "Vede rapoarte",
+  "documents.view":       "Vede documente",
+  "documents.upload":     "Încarcă documente",
+  "vehicles.view":        "Vede vehicule",
+  "cazari.view":          "Vede cazări",
+  "subcontractors.view":  "Vede subcontractori",
+  "users.view":           "Vede utilizatori",
+  "issues.view":          "Vede probleme / suport",
+  "calendar.view":        "Vede calendar",
+  "ai.use":               "Folosește AI Copilot",
+  "settings.view":        "Acces setări organizație",
+  "tenant.switch":        "Schimbă flota activă",
+};
+
 function RoluriPermisiuniCard() {
-  const toast = useToast();
+  const { settings } = useSettings();
+  const [openRole, setOpenRole] = useState<TeamRoleKey | null>(null);
+
+  const roles = Object.keys(TEAM_ROLE_LABEL) as TeamRoleKey[];
+
   return (
     <section className="rounded-2xl border border-line bg-card">
       <header className="border-b border-line/70 px-5 py-4">
         <h3 className="text-[15px] font-semibold text-fg">Roluri și permisiuni</h3>
-        <p className="text-[11.5px] text-fg-muted">Definește rolurile și permisiunile din organizație.</p>
+        <p className="text-[11.5px] text-fg-muted">Apasă pe un rol pentru a vedea permisiunile detaliate și modulele accesibile.</p>
       </header>
       <ul className="divide-y divide-line/40">
-        {(Object.keys(TEAM_ROLE_LABEL) as TeamRoleKey[]).map((r) => {
+        {roles.map((r) => {
           const Icon = ROLE_ICON[r];
+          const rbacRole = TEAM_TO_RBAC[r];
+          const perms = Array.from(ACCESS_MATRIX[rbacRole]);
+          const memberCount = settings.team.members.filter((m) => m.role === r).length;
+          const accessibleModules = NAV_ITEMS.filter((n) => perms.includes(n.permission));
+          const isOpen = openRole === r;
           return (
-            <li key={r} className="flex items-center gap-3 px-5 py-3">
-              <span className={cn("inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", ROLE_TONE[r])}>
-                <Icon size={14} />
-              </span>
-              <div className="min-w-0 flex-1 leading-tight">
-                <div className="text-[13px] font-semibold text-fg">{TEAM_ROLE_LABEL[r]}</div>
-                <div className="mt-0.5 text-[11.5px] text-fg-muted">{TEAM_ROLE_DESC[r]}</div>
-              </div>
-              <ChevronRight size={14} className="text-fg-dim" />
+            <li key={r}>
+              <button
+                type="button"
+                onClick={() => setOpenRole(isOpen ? null : r)}
+                aria-expanded={isOpen}
+                className="flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-white/[0.02]"
+              >
+                <span className={cn("inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border", ROLE_TONE[r])}>
+                  <Icon size={14} />
+                </span>
+                <div className="min-w-0 flex-1 leading-tight">
+                  <div className="flex items-center gap-2">
+                    <span className="text-[13px] font-semibold text-fg">{TEAM_ROLE_LABEL[r]}</span>
+                    <span className="rounded-md border border-white/10 bg-white/[0.04] px-1.5 py-0.5 text-[10px] font-semibold text-fg-muted">
+                      {memberCount} {memberCount === 1 ? "utilizator" : "utilizatori"}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-[11.5px] text-fg-muted">{TEAM_ROLE_DESC[r]}</div>
+                </div>
+                <span className="flex items-center gap-2 text-[10.5px] font-medium text-fg-dim">
+                  <span>{perms.length} permisiuni</span>
+                  <ChevronRight size={14} className={cn("transition-transform", isOpen && "rotate-90")} />
+                </span>
+              </button>
+              {isOpen && (
+                <div className="space-y-3 border-t border-line/40 bg-card-2/30 px-5 py-4">
+                  {/* Module accesibile */}
+                  <div>
+                    <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-fg-dim">Module accesibile ({accessibleModules.length})</div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {accessibleModules.map((m) => {
+                        const NavIcon = m.icon;
+                        return (
+                          <span key={m.href} className="inline-flex items-center gap-1.5 rounded-md border border-line bg-card-2 px-2 py-1 text-[11px] text-fg-muted">
+                            <NavIcon size={11} />
+                            {m.label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {/* Permisiuni detaliate */}
+                  <div>
+                    <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-fg-dim">Permisiuni detaliate</div>
+                    <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
+                      {perms.map((p) => (
+                        <div key={p} className="flex items-center gap-2 rounded-md border border-line/60 bg-card-2/50 px-2 py-1 text-[11.5px] text-fg-muted">
+                          <ShieldCheck size={11} className="text-emerald-400" />
+                          <span>{PERMISSION_LABEL[p] ?? p}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  {/* Mapare RBAC */}
+                  <div className="flex items-center gap-2 rounded-lg border border-sky-500/20 bg-sky-500/[0.06] px-3 py-2 text-[11px] text-sky-200">
+                    <Shield size={11} />
+                    <span>Mapat pe rolul RBAC intern: <strong className="text-fg">{RBAC_ROLE_LABELS[rbacRole]}</strong></span>
+                  </div>
+                </div>
+              )}
             </li>
           );
         })}
       </ul>
-      <div className="border-t border-line/60 p-4">
-        <button
-          type="button"
-          onClick={() => toast.info("Gestionează roluri", "Deschide editorul de permisiuni per rol — disponibil după integrarea backend.")}
-          className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg border border-line bg-card-2 px-4 py-2.5 text-[12.5px] font-semibold text-fg-muted hover:bg-card-hover hover:text-fg"
-        >
-          Gestionează roluri
-          <ArrowRight size={12} />
-        </button>
-      </div>
     </section>
   );
 }
@@ -819,24 +901,7 @@ function DomainsDialog({ open, onClose }: { open: boolean; onClose: () => void }
 
 /* ═══════════ SAVE BUTTON ═══════════ */
 
-function SaveButton() {
-  const toast = useToast();
-  const { logActivity } = useProfile();
-  function save() {
-    // TODO(real-users): commit către server + revalidate + audit log server-side.
-    logActivity("preferences.update", "Configurație utilizatori și acces", "Setări");
-    toast.success("Modificări salvate.", "Configurația de acces a fost actualizată.");
-  }
-  return (
-    <button
-      type="button"
-      onClick={save}
-      className="rounded-xl bg-gradient-to-r from-violet-600 to-blue-600 px-6 py-2.5 text-[13px] font-semibold text-white hover:from-violet-500 hover:to-blue-500"
-    >
-      Salvează modificările
-    </button>
-  );
-}
+
 
 /* ═══════════ TABLE PRIMITIVES ═══════════ */
 

@@ -68,35 +68,6 @@ export function TabSecurity() {
         </button>
       </section>
 
-      {/* 2FA — pur informativ, în dezvoltare (fără toggle fake) */}
-      <section className="flex items-center justify-between gap-4 rounded-2xl border border-line bg-card p-4">
-        <div className="flex items-center gap-3">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-line bg-card-2 text-fg-dim">
-            <Shield size={17} />
-          </span>
-          <div>
-            <div className="text-[14px] font-semibold text-fg">Autentificare în doi pași (2FA)</div>
-            <div className="mt-0.5 text-[11.5px] text-fg-muted">
-              Adaugă un strat suplimentar de securitate contului tău.
-            </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-md border border-white/10 bg-white/[0.04] px-2 py-0.5 text-[11px] font-semibold text-fg-dim">
-            <span className="inline-block h-1.5 w-1.5 rounded-full bg-fg-dim/70" />
-            În dezvoltare
-          </span>
-          <button
-            type="button"
-            disabled
-            title="Autentificarea în doi pași va fi disponibilă într-o versiune viitoare."
-            className="cursor-not-allowed rounded-lg border border-line bg-card-2/60 px-3.5 py-2 text-[12.5px] font-semibold text-fg-dim"
-          >
-            Indisponibil
-          </button>
-        </div>
-      </section>
-
       {/* Sessions table */}
       <section className="rounded-2xl border border-line bg-card">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line/70 px-5 py-4">
