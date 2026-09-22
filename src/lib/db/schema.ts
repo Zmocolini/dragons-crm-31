@@ -83,6 +83,27 @@ export const courierDocuments = sqliteTable("courier_documents", {
   uploadedBy: text("uploaded_by").default(""),
 });
 
+// ── USERS + SESSIONS ──────────────────────────────────────────────────────
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
+  role: text("role").notNull().default("user"),   // "global_owner" | "user"
+  name: text("name").notNull().default(""),
+  active: integer("active", { mode: "boolean" }).notNull().default(true),
+  createdAtIso: text("created_at_iso").notNull().default(sql`(current_timestamp)`),
+  lastLoginIso: text("last_login_iso"),
+});
+
+export const sessions = sqliteTable("sessions", {
+  token: text("token").primaryKey(),
+  userId: text("user_id").notNull(),
+  createdAtIso: text("created_at_iso").notNull().default(sql`(current_timestamp)`),
+  expiresAtIso: text("expires_at_iso").notNull(),
+  userAgent: text("user_agent"),
+  ip: text("ip"),
+});
+
 // ── BACKUP SNAPSHOTS ──────────────────────────────────────────────────────
 // Fiecare rând = o versiune completă a datelor (toate cheile crm31-*).
 // Cea mai recentă e folosită la auto-restore când localStorage e gol.

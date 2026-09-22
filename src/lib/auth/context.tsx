@@ -55,35 +55,9 @@ function activateTeamMemberByEmail(email: string): void {
   } catch {}
 }
 
-/** Seed: primul owner Dragon Delivery pentru login rapid demo. */
+/** Fără seed demo — Global Owner-ul se creează prin flow-ul /register (unic). */
 async function seedDemoIfEmpty(users: AccountUser[], fleets: FleetTenant[]): Promise<{ users: AccountUser[]; fleets: FleetTenant[] }> {
-  if (users.length > 0) return { users, fleets };
-  const demoFleet: FleetTenant = {
-    id:            "t_dragon",
-    name:          "Dragon Delivery",
-    slug:          "dragon-delivery",
-    city:          "București",
-    country:       "România",
-    cui:           "RO12345678",
-    planLabel:     "Plan Business",
-    planTier:      "business",
-    planUsage:     { used: 0, total: 500 },
-    logoDataUrl:   null,
-    flagEmoji:     "🐉",
-    brandColor:    "#f97316",
-  };
-  const demoUser: AccountUser = {
-    id:            "u_demo",
-    name:          "Demo Owner",
-    email:         "demo@dragondelivery.ro",
-    passwordHash:  await sha256("demo1234"),
-    role:          "global_owner",
-    fleetId:       demoFleet.id,
-    avatarDataUrl: null,
-    createdAtIso:  new Date().toISOString(),
-    lastLoginIso:  null,
-  };
-  return { users: [demoUser], fleets: [demoFleet] };
+  return { users, fleets };
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -129,10 +103,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (input: LoginInput): Promise<{ ok: true } | { ok: false; error: string }> => {
     const email = input.email.trim().toLowerCase();
-    const u = users.find((x) => x.email.toLowerCase() === email);
-    if (!u) return { ok: false, error: "Email inexistent." };
-    const hash = await sha256(input.password);
-    if (hash !== u.passwordHash) return { ok: false, error: "Parolă greșită." };
+    // ÎNTÂI: validare pe server → setează cookie session (middleware permite acces).
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password: input.password }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({} as { error?: string }));
+        return { ok: false, error: j.error ?? "Credențiale invalide." };
+      }
+    } catch {
+      return { ok: false, error: "Server indisponibil. Încearcă din nou." };
+    }
+    // Local: setează sesiunea în state (pentru UI-ul existent). Auto-seed user dacă lipsește.
+    let u = users.find((x) => x.email.toLowerCase() === email);
+    if (!u) {
+      // User există server-side dar nu local (ex: după clear localStorage) — creez un stub minimal.
+      const stub: AccountUser = {
+        id: uid("u"),
+        name: email.split("@")[0],
+        email,
+        passwordHash: await sha256(input.password),
+        role: "global_owner",
+        fleetId: fleets[0]?.id ?? "t_dragon",
+        avatarDataUrl: null,
+        createdAtIso: new Date().toISOString(),
+        lastLoginIso: new Date().toISOString(),
+      };
+      persistUsers([...users, stub]);
+      u = stub;
+    }
     const now = new Date();
     const newSession: Session = {
       userId: u.id,
@@ -141,9 +143,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     setSession(newSession);
     safeWrite(SESSION_KEY, newSession);
-    persistUsers(users.map((x) => x.id === u.id ? { ...x, lastLoginIso: now.toISOString() } : x));
+    persistUsers(users.map((x) => x.id === u!.id ? { ...x, lastLoginIso: now.toISOString() } : x));
     return { ok: true };
-  }, [users, persistUsers]);
+  }, [users, fleets, persistUsers]);
 
   const register = useCallback(async (input: RegisterInput): Promise<{ ok: true } | { ok: false; error: string }> => {
     const email = input.email.trim().toLowerCase();
@@ -152,6 +154,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
     if (input.password.length < 6) return { ok: false, error: "Parola trebuie să aibă min. 6 caractere." };
     if (!input.fleetName.trim()) return { ok: false, error: "Numele flotei e obligatoriu." };
+    // Creează Global Owner pe server (unic în sistem — refuză dacă există deja).
+    try {
+      const res = await fetch("/api/auth/setup", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password: input.password, name: input.name }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({} as { error?: string }));
+        return { ok: false, error: j.error ?? "Setup imposibil. Global Owner există deja." };
+      }
+    } catch {
+      return { ok: false, error: "Server indisponibil. Încearcă din nou." };
+    }
 
     const fleet: FleetTenant = {
       id:            uid("t"),
@@ -195,6 +211,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = useCallback(() => {
     setSession(null);
     safeWrite(SESSION_KEY, null);
+    // Șterge și cookie-ul de pe server → middleware va bloca următorul request.
+    fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
   }, []);
 
   // ── Invitații ──────────────────────────────────────────────────────────────

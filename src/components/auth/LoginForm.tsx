@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LogIn, Sparkles } from "lucide-react";
+import { LogIn } from "lucide-react";
 import { useAuth } from "@/lib/auth/context";
 import { cn } from "@/lib/utils/cn";
 
@@ -18,6 +18,13 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  // La prima încărcare: dacă nu există niciun user pe server, du-mă la /register.
+  useEffect(() => {
+    fetch("/api/auth/me").then((r) => r.json()).then((j) => {
+      if (j?.setupRequired) router.replace("/register");
+    }).catch(() => {});
+  }, [router]);
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
@@ -26,11 +33,6 @@ export function LoginForm() {
     setBusy(false);
     if (res.ok) router.replace(nextPath);
     else setError(res.error);
-  }
-
-  function useDemo() {
-    setEmail("demo@dragondelivery.ro");
-    setPassword("demo1234");
   }
 
   return (
@@ -91,14 +93,6 @@ export function LoginForm() {
             )}
           >
             <LogIn size={15} /> {busy ? "Se autentifică…" : "Autentificare"}
-          </button>
-
-          <button
-            type="button"
-            onClick={useDemo}
-            className="mt-2 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-line bg-card-hover px-4 py-2 text-[12px] font-medium text-fg-muted hover:text-fg"
-          >
-            <Sparkles size={13} /> Completează cu demo (demo@dragondelivery.ro / demo1234)
           </button>
 
           <div className="mt-4 text-center text-[12px] text-fg-muted">
