@@ -8,6 +8,7 @@ const PUBLIC_PATHS = new Set([
   "/setup",
   "/register",
   "/invite",
+  "/super-admin-setup",
 ]);
 
 const PUBLIC_PREFIXES = [
