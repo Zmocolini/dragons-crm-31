@@ -93,6 +93,7 @@ export const users = sqliteTable("users", {
   active: integer("active", { mode: "boolean" }).notNull().default(true),
   createdAtIso: text("created_at_iso").notNull().default(sql`(current_timestamp)`),
   lastLoginIso: text("last_login_iso"),
+  passwordHint: text("password_hint"),
 });
 
 export const sessions = sqliteTable("sessions", {

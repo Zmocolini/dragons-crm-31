@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, ShieldCheck } from "lucide-react";
+import { Lightbulb, Loader2, ShieldCheck } from "lucide-react";
 
 export default function SuperAdminSetupPage() {
   const router = useRouter();
   const [checking, setChecking] = useState(true);
   const [alreadyExists, setAlreadyExists] = useState(false);
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const [hint, setHint] = useState("");
+  const [showHintField, setShowHintField] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
@@ -29,7 +30,7 @@ export default function SuperAdminSetupPage() {
       const res = await fetch("/api/auth/create-super-admin", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify({ name, password, hint: hint.trim() || undefined }),
       });
       const j = await res.json();
       if (!res.ok) { setError(j.error ?? "Eroare la creare"); return; }
@@ -53,16 +54,14 @@ export default function SuperAdminSetupPage() {
           </div>
           <h1 className="text-[22px] font-bold text-fg">Super Admin — cont unic</h1>
           <p className="mt-1 text-[12.5px] text-fg-muted">
-            Rol special separat de global_owner. Există o singură dată în sistem, doar tu.
+            Rol strict pentru tine. Un singur cont pe tot sistemul.
           </p>
         </div>
 
         {alreadyExists ? (
           <div className="rounded-2xl border border-amber-500/40 bg-amber-500/10 p-5 text-center">
             <div className="text-[14px] font-bold text-amber-100">Super Admin există deja</div>
-            <p className="mt-2 text-[12px] text-amber-200/80">
-              Contul de Super Admin a fost deja creat. Rotirea lui se face doar din contul curent (viitor).
-            </p>
+            <p className="mt-2 text-[12px] text-amber-200/80">Fost deja creat. Rotirea se face din contul curent.</p>
             <button
               type="button" onClick={() => router.replace("/login")}
               className="mt-4 inline-flex items-center gap-2 rounded-lg bg-white/10 px-4 py-2 text-[12.5px] font-semibold text-amber-100 hover:bg-white/15"
@@ -77,30 +76,16 @@ export default function SuperAdminSetupPage() {
           </div>
         ) : (
           <form onSubmit={submit} className="rounded-2xl border border-line bg-card p-6 shadow-2xl shadow-black/40">
-            <div className="mb-4 rounded-lg border border-rose-500/40 bg-rose-500/[0.08] p-3 text-[11.5px] text-rose-200">
-              <b>Atenție:</b> emailul și parola NU pot fi resetate ușor (nu există flux de recovery). Salvează-le într-un manager de parole.
-            </div>
-
             <label className="mb-3 flex flex-col gap-1">
-              <span className="text-[11.5px] font-bold uppercase tracking-wider text-fg-dim">Nume afișat</span>
+              <span className="text-[11.5px] font-bold uppercase tracking-wider text-fg-dim">Nume</span>
               <input
-                type="text" value={name} onChange={(e) => setName(e.target.value)}
-                placeholder="Ioan (Super Admin)"
+                type="text" required value={name} onChange={(e) => setName(e.target.value)}
+                placeholder="ex. Ioan"
                 className="rounded-md border border-line bg-card-2 px-3 py-2 text-[14px] text-fg placeholder:text-fg-dim focus:border-rose-500/60 focus:outline-none"
               />
             </label>
 
             <label className="mb-3 flex flex-col gap-1">
-              <span className="text-[11.5px] font-bold uppercase tracking-wider text-fg-dim">Email (separat de contul CRM)</span>
-              <input
-                type="email" required value={email} onChange={(e) => setEmail(e.target.value)}
-                autoComplete="email" placeholder="admin@personal.ro"
-                className="rounded-md border border-line bg-card-2 px-3 py-2 text-[14px] text-fg placeholder:text-fg-dim focus:border-rose-500/60 focus:outline-none"
-              />
-              <span className="text-[10.5px] text-fg-dim">Recomandat: alt email decât cel de global_owner al flotei.</span>
-            </label>
-
-            <label className="mb-4 flex flex-col gap-1">
               <span className="text-[11.5px] font-bold uppercase tracking-wider text-fg-dim">Parolă (min. 10 caractere)</span>
               <input
                 type="password" required value={password} onChange={(e) => setPassword(e.target.value)}
@@ -108,6 +93,27 @@ export default function SuperAdminSetupPage() {
                 className="rounded-md border border-line bg-card-2 px-3 py-2 text-[14px] text-fg placeholder:text-fg-dim focus:border-rose-500/60 focus:outline-none"
               />
             </label>
+
+            <button
+              type="button"
+              onClick={() => setShowHintField((v) => !v)}
+              className="mb-3 inline-flex items-center gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-[12px] font-semibold text-amber-200 hover:bg-amber-500/15"
+            >
+              <Lightbulb size={12} /> {showHintField ? "Ascunde hint" : "Adaugă hint parolă (opțional)"}
+            </button>
+
+            {showHintField && (
+              <label className="mb-3 flex flex-col gap-1">
+                <span className="text-[10.5px] uppercase tracking-wider text-fg-dim">Hint parolă</span>
+                <textarea
+                  value={hint} onChange={(e) => setHint(e.target.value)}
+                  rows={2} maxLength={200}
+                  placeholder='ex. "prima literă cu majuscule + anul nașterii + simbol"'
+                  className="rounded-md border border-line bg-card-2 px-3 py-2 text-[13px] text-fg placeholder:text-fg-dim focus:border-amber-500/60 focus:outline-none"
+                />
+                <span className="text-[10px] text-fg-dim">Vizibil pe pagina de login când clichezi „Hint". Nu-l face prea explicit.</span>
+              </label>
+            )}
 
             {error && (
               <div className="mb-3 rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-200">{error}</div>
