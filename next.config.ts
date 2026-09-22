@@ -7,7 +7,6 @@ const nextConfig: NextConfig = {
   // TODO: eroare TS preexistente în cod (7 fișiere) — ignorate temporar la build ca să
   // trecem deploy-ul pe Vercel. Fix-uri incrementale ulterior.
   typescript: { ignoreBuildErrors: true },
-  eslint: { ignoreDuringBuilds: true },
 };
 
 export default nextConfig;

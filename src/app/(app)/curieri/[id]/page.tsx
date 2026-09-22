@@ -21,6 +21,7 @@ import { NATIONALITY_LABEL } from "@/lib/candidates/types";
 import { VEHICLE_TYPE_LABEL, VEHICLE_OWNERSHIP_LABEL, COLLABORATION_LABEL, type VehicleType } from "@/lib/couriers/types";
 import { EditCourierDialog } from "@/components/couriers/EditCourierDialog";
 import { UploadDocumentDialog } from "@/components/dashboard/dialogs/UploadDocumentDialog";
+import { CourierDocumentsSection } from "@/components/couriers/CourierDocumentsSection";
 
 // Hub central curier (Etapa 8): agregă din TOATE modulele prin courierId — o singură
 // identitate. Deep-link-urile „Deschide profil" din orice modul ajung aici.
@@ -272,6 +273,9 @@ function DocumentsGallery({ docs, badge }: { docs: Array<{ id: string; file: { n
           )}
         </CardBody>
       </Card>
+
+      {/* Documente + poze stocate în Cloudflare R2 (persistent, safe) */}
+      <CourierDocumentsSection courierId={id} />
 
       {lightbox && typeof document !== "undefined" && createPortal(
         (() => {

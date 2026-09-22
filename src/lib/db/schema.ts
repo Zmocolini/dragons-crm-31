@@ -69,6 +69,20 @@ export const duplicatePairs = sqliteTable("duplicate_pairs", {
   createdAtIso: text("created_at_iso").notNull().default(sql`(current_timestamp)`),
 });
 
+// ── COURIER DOCUMENTS (poze + PDFs stocate în R2) ─────────────────────────
+export const courierDocuments = sqliteTable("courier_documents", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  tenantId: text("tenant_id").notNull().default("fleet_dragons"),
+  courierId: text("courier_id").notNull(),
+  docType: text("doc_type").notNull(),        // "ci", "permis", "contract", "medical", "asigurare", "foto", "alt"
+  filename: text("filename").notNull(),
+  r2Key: text("r2_key").notNull(),
+  contentType: text("content_type").notNull(),
+  sizeBytes: integer("size_bytes").notNull().default(0),
+  uploadedAtIso: text("uploaded_at_iso").notNull().default(sql`(current_timestamp)`),
+  uploadedBy: text("uploaded_by").default(""),
+});
+
 // ── BACKUP SNAPSHOTS ──────────────────────────────────────────────────────
 // Fiecare rând = o versiune completă a datelor (toate cheile crm31-*).
 // Cea mai recentă e folosită la auto-restore când localStorage e gol.
