@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Check, ChevronDown, ChevronUp, ListChecks, Plus, Trash2, X } from "lucide-react";
-import { WEEK_DATES, WEEK_DAYS, WEEK_LABEL } from "@/lib/calendar/data";
+import { WEEK_DAYS, getWeekDatesNow, getWeekLabelNow, getTodayDowNow } from "@/lib/calendar/data";
 import { cn } from "@/lib/utils/cn";
 
 // TODO(real-users): mutare pe tabel `weekly_tasks` cu FK tenant + user + week_iso.
@@ -22,9 +22,7 @@ function todayIsoLocal(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
-function currentDow(): number {
-  return (new Date().getDay() + 6) % 7; // Luni = 0
-}
+// (folosim getTodayDowNow din @/lib/calendar/data)
 
 const DEFAULT_TASKS: WeekTask[] = [
   { id: "d1", text: "Sună curierii inactivi (>3 zile)", dow: 0, done: false, createdAtIso: todayIsoLocal() },
@@ -47,6 +45,15 @@ export function WeeklyTasksBar() {
   const [collapsed, setCollapsed] = useState(false);
   const [addingDow, setAddingDow] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
+  // Re-render zilnic: tick pentru a recalcula WEEK_DATES + today când săptămâna trece.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => setTick((n) => n + 1), 60 * 60 * 1000); // check orar
+    return () => clearInterval(iv);
+  }, []);
+  const weekDates = getWeekDatesNow();
+  const weekLabel = getWeekLabelNow();
+  const today = getTodayDowNow();
 
   useEffect(() => {
     setTasks(safeLoad());
@@ -68,8 +75,6 @@ export function WeeklyTasksBar() {
     for (const t of tasks) if (m[t.dow]) m[t.dow].push(t);
     return m;
   }, [tasks]);
-
-  const today = currentDow();
 
   function toggle(id: string) {
     setTasks((prev) => prev.map((t) => t.id === id ? { ...t, done: !t.done } : t));
@@ -97,7 +102,7 @@ export function WeeklyTasksBar() {
         <div className="min-w-0 flex-1">
           <div className="text-[13px] font-bold text-fg">Task-uri săptămâna curentă</div>
           <div className="text-[11px] text-fg-muted">
-            {WEEK_LABEL} · <b className="text-fg">{remaining}</b> de făcut · {doneCount}/{totalCount} gata
+            {weekLabel} · <b className="text-fg">{remaining}</b> de făcut · {doneCount}/{totalCount} gata
           </div>
         </div>
         <button
@@ -116,7 +121,7 @@ export function WeeklyTasksBar() {
             const dow = i;
             const isToday = dow === today;
             const list = byDow[dow] ?? [];
-            const dd = String(WEEK_DATES[i] ?? "").padStart(2, "0");
+            const dd = String(weekDates[i] ?? "").padStart(2, "0");
             return (
               <div
                 key={dow}

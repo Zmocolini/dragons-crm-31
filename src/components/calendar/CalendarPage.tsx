@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Check, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/Card";
-import { WEEK_DATES, WEEK_DAYS, WEEK_LABEL, TODAY_DOW } from "@/lib/calendar/data";
+import { WEEK_DAYS, getWeekDatesNow, getWeekLabelNow, getTodayDowNow } from "@/lib/calendar/data";
 import { useSession } from "@/lib/rbac/session";
 import { cn } from "@/lib/utils/cn";
 
@@ -77,13 +77,23 @@ export function CalendarPage() {
     setNotes((prev) => prev.filter((n) => n.id !== id));
   }
 
+  // Re-render zilnic ca să prindem trecerea la săptămâna următoare + evidențierea zilei.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const iv = setInterval(() => setTick((n) => n + 1), 60 * 60 * 1000);
+    return () => clearInterval(iv);
+  }, []);
+  const weekDates = getWeekDatesNow();
+  const weekLabel = getWeekLabelNow();
+  const todayDow = getTodayDowNow();
+
   return (
     <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 p-4 lg:p-6">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <div>
           <h1 className="text-[24px] font-bold tracking-tight text-fg">Calendar</h1>
           <p className="mt-0.5 text-[12.5px] text-fg-muted">
-            Notițe globale · {WEEK_LABEL}
+            Notițe globale · {weekLabel}
             {!canEdit && (
               <span className="ml-2 inline-flex items-center gap-1 rounded border border-line bg-card-hover px-1.5 py-0.5 text-[10.5px] font-medium text-fg-dim">
                 <Lock size={9} /> doar Global Owner poate edita
@@ -95,7 +105,7 @@ export function CalendarPage() {
 
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-7">
         {WEEK_DAYS.map((day, dow) => {
-          const isToday = dow === TODAY_DOW;
+          const isToday = dow === todayDow;
           const dayNotes = notes.filter((n) => n.dow === dow);
           return (
             <Card
@@ -117,7 +127,7 @@ export function CalendarPage() {
                     "text-[18px] font-bold leading-none",
                     isToday ? "text-violet-100" : "text-fg",
                   )}>
-                    {WEEK_DATES[dow]}
+                    {weekDates[dow]}
                   </div>
                 </div>
                 {canEdit && (
