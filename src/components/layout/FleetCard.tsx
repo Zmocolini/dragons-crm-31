@@ -1,11 +1,12 @@
 "use client";
 
-import { ChevronsUpDown } from "lucide-react";
+import { ChevronsUpDown, Globe, User as UserIcon } from "lucide-react";
 import { useState } from "react";
 import { useSession } from "@/lib/rbac/session";
 import { useCouriers } from "@/lib/couriers/context";
 import { useMemo } from "react";
 import { FleetSwitcherDialog } from "./FleetSwitcherDialog";
+import { useOwnerScope } from "@/lib/owner-scope/context";
 import { cn } from "@/lib/utils/cn";
 
 /**
@@ -15,9 +16,16 @@ import { cn } from "@/lib/utils/cn";
 export function FleetCard() {
   const { user, activeFleetId, can } = useSession();
   const { allRows } = useCouriers();
+  const { scope } = useOwnerScope();
   const [open, setOpen] = useState(false);
   const t = user.activeTenant;
   const canSwitch = can("tenant.switch");
+
+  if (!canSwitch) return null;
+
+  // Label-uri dinamice bazate pe scope
+  const displayName = scope ? scope.name : "Toate flotele";
+  const displaySub = scope ? scope.email : "Vezi datele TUTUROR subcontractorilor";
 
   const activeInFleet = useMemo(
     () => allRows.filter((c) => c.tenantId === activeFleetId && c.status === "active").length,
@@ -46,37 +54,24 @@ export function FleetCard() {
         style={{ borderColor: `${brandColor}30` }}
       >
         <div className="flex items-center gap-2.5">
-          {t.logoDataUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={t.logoDataUrl}
-              alt={`${t.name} logo`}
-              className="h-9 w-9 shrink-0 rounded-lg object-cover"
-              style={{ boxShadow: `0 4px 12px -4px ${brandColor}80` }}
-            />
-          ) : (
-            <span
-              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[16px] font-black text-white"
-              style={{
-                background: `linear-gradient(135deg, ${brandColor} 0%, ${brandColor}cc 100%)`,
-                boxShadow: `0 4px 12px -4px ${brandColor}80`,
-              }}
-            >
-              {flagOrInitials}
-            </span>
-          )}
+          <span
+            className={cn(
+              "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-white",
+              scope
+                ? "bg-gradient-to-br from-cyan-500 to-blue-600"
+                : "bg-gradient-to-br from-amber-500 to-orange-500",
+            )}
+          >
+            {scope ? <UserIcon size={16} /> : <Globe size={16} />}
+          </span>
           <span className="min-w-0 flex-1 leading-tight">
             <span className="block text-[9.5px] font-semibold uppercase tracking-wider text-fg-dim">
               Flotă activă
             </span>
-            <span className="block truncate text-[13px] font-semibold text-fg">{t.name}</span>
+            <span className="block truncate text-[13px] font-semibold text-fg">{displayName}</span>
+            <span className="block truncate text-[10px] text-fg-dim">{displaySub}</span>
           </span>
-          {canSwitch && (
-            <ChevronsUpDown
-              size={13}
-              className="shrink-0 text-fg-dim group-hover:text-fg-muted"
-            />
-          )}
+          <ChevronsUpDown size={13} className="shrink-0 text-fg-dim group-hover:text-fg-muted" />
         </div>
 
         <div>

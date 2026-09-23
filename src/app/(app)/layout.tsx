@@ -9,6 +9,7 @@ import { CandidatesProvider } from "@/lib/candidates/context";
 import { CandidatesStageProvider } from "@/lib/candidates/stage-context";
 import { CouriersProvider } from "@/lib/couriers/context";
 import { DuplicatePairsProvider } from "@/lib/subcontractors/duplicate-pairs-context";
+import { OwnerScopeProvider } from "@/lib/owner-scope/context";
 import { PaymentsProvider } from "@/lib/payments/context";
 import { ReportsProvider } from "@/lib/reports/context";
 import { DocumentsProvider } from "@/lib/documents/context";
@@ -21,6 +22,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
     <BackupProvider>
+    <OwnerScopeProvider>
     <SessionProvider>
       <ProfileProvider>
         <SettingsProvider>
@@ -54,6 +56,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
         </SettingsProvider>
       </ProfileProvider>
     </SessionProvider>
+    </OwnerScopeProvider>
     </BackupProvider>
   );
 }

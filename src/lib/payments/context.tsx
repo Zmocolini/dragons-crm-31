@@ -12,6 +12,7 @@ import {
 } from "./types";
 import { SEED_PAYMENTS } from "./seed";
 import { useSession } from "@/lib/rbac/session";
+import { useOwnerScope } from "@/lib/owner-scope/context";
 
 // TODO(real-users): server action `createPayment(input)` cu authorize(role, "payments.create")
 // + insert în tabelul `payments` + audit log server-side. Momentan: seed determinist +
@@ -121,6 +122,7 @@ function nowIso(): string {
 
 export function PaymentsProvider({ children }: { children: ReactNode }) {
   const { activeFleetId, user: sessionUser } = useSession();
+  const { scope: ownerScope } = useOwnerScope();
 
   const [userPayments, setUserPayments] = useState<Payment[]>([]);
   const [patches, setPatches] = useState<Record<string, Patch>>({});
@@ -161,13 +163,16 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
 
   const fleetPayments = useMemo(() => {
     let list = payments.filter((p) => p.fleetId === activeFleetId);
-    // Subcontractor vede doar plățile create de el (după createdBy = email).
     if (sessionUser.role === "subcontractor_owner") {
       const myEmail = sessionUser.email.toLowerCase();
       list = list.filter((p) => (p.createdBy || "").toLowerCase() === myEmail);
+    } else if (ownerScope) {
+      // Global Owner cu scope activ → vede plățile subcontractorului selectat.
+      const scopeEmail = ownerScope.email.toLowerCase();
+      list = list.filter((p) => (p.createdBy || "").toLowerCase() === scopeEmail);
     }
     return list;
-  }, [payments, activeFleetId, sessionUser]);
+  }, [payments, activeFleetId, sessionUser, ownerScope]);
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const logActivity = useCallback(
