@@ -8,7 +8,7 @@ import type { TicketCategory, TicketPriority } from "@/lib/issues/data";
 import { cn } from "@/lib/utils/cn";
 
 // TODO(real-users): mută în setări/tenant → contact_support field.
-const SUPPORT_PHONE = "+40 700 000 000";
+const SUPPORT_PHONE = "+40 724 990 952";
 const SUPPORT_EMAIL = "suport@dragondelivery.ro";
 const SUPPORT_HOURS = "Luni–Vineri 09:00 — 21:00 · Sâmbătă 10:00 — 16:00";
 

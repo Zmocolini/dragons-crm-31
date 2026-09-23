@@ -320,11 +320,12 @@ export function AddCourierDialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="add-courier-title"
-      className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-black/70 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] overflow-y-auto bg-black/70 backdrop-blur-sm"
       onClick={requestClose}
     >
+      <div className="flex min-h-full items-center justify-center p-4">
       <div
-        className="relative my-6 flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-line bg-card shadow-2xl"
+        className="relative my-6 flex max-h-[calc(100vh-3rem)] w-full max-w-3xl flex-col overflow-hidden rounded-2xl border border-line bg-card shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
@@ -349,7 +350,7 @@ export function AddCourierDialog({
         </div>
 
         {/* Body */}
-        <div className="space-y-4 px-6 py-5">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-6 py-5">
           {duplicates.length > 0 && <DuplicatesBanner matches={duplicates} />}
 
           <div className="grid gap-4 md:grid-cols-2">
@@ -711,6 +712,7 @@ export function AddCourierDialog({
             </button>
           </div>
         </div>
+      </div>
       </div>
 
       {/* Confirm close */}
