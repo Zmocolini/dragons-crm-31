@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { PublicFooter } from "@/components/layout/Footer";
 
 export const metadata = { title: "Politica de Cookie-uri · Dragons CRM" };
 
 export default function CookiePolicyPage() {
   const lastUpdated = "23 septembrie 2026";
   return (
+    <>
     <div className="mx-auto max-w-3xl px-4 py-8 lg:py-12">
       <Link href="/" className="mb-6 inline-block text-[12.5px] text-violet-300 hover:underline">← Înapoi la aplicație</Link>
       <h1 className="mb-2 text-[26px] font-bold text-fg">Politica de Cookie-uri</h1>
@@ -84,6 +86,8 @@ export default function CookiePolicyPage() {
         <Link href="/termeni" className="hover:text-fg">Termeni și Condiții</Link>
       </div>
     </div>
+    <PublicFooter />
+    </>
   );
 }
 

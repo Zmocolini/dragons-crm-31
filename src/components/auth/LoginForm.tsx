@@ -103,8 +103,15 @@ export function LoginForm() {
           </div>
         </form>
 
-        <div className="mt-4 text-center text-[10.5px] text-fg-dim">
-          Auth mock — parolele sunt hash SHA-256 în localStorage. Nu folosi date reale.
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-center text-[10.5px] text-fg-dim">
+          <Link href="/politica-cookies" className="hover:text-fg">Cookie-uri</Link>
+          <span className="text-fg-dim/60">·</span>
+          <Link href="/politica-confidentialitate" className="hover:text-fg">Confidențialitate</Link>
+          <span className="text-fg-dim/60">·</span>
+          <Link href="/termeni" className="hover:text-fg">Termeni</Link>
+        </div>
+        <div className="mt-3 text-center text-[10.5px] text-fg-dim">
+          © {new Date().getFullYear()} <span className="font-semibold">Dragons Delivery</span>. Toate drepturile rezervate.
         </div>
       </div>
     </div>

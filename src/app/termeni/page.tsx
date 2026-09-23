@@ -1,10 +1,12 @@
 import Link from "next/link";
+import { PublicFooter } from "@/components/layout/Footer";
 
 export const metadata = { title: "Termeni și Condiții · Dragons CRM" };
 
 export default function TermsPage() {
   const lastUpdated = "23 septembrie 2026";
   return (
+    <>
     <div className="mx-auto max-w-3xl px-4 py-8 lg:py-12">
       <Link href="/" className="mb-6 inline-block text-[12.5px] text-violet-300 hover:underline">← Înapoi la aplicație</Link>
       <h1 className="mb-2 text-[26px] font-bold text-fg">Termeni și Condiții</h1>
@@ -140,6 +142,8 @@ export default function TermsPage() {
         <Link href="/politica-confidentialitate" className="hover:text-fg">Politica de Confidențialitate</Link>
       </div>
     </div>
+    <PublicFooter />
+    </>
   );
 }
 
