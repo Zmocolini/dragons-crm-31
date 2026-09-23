@@ -89,15 +89,15 @@ export function LoginForm() {
             <div
               role="alert"
               aria-live="assertive"
-              style={{ backgroundColor: "#dc2626", color: "#ffffff" }}
-              className="mt-3 flex items-center gap-3 rounded-lg border-2 border-red-700 px-4 py-3 shadow-xl shadow-red-500/40 animate-in fade-in slide-in-from-top-1 duration-200"
+              style={{ backgroundColor: "#dc2626", color: "#000000" }}
+              className="mt-3 flex items-center gap-3 rounded-lg border-2 border-red-800 px-4 py-3 shadow-xl shadow-red-500/40 animate-in fade-in slide-in-from-top-1 duration-200"
             >
-              <AlertCircle size={22} className="shrink-0" style={{ color: "#ffffff" }} />
+              <AlertCircle size={22} className="shrink-0" style={{ color: "#000000" }} />
               <div>
-                <div className="text-[15px] font-black uppercase tracking-wide" style={{ color: "#ffffff" }}>
+                <div className="text-[15px] font-black uppercase tracking-wide" style={{ color: "#000000" }}>
                   Credențiale invalide
                 </div>
-                <div className="mt-0.5 text-[12.5px] font-semibold" style={{ color: "#fecaca" }}>
+                <div className="mt-0.5 text-[12.5px] font-semibold" style={{ color: "#000000" }}>
                   {error}
                 </div>
               </div>
