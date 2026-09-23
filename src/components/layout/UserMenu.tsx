@@ -130,18 +130,6 @@ export function UserMenu() {
               subtitle="Preferințe cont și notificări"
               onClick={closeMenu}
             />
-            <MenuItem
-              icon={<Building2 size={16} />}
-              iconTone="text-amber-300"
-              title="Schimbă flota"
-              subtitle={`Activă: ${user.activeTenant.name} · ${activeInFleet} ${activeInFleet === 1 ? "curier activ" : "curieri activi"}`}
-              onClick={() => {
-                closeMenu();
-                // scurt delay ca dropdown-ul să dispară înainte de dialog (evită „artefacte")
-                setTimeout(() => setDialog("tenant"), 50);
-              }}
-            />
-
             <div className="mx-3 my-1.5 h-px bg-line/60" />
 
             <MenuItem
