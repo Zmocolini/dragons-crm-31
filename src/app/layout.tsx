@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { RootAuthProvider } from "@/components/auth/RootAuthProvider";
+import { CookieBanner } from "@/components/layout/CookieBanner";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -69,6 +70,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       </head>
       <body className="min-h-full bg-app text-fg">
         <RootAuthProvider>{children}</RootAuthProvider>
+        <CookieBanner />
       </body>
     </html>
   );

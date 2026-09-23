@@ -8,6 +8,9 @@ const PUBLIC_PATHS = new Set([
   "/setup",
   "/register",
   "/invite",
+  "/politica-cookies",
+  "/politica-confidentialitate",
+  "/termeni",
 ]);
 
 const PUBLIC_PREFIXES = [
