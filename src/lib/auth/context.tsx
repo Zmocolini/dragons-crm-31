@@ -67,6 +67,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [hydrated, setHydrated] = useState(false);
 
+  // Server user (sursa de adevăr) — populat din /api/auth/me la mount și după login.
+  const [serverUser, setServerUser] = useState<{ id: string; email: string; name: string; role: string } | null>(null);
+
   useEffect(() => {
     (async () => {
       const loadedUsers = safeRead<AccountUser[]>(USERS_KEY, []);
@@ -78,35 +81,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (seeded.users !== loadedUsers) safeWrite(USERS_KEY, seeded.users);
       if (seeded.fleets !== loadedFleets) safeWrite(FLEETS_KEY, seeded.fleets);
 
-      const s = safeRead<Session | null>(SESSION_KEY, null);
-      // SINCRONIZARE cu serverul (sursă de adevăr): dacă cookie server lipsește
-      // (expirat, browser închis, alt browser), NU accept sesiune locală veche →
-      // altfel se face loop între middleware.redirect /login și AuthGuard.redirect /.
-      let serverAuthed = false;
+      // Sursă de adevăr: /api/auth/me. Dacă server zice user, îl setăm.
       try {
         const res = await fetch("/api/auth/me");
         const j = await res.json();
-        serverAuthed = !!j?.user;
-      } catch { serverAuthed = false; }
-
-      if (s && new Date(s.expiresAtIso).getTime() > Date.now() && serverAuthed) {
-        setSession(s);
-      } else {
-        // Fie nu are session local valid, fie server-ul zice nu ești logat → clear.
-        if (s) safeWrite(SESSION_KEY, null);
-      }
+        if (j?.user) setServerUser(j.user);
+      } catch {}
       setHydrated(true);
     })();
   }, []);
 
   const current = useMemo<ActiveSessionUser | null>(() => {
-    if (!session) return null;
-    const u = users.find((x) => x.id === session.userId);
-    if (!u) return null;
-    const f = fleets.find((x) => x.id === u.fleetId);
-    if (!f) return null;
-    return { ...u, fleet: f };
-  }, [session, users, fleets]);
+    if (!serverUser) return null;
+    // Folosesc datele DE PE SERVER + o flotă implicită (UI-ul are nevoie de fleet).
+    const fleet: FleetTenant = fleets[0] ?? {
+      id: "t_default",
+      name: "Flota mea",
+      slug: "flota-mea",
+      city: "—",
+      country: "România",
+      cui: "",
+      planLabel: "Standard",
+      planTier: "business",
+      planUsage: { used: 0, total: 500 },
+      logoDataUrl: null,
+      flagEmoji: "🐉",
+      brandColor: "#f97316",
+    };
+    return {
+      id: serverUser.id,
+      name: serverUser.name || serverUser.email.split("@")[0],
+      email: serverUser.email,
+      passwordHash: "",
+      role: (serverUser.role as ActiveSessionUser["role"]) || "global_owner",
+      fleetId: fleet.id,
+      avatarDataUrl: null,
+      createdAtIso: new Date().toISOString(),
+      lastLoginIso: new Date().toISOString(),
+      fleet,
+    };
+  }, [serverUser, fleets]);
 
   const persistUsers       = useCallback((next: AccountUser[]) => { setUsers(next);        safeWrite(USERS_KEY, next); }, []);
   const persistFleets      = useCallback((next: FleetTenant[]) => { setFleets(next);       safeWrite(FLEETS_KEY, next); }, []);
@@ -125,6 +139,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const j = await res.json().catch(() => ({} as { error?: string }));
         return { ok: false, error: j.error ?? "Credențiale invalide." };
       }
+      // Extrage user-ul din răspuns → sursă de adevăr pentru rol.
+      const loginJ = await res.json().catch(() => null) as { user?: { id: string; email: string; name: string; role: string } } | null;
+      if (loginJ?.user) setServerUser(loginJ.user);
     } catch {
       return { ok: false, error: "Server indisponibil. Încearcă din nou." };
     }
@@ -244,8 +261,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     setSession(null);
+    setServerUser(null);
     safeWrite(SESSION_KEY, null);
-    // Șterge și cookie-ul de pe server → middleware va bloca următorul request.
     fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
   }, []);
 
