@@ -128,23 +128,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch {
       return { ok: false, error: "Server indisponibil. Încearcă din nou." };
     }
-    // Local: setează sesiunea în state (pentru UI-ul existent). Auto-seed user dacă lipsește.
+    // Local: setează sesiunea în state (pentru UI-ul existent). Auto-seed user + fleet dacă lipsesc.
+    let currentFleets = fleets;
+    if (currentFleets.length === 0) {
+      // Creez o flotă implicită ca să nu blochez `current` derivation.
+      const defaultFleet: FleetTenant = {
+        id: "t_default",
+        name: "Flota mea",
+        slug: "flota-mea",
+        city: "—",
+        country: "România",
+        cui: "",
+        planLabel: "Standard",
+        planTier: "business",
+        planUsage: { used: 0, total: 500 },
+        logoDataUrl: null,
+        flagEmoji: "🐉",
+        brandColor: "#f97316",
+      };
+      currentFleets = [defaultFleet];
+      persistFleets(currentFleets);
+    }
     let u = users.find((x) => x.email.toLowerCase() === email);
     if (!u) {
-      // User există server-side dar nu local (ex: după clear localStorage) — creez un stub minimal.
       const stub: AccountUser = {
         id: uid("u"),
         name: email.split("@")[0],
         email,
         passwordHash: await sha256(input.password),
         role: "global_owner",
-        fleetId: fleets[0]?.id ?? "t_dragon",
+        fleetId: currentFleets[0].id,
         avatarDataUrl: null,
         createdAtIso: new Date().toISOString(),
         lastLoginIso: new Date().toISOString(),
       };
       persistUsers([...users, stub]);
       u = stub;
+    } else if (!currentFleets.some((f) => f.id === u!.fleetId)) {
+      // User există local dar fleet-ul lui nu → repointez la prima flotă disponibilă.
+      u = { ...u, fleetId: currentFleets[0].id };
+      persistUsers(users.map((x) => x.id === u!.id ? u! : x));
     }
     const now = new Date();
     const newSession: Session = {
@@ -156,7 +179,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     safeWrite(SESSION_KEY, newSession);
     persistUsers(users.map((x) => x.id === u!.id ? { ...x, lastLoginIso: now.toISOString() } : x));
     return { ok: true };
-  }, [users, fleets, persistUsers]);
+  }, [users, fleets, persistUsers, persistFleets]);
 
   const register = useCallback(async (input: RegisterInput): Promise<{ ok: true } | { ok: false; error: string }> => {
     const email = input.email.trim().toLowerCase();
