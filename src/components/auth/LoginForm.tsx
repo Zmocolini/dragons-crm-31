@@ -18,12 +18,7 @@ export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // La prima încărcare: dacă nu există niciun user pe server, du-mă la /register.
-  useEffect(() => {
-    fetch("/api/auth/me").then((r) => r.json()).then((j) => {
-      if (j?.setupRequired) router.replace("/register");
-    }).catch(() => {});
-  }, [router]);
+  // NU mai redirect la /register — accesul se acordă manual de admin.
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -95,11 +90,8 @@ export function LoginForm() {
             <LogIn size={15} /> {busy ? "Se autentifică…" : "Autentificare"}
           </button>
 
-          <div className="mt-4 text-center text-[12px] text-fg-muted">
-            Nu ai cont încă?{" "}
-            <Link href="/register" className="font-semibold text-violet-300 hover:underline">
-              Înregistrează flota
-            </Link>
+          <div className="mt-4 text-center text-[11.5px] text-fg-dim">
+            Accesul se acordă exclusiv de administrator. Contactează-l pentru a primi cont.
           </div>
         </form>
 

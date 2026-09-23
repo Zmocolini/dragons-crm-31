@@ -1,5 +1,6 @@
-import { RegisterForm } from "@/components/auth/RegisterForm";
+import { redirect } from "next/navigation";
 
+// Register dezactivat: accesul se acordă exclusiv de admin. Toate cererile → /login.
 export default function RegisterPage() {
-  return <RegisterForm />;
+  redirect("/login");
 }
