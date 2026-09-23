@@ -21,16 +21,17 @@ export function FleetCard() {
   const t = user.activeTenant;
   const canSwitch = can("tenant.switch");
 
+  const activeInFleet = useMemo(
+    () => allRows.filter((c) => c.tenantId === activeFleetId && c.status === "active").length,
+    [allRows, activeFleetId],
+  );
+
+  // REGULĂ HOOKS: early-return DOAR după toate hook-urile (React error #310).
   if (!canSwitch) return null;
 
   // Label-uri dinamice bazate pe scope
   const displayName = scope ? scope.name : "Toate flotele";
   const displaySub = scope ? scope.email : "Vezi datele TUTUROR subcontractorilor";
-
-  const activeInFleet = useMemo(
-    () => allRows.filter((c) => c.tenantId === activeFleetId && c.status === "active").length,
-    [allRows, activeFleetId],
-  );
   const capacity = t.planUsage.total;
   const pct = capacity > 0 ? Math.min(100, Math.max(0, Math.round((activeInFleet / capacity) * 100))) : 0;
   const initials = t.name.split(" ").map((w) => w[0]).slice(0, 2).join("").toUpperCase();
