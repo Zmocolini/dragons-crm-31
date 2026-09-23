@@ -79,10 +79,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (seeded.fleets !== loadedFleets) safeWrite(FLEETS_KEY, seeded.fleets);
 
       const s = safeRead<Session | null>(SESSION_KEY, null);
-      if (s && new Date(s.expiresAtIso).getTime() > Date.now()) {
+      // SINCRONIZARE cu serverul (sursă de adevăr): dacă cookie server lipsește
+      // (expirat, browser închis, alt browser), NU accept sesiune locală veche →
+      // altfel se face loop între middleware.redirect /login și AuthGuard.redirect /.
+      let serverAuthed = false;
+      try {
+        const res = await fetch("/api/auth/me");
+        const j = await res.json();
+        serverAuthed = !!j?.user;
+      } catch { serverAuthed = false; }
+
+      if (s && new Date(s.expiresAtIso).getTime() > Date.now() && serverAuthed) {
         setSession(s);
-      } else if (s) {
-        safeWrite(SESSION_KEY, null);
+      } else {
+        // Fie nu are session local valid, fie server-ul zice nu ești logat → clear.
+        if (s) safeWrite(SESSION_KEY, null);
       }
       setHydrated(true);
     })();
