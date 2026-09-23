@@ -9,6 +9,7 @@ import { useSession } from "@/lib/rbac/session";
 import { useCouriers } from "@/lib/couriers/context";
 import { usePayments } from "@/lib/payments/context";
 import { useDocuments } from "@/lib/documents/context";
+import { useOwnerScope } from "@/lib/owner-scope/context";
 import { UNPAID_STATUSES } from "@/lib/payments/types";
 import { formatRon } from "@/lib/reports/analytics";
 import { cn } from "@/lib/utils/cn";
@@ -46,6 +47,7 @@ export function AICopilotPage() {
   const { allRows } = useCouriers();
   const { fleetPayments } = usePayments();
   const { fleetDocuments } = useDocuments();
+  const { scope } = useOwnerScope();
   const endRef = useRef<HTMLDivElement>(null);
 
   const fleetCouriers = useMemo(() => allRows.filter((c) => c.tenantId === activeFleetId), [allRows, activeFleetId]);
@@ -148,6 +150,7 @@ ${recentPayments || "—"}`;
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
+          impersonatedEmail: scope?.email ?? null,
           messages: [
             ...history,
             { role: "user", content: `${contextInfo}\n\n---\n\nÎntrebare: ${t}` },

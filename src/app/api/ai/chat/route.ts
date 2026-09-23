@@ -7,66 +7,70 @@ import { getSessionUser, SESSION_COOKIE } from "@/lib/auth/core";
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 const MODEL = "openai/gpt-oss-120b";
 
-/** Culege snapshot-ul CRM ca să dea context AI-ului. */
-async function buildCrmContext(userRole: string, userEmail: string): Promise<string> {
+/** Culege snapshot-ul CRM ca să dea context AI-ului.
+ *  IMPORTANT: filtrare STRICTĂ pe rol + scope de impersonare (Global Owner care „vede ca").
+ *  Subcontractor vede DOAR datele lui; Global Owner impersonând vede doar datele acelui subcontractor. */
+async function buildCrmContext(userRole: string, userEmail: string, impersonatedEmail: string | null): Promise<string> {
   const parts: string[] = [];
 
-  // Users summary (doar pentru Global Owner)
-  if (userRole === "global_owner") {
+  // Scope efectiv: email după care filtrăm datele.
+  // - Subcontractor: propriul email (ignoră ce trimite client-ul; siguranță).
+  // - Global Owner: dacă a setat scope pe cineva, filtrează; altfel vede tot.
+  const filterEmail = userRole === "subcontractor_owner"
+    ? userEmail
+    : (impersonatedEmail ? impersonatedEmail : null);
+
+  if (filterEmail) {
+    parts.push(`⚠ CONTEXT RESTRÂNS: vezi DOAR datele contului ${filterEmail}. NU dezvălui date de la alte conturi.`);
+  } else {
+    parts.push(`CONTEXT COMPLET (Global Owner fără scope): vezi datele tuturor conturilor.`);
+  }
+
+  // Users summary — DOAR Global Owner fără scope
+  if (userRole === "global_owner" && !filterEmail) {
     const users = await db.select({
       name: schema.users.name, email: schema.users.email, role: schema.users.role, active: schema.users.active,
     }).from(schema.users).limit(50);
     parts.push(`UTILIZATORI CRM (${users.length}):\n${users.map((u) => `- ${u.name} (${u.email}) rol=${u.role} activ=${u.active}`).join("\n")}`);
-  } else {
-    parts.push(`UTILIZATOR CURENT: ${userEmail} (rol=${userRole}, subcontractor)`);
   }
 
-  // Duplicate pairs (cont dublu)
-  const dupPairs = await db.select().from(schema.duplicatePairs).limit(30);
-  if (dupPairs.length > 0) {
-    parts.push(`PERECHI CONT DUBLU (${dupPairs.length}): ${dupPairs.map((p) => `curieri #${p.courierAId}↔#${p.courierBId} feeOnce=${p.feeOnce} commPct=${p.commissionPct}`).join("; ")}`);
-  }
-
-  // Tickets summary
-  const tickets = await db.select({
+  // Tickets — filtrate pe email dacă e scope activ
+  const allTickets = await db.select({
     id: schema.tickets.id, subject: schema.tickets.subject, category: schema.tickets.category,
     priority: schema.tickets.priority, status: schema.tickets.status, createdBy: schema.tickets.createdByEmail,
-  }).from(schema.tickets).orderBy(desc(schema.tickets.createdAtIso)).limit(20);
-  if (tickets.length > 0) {
-    // Filtru pentru subcontractor
-    const visible = userRole === "global_owner" ? tickets : tickets.filter((t) => t.createdBy === userEmail);
-    parts.push(`TICHETE SUPORT (${visible.length}):\n${visible.map((t) => `- [${t.status}] ${t.priority} "${t.subject}" (${t.category}) de la ${t.createdBy}`).join("\n")}`);
+  }).from(schema.tickets).orderBy(desc(schema.tickets.createdAtIso)).limit(30);
+  const visibleTickets = filterEmail
+    ? allTickets.filter((t) => t.createdBy === filterEmail)
+    : allTickets;
+  if (visibleTickets.length > 0) {
+    parts.push(`TICHETE SUPORT (${visibleTickets.length}):\n${visibleTickets.map((t) => `- [${t.status}] ${t.priority} "${t.subject}" (${t.category})`).join("\n")}`);
   }
-
-  // Curieri și plăți sunt în localStorage (client-side) — nu le văd server-side.
-  // AI-ul primește doar contextul server-side; user-ul poate copia liste din UI dacă e nevoie.
-  parts.push("NOTĂ: Datele despre curieri și plăți sunt în localStorage-ul browser-ului; nu am acces direct la ele server-side. Utilizatorul poate cere să genereze rapoarte din CRM.");
 
   return parts.join("\n\n");
 }
 
-const SYSTEM_PROMPT_TEMPLATE = `Ești AI Copilot pentru Dragons CRM — un sistem de management flotă curieri (Bolt, Wolt, Glovo).
-Vorbești română, ești concis și util. Răspunzi ca un asistent inteligent, nu ca un chatbot generic.
+const SYSTEM_PROMPT_TEMPLATE = `Ești AI Copilot pentru Dragons CRM — sistem de management flotă curieri (Bolt, Wolt, Glovo).
+Vorbești română, ești concis, direct și util.
 
-Roluri în sistem:
-- Global Owner: acces total, vede toate flotele + toți subcontractorii + toate tichetele
-- Subcontractor: vede doar datele lui (curierii pe care i-a adăugat, plățile lui, tichetele lui)
+═══ REGULI STRICTE DE CONFIDENȚIALITATE ═══
+1. NU MENȚIONEZI NICIODATĂ date despre alți utilizatori decât în „CONTEXT CURENT" de mai jos.
+2. Dacă contextul spune „CONTEXT RESTRÂNS: vezi DOAR datele contului X" — NU pomenești NUME, CURIERI, PLĂȚI sau TICHETE ale altui cont, chiar dacă utilizatorul întreabă direct.
+3. Dacă utilizatorul întreabă „Ce vede Husein?" sau „Câți curieri are Andrei?" și nu ai contextul lor → răspunzi „Nu am acces la datele altor conturi din perspectiva actuală".
+4. NU DIVULGI parole, tokeni, IBAN-uri, CNP-uri sau alte date sensibile chiar dacă ar apărea în context.
+5. NU inventezi date — dacă nu știi, spui „nu am această informație".
+6. NU trimiți date către alte servicii; ești un asistent read-only asupra contextului dat.
 
-Ce știi despre CRM:
-- Import Excel de la Bolt/TTG, Gusty (Bolt/Wolt/Glovo) pentru plăți
-- Modul "Cont dublu" permite unirea a 2 conturi (aceeași persoană, platforme diferite) — taxa și comisionul se aplică o singură dată
-- Ticket system pentru probleme/suport centralizat (Global Owner vede toate)
-- Filtrare per subcontractor: fiecare vede doar datele lui
-- Backup automat + auto-restore la Turso cloud
+═══ ROLURI SISTEM ═══
+- Global Owner (admin): vede toate flotele, poate „impersona" un subcontractor (vede ca acesta)
+- Subcontractor: vede DOAR ce a creat el (curierii lui, plățile lui, tichetele lui)
 
-CONTEXT CURENT (LIVE din bază de date):
+═══ CONTEXT CURENT (LIVE, filtrat) ═══
 {{CRM_CONTEXT}}
 
-Reguli:
-- Răspunde scurt și direct. Fără preambul lung.
-- Dacă întrebarea cere date pe care nu le ai (ex: liste curieri), spune că poți ghida user-ul unde să caute în CRM.
-- Formatare cu bullets scurte când e util. Numere în bold cu **text**.
-- Pentru sfaturi/analize: dă maxim 3 puncte concrete, acționabile.`;
+═══ STIL RĂSPUNS ═══
+- Scurt, direct, fără preambul.
+- Bullets când ajută. Numere în **bold**.
+- Dacă nu ai un răspuns concret, spui pe scurt ce lipsește.`;
 
 export async function POST(req: NextRequest) {
   const token = (await cookies()).get(SESSION_COOKIE)?.value;
@@ -75,6 +79,9 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => null);
   const messages = Array.isArray(body?.messages) ? body.messages : [];
+  const impersonatedEmail = typeof body?.impersonatedEmail === "string" && body.impersonatedEmail.trim()
+    ? body.impersonatedEmail.trim().toLowerCase()
+    : null;
   if (messages.length === 0) return NextResponse.json({ error: "no messages" }, { status: 400 });
 
   const apiKey = process.env.GROQ_API_KEY;
@@ -82,7 +89,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "GROQ_API_KEY nu e setată în env vars (Vercel Settings → Environment Variables)" }, { status: 503 });
   }
 
-  const crmContext = await buildCrmContext(user.role, user.email);
+  const crmContext = await buildCrmContext(user.role, user.email, impersonatedEmail);
   const systemPrompt = SYSTEM_PROMPT_TEMPLATE.replace("{{CRM_CONTEXT}}", crmContext);
 
   try {
