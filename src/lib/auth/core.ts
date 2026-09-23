@@ -1,7 +1,7 @@
 import "server-only";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
-import { eq, gt } from "drizzle-orm";
+import { eq, lt } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 
 export const SESSION_COOKIE = "crm31_session";
@@ -93,8 +93,9 @@ export async function deleteSession(token: string): Promise<void> {
   await db.delete(schema.sessions).where(eq(schema.sessions.token, token));
 }
 
-/** Cleanup periodic: șterge sesiunile expirate (best-effort, la fiecare login). */
+/** Cleanup periodic: șterge sesiunile expirate (best-effort, la fiecare login).
+ *  FIX: era `gt` (ștergea sesiunile VALIDE) → acum `lt` (șterge doar cele expirate). */
 export async function cleanExpiredSessions(): Promise<void> {
   const now = new Date().toISOString();
-  await db.delete(schema.sessions).where(gt(schema.sessions.expiresAtIso, now));
+  await db.delete(schema.sessions).where(lt(schema.sessions.expiresAtIso, now));
 }
