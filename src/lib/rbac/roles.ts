@@ -1,6 +1,8 @@
 // TODO(real-users): mutare la Better-Auth cu server-side session + permissions din DB.
 // Enum-ul + access matrix aici sunt sursa de adevăr până când auth real aterizează.
 
+// Sistem simplificat: DOAR 2 roluri active (Global Owner + Subcontractor).
+// Cele vechi rămân în type pentru back-compat cu date istorice, dar nu se mai oferă la creare.
 export const ROLES = [
   "global_owner",
   "subcontractor_owner",
@@ -11,12 +13,15 @@ export const ROLES = [
 
 export type Role = (typeof ROLES)[number];
 
+/** Rolurile active oferite la creare cont. */
+export const ACTIVE_ROLES: Role[] = ["global_owner", "subcontractor_owner"];
+
 export const ROLE_LABELS: Record<Role, string> = {
   global_owner: "Global Owner",
-  subcontractor_owner: "Subcontractor Owner",
-  operator_payments: "Operator Payments",
-  operator_recruitment: "Operator Recruitment",
-  viewer: "Viewer",
+  subcontractor_owner: "Subcontractor",
+  operator_payments: "Operator Payments (legacy)",
+  operator_recruitment: "Operator Recruitment (legacy)",
+  viewer: "Viewer (legacy)",
 };
 
 export type Permission =
