@@ -105,6 +105,24 @@ export const sessions = sqliteTable("sessions", {
   ip: text("ip"),
 });
 
+// ── TICKETS (probleme / suport) ────────────────────────────────────────────
+export const tickets = sqliteTable("tickets", {
+  id: text("id").primaryKey(),
+  createdByEmail: text("created_by_email").notNull(),
+  createdByName: text("created_by_name").notNull(),
+  createdByRole: text("created_by_role").notNull(),
+  requesterName: text("requester_name").notNull(),
+  category: text("category").notNull(),
+  priority: text("priority").notNull().default("normal"),
+  platform: text("platform").notNull().default(""),
+  subject: text("subject").notNull(),
+  body: text("body").notNull().default(""),
+  status: text("status").notNull().default("open"),
+  assignee: text("assignee").default(""),
+  createdAtIso: text("created_at_iso").notNull().default(sql`(current_timestamp)`),
+  updatedAtIso: text("updated_at_iso").notNull().default(sql`(current_timestamp)`),
+});
+
 // ── BACKUP SNAPSHOTS ──────────────────────────────────────────────────────
 // Fiecare rând = o versiune completă a datelor (toate cheile crm31-*).
 // Cea mai recentă e folosită la auto-restore când localStorage e gol.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CheckCircle2, Clock, Download, LifeBuoy, MoreHorizontal, Phone, Plus, Search, Send, Ticket as TicketIcon, X } from "lucide-react";
 import { Bar, BarChart, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, XAxis } from "recharts";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -36,7 +36,38 @@ export function IssuesPage() {
   const fleetCouriers = useMemo(() => allRows.filter((c) => c.tenantId === activeFleetId), [allRows, activeFleetId]);
   const seed = useMemo(() => buildTickets(fleetCouriers), [fleetCouriers]);
   const [tickets, setTickets] = useState<Ticket[]>([]);
-  const list = useMemo(() => (tickets.length ? tickets : seed), [tickets, seed]);
+  const [loadedFromApi, setLoadedFromApi] = useState(false);
+  const list = useMemo(() => (loadedFromApi ? tickets : (tickets.length ? tickets : seed)), [loadedFromApi, tickets, seed]);
+
+  // Sync cu serverul: fetch la mount + după create
+  const refresh = async () => {
+    try {
+      const res = await fetch("/api/tickets");
+      const j = await res.json();
+      if (res.ok && Array.isArray(j.tickets)) {
+        // Convert DB row → Ticket shape
+        const mapped: Ticket[] = j.tickets.map((r: {
+          id: string; requesterName: string; category: TicketCategory; priority: TicketPriority;
+          platform: string; subject: string; body: string; status: TicketStatus;
+          assignee: string | null; createdAtIso: string; updatedAtIso: string;
+        }, idx: number) => ({
+          id: r.id,
+          number: 6000 + idx,
+          subject: r.subject,
+          description: r.body,
+          requesterName: r.requesterName, requesterRole: "Curier", requesterPhone: "",
+          category: r.category, platform: r.platform as Ticket["platform"], priority: r.priority, status: r.status,
+          createdIso: r.createdAtIso, updatedIso: r.updatedAtIso,
+          assignee: r.assignee ?? "", filesCount: 0,
+          messages: [{ id: `m_${r.id}`, author: r.requesterName, isOperator: false, internal: false, text: r.body || r.subject, at: r.createdAtIso }],
+          tenantId: activeFleetId,
+        }));
+        setTickets(mapped);
+        setLoadedFromApi(true);
+      }
+    } catch {}
+  };
+  useEffect(() => { refresh(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
   const [q, setQ] = useState(""); const [tab, setTab] = useState<TicketStatus | "all">("all"); const [cat, setCat] = useState<TicketCategory | "all">("all"); const [prio, setPrio] = useState<TicketPriority | "all">("all"); const [platform, setPlatform] = useState("all");
   const [page, setPage] = useState(1); const [selId, setSelId] = useState<string | null>(null); const [newOpen, setNewOpen] = useState(false);
@@ -73,24 +104,29 @@ export function IssuesPage() {
 
   const mutate = (id: string, fn: (t: Ticket) => Ticket) => setTickets(() => list.map((t) => (t.id === id ? fn(t) : t)));
 
-  const createTicket = (p: NewTicketPayload) => {
-    const nowIso = new Date().toISOString();
-    const nextNumber = list.reduce((m, t) => Math.max(m, t.number), 5599) + 1;
+  const createTicket = async (p: NewTicketPayload) => {
     const requester = p.requesterName.trim() || user.name;
-    const ticket: Ticket = {
-      id: `tk_new_${Date.now()}`,
-      number: nextNumber,
-      subject: p.subject.trim(),
-      description: p.description.trim() || `${requester} a raportat: „${p.subject.trim()}".`,
-      requesterName: requester, requesterRole: "Curier", requesterPhone: "",
-      category: p.category, platform: p.platform as Ticket["platform"], priority: p.priority, status: "open",
-      createdIso: nowIso, updatedIso: nowIso, assignee: user.name, filesCount: 0,
-      messages: [{ id: `m${Date.now()}`, author: requester, isOperator: false, internal: false, text: p.description.trim() || p.subject.trim(), at: nowIso }],
-      tenantId: activeFleetId,
-    };
-    setTickets([ticket, ...list]);
-    setTab("all"); setPage(1); setSelId(ticket.id); setNewOpen(false);
-    toast.success("Tichet creat", `#${ticket.number} · ${ticket.subject}`);
+    try {
+      const res = await fetch("/api/tickets", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          requesterName: requester,
+          category: p.category,
+          priority: p.priority,
+          platform: p.platform,
+          subject: p.subject.trim(),
+          body: p.description.trim() || `${requester} a raportat: „${p.subject.trim()}".`,
+        }),
+      });
+      const j = await res.json();
+      if (!res.ok) { toast.error("Eroare tichet", j.error ?? "Nu s-a putut crea."); return; }
+      await refresh();
+      setTab("all"); setPage(1); setNewOpen(false);
+      toast.success("Tichet creat", `${p.subject.trim()}`);
+    } catch {
+      toast.error("Server indisponibil", "Încearcă din nou.");
+    }
   };
 
   return (
