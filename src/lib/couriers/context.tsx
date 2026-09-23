@@ -1,11 +1,12 @@
 "use client";
 
 import {
-  createContext, useCallback, useContext, useEffect, useMemo, useState,
+  createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
   type ReactNode,
 } from "react";
 import type { Courier, CourierDuplicateMatch } from "./types";
 import { SEED_COURIERS, type CourierRow } from "./mock-seed";
+import { useAuth } from "@/lib/auth/context";
 import { useCandidates } from "@/lib/candidates/context";
 
 // TODO(real-users): server actions + Drizzle table `couriers`; duplicate detection
@@ -92,8 +93,12 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
   }, [couriers, deletedIds, hydrated]);
 
   const addCourier = useCallback((c: Omit<Courier, "id" | "createdAtIso">) => {
+    // ATENȚIE: forțez createdBy = emailul user-ului logat ca să funcționeze filtrarea
+    // per rol (subcontractor vede doar ce a creat el). Ignoră ce trimite caller-ul.
+    const ownerEmail = currentUserEmailRef.current || c.createdBy || "";
     const created: Courier = {
       ...c,
+      createdBy: ownerEmail,
       id: `courier_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       createdAtIso: new Date().toISOString(),
     };
@@ -110,10 +115,20 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
     setDeletedIds((prev) => (prev.includes(id) ? prev : [id, ...prev]));
   }, []);
 
-  const allRows = useMemo<CourierRow[]>(
-    () => [...couriers.map(wrapUserCourier), ...SEED_COURIERS].filter((c) => !deletedIds.includes(c.id)),
-    [couriers, deletedIds],
-  );
+  const { current } = useAuth();
+  const currentUserEmailRef = useRef<string>("");
+  useEffect(() => { currentUserEmailRef.current = current?.email ?? ""; }, [current]);
+
+  const allRows = useMemo<CourierRow[]>(() => {
+    const all = [...couriers.map(wrapUserCourier), ...SEED_COURIERS].filter((c) => !deletedIds.includes(c.id));
+    // Subcontractor vede DOAR curierii creați de el (după email).
+    if (current?.role === "subcontractor_owner") {
+      const myEmail = current.email.toLowerCase();
+      return all.filter((c) => (c.createdBy || "").toLowerCase() === myEmail);
+    }
+    // Global Owner / viewer / etc → vede tot.
+    return all;
+  }, [couriers, deletedIds, current]);
 
   const findDuplicates = useCallback((phone: string, email: string | null): CourierDuplicateMatch[] => {
     const nphone = normalizePhone(phone);

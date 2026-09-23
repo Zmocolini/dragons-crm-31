@@ -120,7 +120,7 @@ function nowIso(): string {
 }
 
 export function PaymentsProvider({ children }: { children: ReactNode }) {
-  const { activeFleetId } = useSession();
+  const { activeFleetId, user: sessionUser } = useSession();
 
   const [userPayments, setUserPayments] = useState<Payment[]>([]);
   const [patches, setPatches] = useState<Record<string, Patch>>({});
@@ -159,10 +159,15 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
       .map((p) => applyPatch(p, patches[p.id]));
   }, [userPayments, patches, deletedIds]);
 
-  const fleetPayments = useMemo(
-    () => payments.filter((p) => p.fleetId === activeFleetId),
-    [payments, activeFleetId],
-  );
+  const fleetPayments = useMemo(() => {
+    let list = payments.filter((p) => p.fleetId === activeFleetId);
+    // Subcontractor vede doar plățile create de el (după createdBy = email).
+    if (sessionUser.role === "subcontractor_owner") {
+      const myEmail = sessionUser.email.toLowerCase();
+      list = list.filter((p) => (p.createdBy || "").toLowerCase() === myEmail);
+    }
+    return list;
+  }, [payments, activeFleetId, sessionUser]);
 
   // ── Mutations ──────────────────────────────────────────────────────────────
   const logActivity = useCallback(
@@ -181,11 +186,13 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addPayment = useCallback((p: Omit<Payment, "id" | "createdAtIso">) => {
-    const created: Payment = { ...p, id: uid("pay"), createdAtIso: nowIso() };
+    // Forțez createdBy = emailul user-ului curent → filtrarea per rol funcționează.
+    const ownerEmail = sessionUser.email || p.createdBy || "";
+    const created: Payment = { ...p, createdBy: ownerEmail, id: uid("pay"), createdAtIso: nowIso() };
     setUserPayments((prev) => [created, ...prev]);
     logActivity(created.id, "created", `Plată generată pentru ${created.recipient.name}`, created.createdBy);
     return created;
-  }, [logActivity]);
+  }, [logActivity, sessionUser]);
 
   const updatePaymentStatus = useCallback((id: string, status: PaymentStatus) => {
     patchPayment(id, { status });
