@@ -105,7 +105,37 @@ export function AICopilotPage() {
     const unpaid = fleetPayments.filter((p) => UNPAID_STATUSES.includes(p.status)).length;
     const soonNow = new Date().getTime();
     const soonDocs = fleetDocuments.filter((d) => d.expiryIso && (new Date(d.expiryIso).getTime() - soonNow) / 86400000 <= 30 && (new Date(d.expiryIso).getTime() - soonNow) >= 0).length;
-    const contextInfo = `DATE FLOTĂ ACTUALE (din browser localStorage):\n- ${fleetCouriers.length} curieri (${fleetCouriers.filter((c) => c.status === "active").length} activi)\n- ${fleetPayments.length} plăți înregistrate, venit brut total ${formatRon(gross)}\n- ${unpaid} plăți neplătite\n- ${soonDocs} documente care expiră în 30 zile\n- Flotă activă: ${user.activeTenant.name}`;
+
+    // Grupare pe orașe și platforme (numere agregate → puține tokens)
+    const cityCounts = new Map<string, number>();
+    for (const c of fleetCouriers) cityCounts.set(c.city, (cityCounts.get(c.city) ?? 0) + 1);
+    const cityList = Array.from(cityCounts.entries()).sort((a, b) => b[1] - a[1]).map(([c, n]) => `${c}(${n})`).join(", ");
+    const platCounts = { bolt: 0, wolt: 0, glovo: 0 } as Record<string, number>;
+    for (const c of fleetCouriers) for (const p of c.platforms) if (p in platCounts) platCounts[p]++;
+
+    // Lista scurtă (nume + oraș + platforme + status + subcontractor) pentru primii 30 curieri
+    const shortList = fleetCouriers.slice(0, 30).map((c) =>
+      `${c.fullName} · ${c.city} · [${c.platforms.join(",")}] · ${c.status}${c.subcontractorName ? ` · sub:${c.subcontractorName}` : ""}`
+    ).join("\n");
+
+    // Ultimele 15 plăți — recipient, gros, status
+    const recentPayments = [...fleetPayments]
+      .sort((a, b) => b.createdAtIso.localeCompare(a.createdAtIso))
+      .slice(0, 15)
+      .map((p) => `${p.recipient.name}: brut ${formatRon(p.breakdown.grossRevenue)}, net ${formatRon(p.totalCalculated)}, status ${p.status}`)
+      .join("\n");
+
+    const contextInfo = `DATE FLOTĂ (LIVE, din browser):
+Flotă activă: ${user.activeTenant.name}
+TOTAL: ${fleetCouriers.length} curieri (${fleetCouriers.filter((c) => c.status === "active").length} activi) · ${fleetPayments.length} plăți · brut ${formatRon(gross)} · ${unpaid} neplătite · ${soonDocs} documente expiră în 30 zile
+PE PLATFORME: Bolt ${platCounts.bolt}, Wolt ${platCounts.wolt}, Glovo ${platCounts.glovo}
+PE ORAȘE: ${cityList || "—"}
+
+CURIERI (max 30):
+${shortList || "—"}
+
+ULTIMELE PLĂȚI (max 15):
+${recentPayments || "—"}`;
 
     // Prepară istoricul mesajelor pentru API (fără cel de greeting)
     const history = messages.filter((m) => m.id !== "g").map((m) => ({
