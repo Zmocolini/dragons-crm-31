@@ -95,16 +95,49 @@ export function AICopilotPage() {
     return { text: `Am înțeles întrebarea, dar încă nu am o rutină dedicată pentru ea. Pot răspunde la întrebări despre curieri neplătiți, documente expirate, activări, top performeri, liste pe orașe și rapoarte de plăți — toate din datele reale ale flotei tale.`, actions: false };
   };
 
-  const send = (text: string) => {
+  const send = async (text: string) => {
     const t = text.trim(); if (!t) return;
     setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: t }]);
     setInput(""); setLoading(true); setAsked((n) => n + 1);
-    setTimeout(() => {
-      const a = answer(t);
-      setMessages((m) => [...m, { id: `a${Date.now()}`, role: "ai", text: a.text, actions: a.actions }]);
+
+    // Construiește contextul local (curieri/plăți/documente din state) → mesaj context inline.
+    const gross = fleetPayments.reduce((s, p) => s + p.breakdown.grossRevenue, 0);
+    const unpaid = fleetPayments.filter((p) => UNPAID_STATUSES.includes(p.status)).length;
+    const soonNow = new Date().getTime();
+    const soonDocs = fleetDocuments.filter((d) => d.expiryIso && (new Date(d.expiryIso).getTime() - soonNow) / 86400000 <= 30 && (new Date(d.expiryIso).getTime() - soonNow) >= 0).length;
+    const contextInfo = `DATE FLOTĂ ACTUALE (din browser localStorage):\n- ${fleetCouriers.length} curieri (${fleetCouriers.filter((c) => c.status === "active").length} activi)\n- ${fleetPayments.length} plăți înregistrate, venit brut total ${formatRon(gross)}\n- ${unpaid} plăți neplătite\n- ${soonDocs} documente care expiră în 30 zile\n- Flotă activă: ${user.activeTenant.name}`;
+
+    // Prepară istoricul mesajelor pentru API (fără cel de greeting)
+    const history = messages.filter((m) => m.id !== "g").map((m) => ({
+      role: m.role === "ai" ? "assistant" : "user",
+      content: m.text,
+    }));
+
+    try {
+      const res = await fetch("/api/ai/chat", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          messages: [
+            ...history,
+            { role: "user", content: `${contextInfo}\n\n---\n\nÎntrebare: ${t}` },
+          ],
+        }),
+      });
+      const j = await res.json();
+      if (!res.ok) {
+        setMessages((m) => [...m, { id: `err${Date.now()}`, role: "ai", text: `⚠️ Eroare: ${j.error ?? "Eșec la AI"}. Verifică GROQ_API_KEY în Vercel Env Vars.` }]);
+      } else {
+        const a = answer(t); // fallback local pentru cazul în care e o întrebare simplă
+        const useLocal = a.actions && j.reply.length < 60; // preferă locala dacă are acțiuni + AI e scurt
+        setMessages((m) => [...m, { id: `a${Date.now()}`, role: "ai", text: useLocal ? a.text : j.reply, actions: useLocal ? a.actions : false }]);
+      }
+    } catch (e) {
+      setMessages((m) => [...m, { id: `err${Date.now()}`, role: "ai", text: `⚠️ Server AI indisponibil: ${String((e as Error).message ?? e)}` }]);
+    } finally {
       setLoading(false);
       setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
-    }, 650);
+    }
   };
 
   return (
@@ -115,7 +148,7 @@ export function AICopilotPage() {
           <p className="mt-1 max-w-2xl text-[13px] text-fg-muted">Asistentul tău inteligent pentru o flotă mai eficientă. Îți oferă răspunsuri, analize și automatizări în timp real.</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-2 rounded-lg border border-line bg-card-hover px-3 py-2 text-[12px] font-medium text-fg"><Sparkles size={13} className="text-[color:var(--color-accent-3)]" /> Claude Opus 4.8 <span className="ml-1 inline-flex items-center gap-1 text-[color:var(--color-success)]"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Online</span></span>
+          <span className="inline-flex items-center gap-2 rounded-lg border border-line bg-card-hover px-3 py-2 text-[12px] font-medium text-fg"><Sparkles size={13} className="text-[color:var(--color-accent-3)]" /> Llama 3.3 70B (Groq) <span className="ml-1 inline-flex items-center gap-1 text-[color:var(--color-success)]"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Online</span></span>
         </div>
       </header>
 
