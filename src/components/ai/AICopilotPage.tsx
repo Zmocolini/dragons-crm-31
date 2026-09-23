@@ -115,16 +115,21 @@ export function AICopilotPage() {
     const platCounts = { bolt: 0, wolt: 0, glovo: 0 } as Record<string, number>;
     for (const c of fleetCouriers) for (const p of c.platforms) if (p in platCounts) platCounts[p]++;
 
-    // Lista scurtă (nume + oraș + platforme + status + subcontractor) pentru primii 30 curieri
-    const shortList = fleetCouriers.slice(0, 30).map((c) =>
-      `${c.fullName} · ${c.city} · [${c.platforms.join(",")}] · ${c.status}${c.subcontractorName ? ` · sub:${c.subcontractorName}` : ""}`
-    ).join("\n");
+    // Lista scurtă — NUME SCURT (doar prenume) + oraș + platforme + status + subcontractor.
+    // Fără telefoane, IBAN, email, boltUid → date sensibile stay OUT of AI context.
+    const shortList = fleetCouriers.slice(0, 30).map((c) => {
+      const shortName = c.fullName.split(" ").slice(0, 2).join(" "); // prenume + prima parte nume
+      return `${shortName} · ${c.city} · [${c.platforms.join(",")}] · ${c.status}${c.subcontractorName ? ` · sub:${c.subcontractorName}` : ""}`;
+    }).join("\n");
 
-    // Ultimele 15 plăți — recipient, gros, status
+    // Ultimele 15 plăți — nume scurt, sume, status. FĂRĂ IBAN, referință, note.
     const recentPayments = [...fleetPayments]
       .sort((a, b) => b.createdAtIso.localeCompare(a.createdAtIso))
       .slice(0, 15)
-      .map((p) => `${p.recipient.name}: brut ${formatRon(p.breakdown.grossRevenue)}, net ${formatRon(p.totalCalculated)}, status ${p.status}`)
+      .map((p) => {
+        const shortName = p.recipient.name.split(" ").slice(0, 2).join(" ");
+        return `${shortName}: brut ${formatRon(p.breakdown.grossRevenue)}, net ${formatRon(p.totalCalculated)}, status ${p.status}`;
+      })
       .join("\n");
 
     const contextInfo = `DATE FLOTĂ (LIVE, din browser):
