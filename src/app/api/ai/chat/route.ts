@@ -5,7 +5,7 @@ import { db, schema } from "@/lib/db/client";
 import { getSessionUser, SESSION_COOKIE } from "@/lib/auth/core";
 
 const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL = "llama-3.3-70b-versatile";
+const MODEL = "openai/gpt-oss-120b";
 
 /** Culege snapshot-ul CRM ca să dea context AI-ului. */
 async function buildCrmContext(userRole: string, userEmail: string): Promise<string> {

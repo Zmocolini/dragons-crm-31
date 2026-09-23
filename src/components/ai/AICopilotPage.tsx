@@ -148,7 +148,7 @@ export function AICopilotPage() {
           <p className="mt-1 max-w-2xl text-[13px] text-fg-muted">Asistentul tău inteligent pentru o flotă mai eficientă. Îți oferă răspunsuri, analize și automatizări în timp real.</p>
         </div>
         <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-2 rounded-lg border border-line bg-card-hover px-3 py-2 text-[12px] font-medium text-fg"><Sparkles size={13} className="text-[color:var(--color-accent-3)]" /> Llama 3.3 70B (Groq) <span className="ml-1 inline-flex items-center gap-1 text-[color:var(--color-success)]"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Online</span></span>
+          <span className="inline-flex items-center gap-2 rounded-lg border border-line bg-card-hover px-3 py-2 text-[12px] font-medium text-fg"><Sparkles size={13} className="text-[color:var(--color-accent-3)]" /> GPT-OSS 120B (Groq) <span className="ml-1 inline-flex items-center gap-1 text-[color:var(--color-success)]"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Online</span></span>
         </div>
       </header>
 
