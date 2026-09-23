@@ -10,4 +10,4 @@ const nextConfig: NextConfig = {
 };
 
 export default nextConfig;
-// build 2026-09-23-fix
+// build 2026-09-23-owner-scope-v3
