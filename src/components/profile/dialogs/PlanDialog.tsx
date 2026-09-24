@@ -32,20 +32,12 @@ const TIERS: Tier[] = [
     priceSub: "RON / lună",
     monthly: 99,
     annualDiscount: 20,
-    couriers: "până la 30 curieri",
+    couriers: "30 curieri",
     icon: Rocket,
     gradient: "from-sky-500 via-blue-600 to-indigo-700",
     ring: "ring-sky-400/40",
-    features: [
-      "30 curieri activi în flotă",
-      "Import Bolt / Wolt / Glovo",
-      "Calcul automat plăți",
-      "Cont dublu (perechi manuale)",
-      "1 utilizator Global Owner",
-      "Backup automat + 30 zile istoric",
-      "Suport email",
-    ],
-    ctaLabel: "Începe cu Starter",
+    features: [],
+    ctaLabel: "Alege",
   },
   {
     key: "business",
@@ -54,23 +46,13 @@ const TIERS: Tier[] = [
     priceSub: "RON / lună",
     monthly: 299,
     annualDiscount: 25,
-    couriers: "până la 200 curieri",
+    couriers: "200 curieri",
     icon: Crown,
     gradient: "from-violet-600 via-purple-600 to-fuchsia-700",
     ring: "ring-violet-400/40",
     popular: true,
-    features: [
-      "200 curieri activi în flotă",
-      "Toate din Starter",
-      "Utilizatori subcontractori nelimitați",
-      "AI Copilot inclus (Groq)",
-      "Cloudflare R2 pentru documente (5 GB)",
-      "Tichete suport centralizate",
-      "Impersonare subcontractor (Global Owner)",
-      "Backup + 90 zile istoric",
-      "Suport chat prioritar",
-    ],
-    ctaLabel: "Upgrade la Business",
+    features: [],
+    ctaLabel: "Alege",
   },
   {
     key: "enterprise",
@@ -78,22 +60,12 @@ const TIERS: Tier[] = [
     price: "custom",
     priceSub: "preț personalizat",
     monthly: 0,
-    couriers: "curieri nelimitați",
+    couriers: "nelimitat",
     icon: Building2,
     gradient: "from-amber-500 via-orange-600 to-red-700",
     ring: "ring-amber-400/40",
-    features: [
-      "Curieri nelimitați",
-      "Toate din Business",
-      "Multi-flotă (mai multe firme)",
-      "Domeniu propriu (crm.firmata.ro)",
-      "SLA 99.9% + integrare custom",
-      "R2 nelimitat pentru documente",
-      "API acces pentru integrări (ERP, contabilitate)",
-      "Onboarding + training dedicat",
-      "Account manager dedicat",
-    ],
-    ctaLabel: "Contactează-ne",
+    features: [],
+    ctaLabel: "Contact",
   },
 ];
 
@@ -160,8 +132,8 @@ export function PlanDialog({
           </button>
         </div>
 
-        {/* Tiere cards */}
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        {/* Tiere cards — compacte */}
+        <div className="grid grid-cols-3 gap-2">
           {TIERS.map((t) => {
             const Icon = t.icon;
             const displayPrice = t.key === "enterprise"
@@ -173,54 +145,36 @@ export function PlanDialog({
               <div
                 key={t.key}
                 className={cn(
-                  "relative flex flex-col overflow-hidden rounded-2xl border p-5",
+                  "relative flex flex-col items-center gap-2 rounded-xl border p-3 text-center",
                   t.popular
-                    ? "border-violet-500/60 bg-gradient-to-br from-violet-500/[0.08] to-fuchsia-500/[0.05] ring-1 ring-violet-500/30"
+                    ? "border-violet-500/60 bg-violet-500/[0.06] ring-1 ring-violet-500/30"
                     : "border-line bg-card",
                 )}
               >
                 {t.popular && (
-                  <span className="absolute right-3 top-3 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white shadow">
-                    Recomandat
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white shadow">
+                    Popular
                   </span>
                 )}
-
-                <div className={cn("inline-flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br text-white", t.gradient)}>
-                  <Icon size={22} />
+                <div className={cn("inline-flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br text-white", t.gradient)}>
+                  <Icon size={16} />
                 </div>
-
-                <div className="mt-3">
-                  <div className="text-[16px] font-bold text-fg">{t.name}</div>
-                  <div className="text-[11.5px] text-fg-muted">{t.couriers}</div>
+                <div className="text-[13px] font-bold text-fg">{t.name}</div>
+                <div className="flex items-baseline gap-0.5">
+                  <span className="text-[20px] font-black text-fg">{displayPrice}</span>
+                  {t.key !== "enterprise" && <span className="text-[10px] text-fg-dim">RON</span>}
                 </div>
-
-                <div className="mt-3 flex items-baseline gap-1">
-                  <span className="text-[28px] font-black text-fg">{displayPrice}</span>
-                  <span className="text-[11.5px] text-fg-muted">
-                    {t.key === "enterprise" ? "" : billing === "annual" ? "RON / lună (facturat anual)" : t.priceSub}
-                  </span>
-                </div>
-
-                <ul className="mt-4 flex flex-1 flex-col gap-1.5">
-                  {t.features.map((f) => (
-                    <li key={f} className="flex items-start gap-1.5 text-[11.5px] text-fg-muted">
-                      <CheckCircle2 size={13} className="mt-0.5 shrink-0 text-emerald-400" />
-                      <span>{f}</span>
-                    </li>
-                  ))}
-                </ul>
-
+                <div className="text-[10.5px] text-fg-muted">{t.couriers}</div>
                 <button
                   type="button"
                   onClick={() => handleUpgrade(t)}
                   className={cn(
-                    "mt-5 inline-flex w-full items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-[12.5px] font-bold transition-colors",
+                    "mt-1 w-full rounded-lg px-2 py-1.5 text-[11.5px] font-semibold transition-colors",
                     t.popular
-                      ? "bg-gradient-to-r from-violet-600 via-fuchsia-600 to-pink-600 text-white hover:from-violet-500 hover:via-fuchsia-500 hover:to-pink-500"
+                      ? "bg-gradient-to-r from-violet-600 to-fuchsia-600 text-white hover:from-violet-500 hover:to-fuchsia-500"
                       : "border border-line bg-card-hover text-fg hover:bg-white/[0.06]",
                   )}
                 >
-                  <Sparkles size={13} />
                   {t.ctaLabel}
                 </button>
               </div>
