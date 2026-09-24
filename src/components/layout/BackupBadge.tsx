@@ -3,10 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { CheckCircle2, CloudUpload, History, Loader2, RotateCcw } from "lucide-react";
 import { useBackup, type BackupInfo } from "@/lib/backup/context";
+import { useSession } from "@/lib/rbac/session";
 import { cn } from "@/lib/utils/cn";
 
-/** Indicator + acțiuni de backup (colț AppShell). */
+/** Indicator + acțiuni de backup (colț AppShell). Vizibil DOAR pentru Global Owner. */
 export function BackupBadge() {
+  const { user } = useSession();
   const { state, backupNow, listBackups, restoreBackup } = useBackup();
   const [open, setOpen] = useState(false);
   const [backups, setBackups] = useState<BackupInfo[]>([]);
@@ -27,6 +29,9 @@ export function BackupBadge() {
   const label = state.lastBackupIso
     ? `acum ${timeAgo(state.lastBackupIso)}`
     : "fără backup încă";
+
+  // Vizibil doar pentru Global Owner (după toate hook-urile — regula React).
+  if (user.role !== "global_owner") return null;
 
   return (
     <div ref={wrapRef} className="relative">
