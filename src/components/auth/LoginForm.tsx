@@ -47,16 +47,16 @@ export function LoginForm() {
           className="rounded-2xl border border-line bg-card p-6 shadow-2xl shadow-black/40"
         >
           <label className="block">
-            <span className="mb-1 block text-[11.5px] font-semibold text-fg-muted">Email</span>
+            <span className="mb-1 block text-[11.5px] font-semibold text-fg-muted">Utilizator (email sau nume)</span>
             <input
-              type="email"
+              type="text"
               name="email"
-              autoComplete="email"
+              autoComplete="username"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               className="w-full rounded-lg border border-line bg-card-2 px-3 py-2 text-[13px] text-fg placeholder:text-fg-dim focus:border-violet-500/60 focus:outline-none"
-              placeholder="contact@firma.ro"
+              placeholder="Admin sau contact@firma.ro"
             />
           </label>
 
