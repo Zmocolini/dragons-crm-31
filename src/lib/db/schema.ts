@@ -123,6 +123,18 @@ export const tickets = sqliteTable("tickets", {
   updatedAtIso: text("updated_at_iso").notNull().default(sql`(current_timestamp)`),
 });
 
+// ── ENTREPRENEUR PROJECTS (Clubul Antreprenorilor) ─────────────────────────
+export const entrepreneurProjects = sqliteTable("entrepreneur_projects", {
+  id: text("id").primaryKey(),
+  title: text("title").notNull(),
+  description: text("description").notNull().default(""),
+  category: text("category").notNull().default(""),
+  url: text("url").default(""),
+  createdByEmail: text("created_by_email").notNull(),
+  createdByName: text("created_by_name").notNull(),
+  createdAtIso: text("created_at_iso").notNull().default(sql`(current_timestamp)`),
+});
+
 // ── BACKUP SNAPSHOTS ──────────────────────────────────────────────────────
 // Fiecare rând = o versiune completă a datelor (toate cheile crm31-*).
 // Cea mai recentă e folosită la auto-restore când localStorage e gol.

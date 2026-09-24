@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ChevronRight, Home } from "lucide-react";
 import { DragonsAllianceDivisions } from "@/components/entrepreneurs/DragonsAllianceDivisions";
+import { CommunityProjects } from "@/components/entrepreneurs/CommunityProjects";
 
 export default function ClubulAntreprenorilorPage() {
   return (
@@ -29,6 +30,7 @@ export default function ClubulAntreprenorilorPage() {
 
       <div className="mt-5">
         <DragonsAllianceDivisions />
+        <CommunityProjects />
       </div>
     </div>
   );
