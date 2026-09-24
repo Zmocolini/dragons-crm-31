@@ -389,7 +389,8 @@ export default function PlatiPage() {
           for (let i = 1; i < items.length; i++) items[i].breakdown.tax = 0;
         }
         if (pair.commissionPct != null) {
-          const totalGross = round2(items.reduce((s, p) => s + (p.breakdown.grossRevenue || 0), 0));
+          // FIX: comisionul se aplică pe brut+tips (nu doar pe grossRevenue fără tips).
+          const totalGross = round2(items.reduce((s, p) => s + (p.breakdown.grossRevenue || 0) + (p.breakdown.tips || 0), 0));
           const commissionTotal = round2(totalGross * (pair.commissionPct / 100));
           items[0].breakdown.fleetCommission = commissionTotal;
           for (let i = 1; i < items.length; i++) items[i].breakdown.fleetCommission = 0;

@@ -112,7 +112,8 @@ export function mergeDuplicatePayments(
     }
     // Unificare comision: recalculat pe totalul brut cu procentul specificat, o singură dată.
     if (opts.commissionPct != null) {
-      const totalGross = round2(items.reduce((s, p) => s + (p.breakdown.grossRevenue || 0), 0));
+      // FIX: comisionul se aplică pe brut+tips (nu doar pe grossRevenue care e fără tips).
+      const totalGross = round2(items.reduce((s, p) => s + (p.breakdown.grossRevenue || 0) + (p.breakdown.tips || 0), 0));
       breakdown.fleetCommission = round2(totalGross * (opts.commissionPct / 100));
     }
 
