@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Briefcase, Building2, CheckCircle2, Download, FileText, Mail, MapPin, MoreHorizontal, Paperclip, Phone, Plus, Search, Trash2, Upload, Users, Wallet, X } from "lucide-react";
 import { useRef } from "react";
 import { Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, XAxis } from "recharts";
@@ -34,7 +34,43 @@ export function SubcontractorsPage() {
   const fleetCouriers = useMemo(() => allRows.filter((c) => c.tenantId === activeFleetId), [allRows, activeFleetId]);
   const seed = useMemo(() => buildSubcontractors(fleetCouriers, activeFleetId), [fleetCouriers, activeFleetId]);
   const [added, setAdded] = usePersistentList<Subcontractor>("crm31-subcontractors-added");
-  const list = useMemo(() => [...added, ...seed], [added, seed]);
+
+  // Auto: conturile CRM cu rol subcontractor_owner apar aici (fără să fie adăugate manual).
+  const [userSubs, setUserSubs] = useState<Subcontractor[]>([]);
+  useEffect(() => {
+    fetch("/api/admin/users").then((r) => r.json()).then((j) => {
+      const subs = (j.users ?? []).filter((u: { role: string; active: boolean }) => u.role === "subcontractor_owner" && u.active);
+      const mapped: Subcontractor[] = subs.map((u: { id: string; name: string; email: string; createdAtIso: string }) => {
+        const couriersOfSub = fleetCouriers.filter((c) => (c.createdBy ?? "").toLowerCase() === u.email.toLowerCase());
+        return {
+          id: `usr_sub_${u.id}`,
+          company: u.name,
+          tagline: "Cont subcontractor CRM",
+          cui: "—",
+          contactName: u.name,
+          contactPhone: "",
+          contactEmail: u.email,
+          website: "",
+          location: "",
+          cities: Array.from(new Set(couriersOfSub.map((c) => c.city).filter(Boolean))),
+          platforms: Array.from(new Set(couriersOfSub.flatMap((c) => c.platforms))),
+          couriersCount: couriersOfSub.length,
+          commissionPct: 10,
+          status: "active",
+          type: "srl",
+          startIso: (u.createdAtIso ?? "").slice(0, 10),
+          contractEndIso: "",
+          tenantId: activeFleetId,
+          revenue3m: 0,
+          commissionGenerated: 0,
+          payRate: 100,
+        };
+      });
+      setUserSubs(mapped);
+    }).catch(() => {});
+  }, [fleetCouriers, activeFleetId]);
+
+  const list = useMemo(() => [...userSubs, ...added, ...seed], [userSubs, added, seed]);
 
   const [q, setQ] = useState(""); const [tab, setTab] = useState<SubStatus | "all">("all"); const [city, setCity] = useState("all"); const [platform, setPlatform] = useState("all"); const [type, setType] = useState("all");
   const [page, setPage] = useState(1); const [selected, setSelected] = useState<Subcontractor | null>(null); const [addOpen, setAddOpen] = useState(false);
