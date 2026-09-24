@@ -47,7 +47,7 @@ function pickPlatform(courier: { boltUid?: string | null }): DuplicateAlias["pla
 export function DuplicatePairsProvider({ children }: { children: ReactNode }) {
   const [pairs, setPairs] = useState<DynamicDuplicatePair[]>([]);
   const [hydrated, setHydrated] = useState(false);
-  const { allRows } = useCouriers();
+  const { allRows, updateCourier } = useCouriers();
 
   useEffect(() => {
     try {
@@ -83,7 +83,15 @@ export function DuplicatePairsProvider({ children }: { children: ReactNode }) {
       if (prev.some((p) => (p.aId === aId && p.bId === bId) || (p.aId === bId && p.bId === aId))) return prev;
       return [...prev, { aId, bId, feeOnce: opts.feeOnce, commissionPct: opts.commissionPct }];
     });
-  }, []);
+    // Propagă comisionul + taxa și în profilul curierilor.
+    const patch: Record<string, unknown> = {};
+    if (opts.commissionPct !== null && opts.commissionPct !== undefined) patch.commissionPct = opts.commissionPct;
+    if (opts.feeOnce !== null && opts.feeOnce !== undefined) patch.weeklyContractFeeRon = opts.feeOnce;
+    if (Object.keys(patch).length > 0) {
+      updateCourier(aId, patch);
+      updateCourier(bId, patch);
+    }
+  }, [updateCourier]);
 
   const removePair = useCallback((aId: string, bId: string) => {
     setPairs((prev) => prev.filter((p) =>
@@ -96,7 +104,15 @@ export function DuplicatePairsProvider({ children }: { children: ReactNode }) {
       const match = (p.aId === aId && p.bId === bId) || (p.aId === bId && p.bId === aId);
       return match ? { ...p, ...opts } : p;
     }));
-  }, []);
+    // Propagă comisionul + taxa în profilul CURIERILOR (vizibil la /curieri/[id] → Editează).
+    const patch: Record<string, unknown> = {};
+    if (opts.commissionPct !== undefined && opts.commissionPct !== null) patch.commissionPct = opts.commissionPct;
+    if (opts.feeOnce !== undefined && opts.feeOnce !== null) patch.weeklyContractFeeRon = opts.feeOnce;
+    if (Object.keys(patch).length > 0) {
+      updateCourier(aId, patch);
+      updateCourier(bId, patch);
+    }
+  }, [updateCourier]);
 
   // Construiesc grupurile dinamice + index pe nume → (grup, opțiuni).
   const { nameToGroup, nameToOpts } = useMemo(() => {
