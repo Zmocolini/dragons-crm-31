@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
+import { CalendarDays, Check, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
 import { Card } from "@/components/ui/Card";
 import { WEEK_DAYS, getWeekDatesNow, getWeekLabelNow, getTodayDowNow } from "@/lib/calendar/data";
 import { useSession } from "@/lib/rbac/session";
@@ -86,6 +86,7 @@ export function CalendarPage() {
   const weekDates = getWeekDatesNow();
   const weekLabel = getWeekLabelNow();
   const todayDow = getTodayDowNow();
+  const todayLabel = new Date().toLocaleDateString("ro-RO", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
 
   return (
     <div className="mx-auto flex w-full max-w-[1200px] flex-col gap-4 p-4 lg:p-6">
@@ -101,6 +102,11 @@ export function CalendarPage() {
             )}
           </p>
         </div>
+        <div className="inline-flex items-center gap-2 rounded-xl border border-violet-500/50 bg-violet-500/15 px-3 py-2 text-violet-100 shadow-[0_0_16px_-4px_rgba(139,92,246,0.6)]">
+          <CalendarDays size={16} className="text-violet-300" />
+          <span className="text-[12px] font-medium text-violet-300">Astăzi:</span>
+          <span className="text-[14px] font-bold capitalize">{todayLabel}</span>
+        </div>
       </header>
 
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-7">
@@ -112,20 +118,23 @@ export function CalendarPage() {
               key={dow}
               className={cn(
                 "flex min-h-[180px] flex-col gap-2 p-3",
-                isToday && "border-violet-500/60 ring-1 ring-violet-500/30",
+                isToday && "border-violet-500/70 bg-violet-500/[0.12] ring-2 ring-violet-500/40",
               )}
             >
               <div className="flex items-baseline justify-between">
                 <div>
                   <div className={cn(
-                    "text-[10.5px] font-bold uppercase tracking-wider",
+                    "flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider",
                     isToday ? "text-violet-200" : "text-fg-muted",
                   )}>
                     {day}
+                    {isToday && (
+                      <span className="rounded bg-violet-500 px-1.5 py-px text-[9px] font-extrabold tracking-widest text-white">AZI</span>
+                    )}
                   </div>
                   <div className={cn(
-                    "text-[18px] font-bold leading-none",
-                    isToday ? "text-violet-100" : "text-fg",
+                    "leading-none",
+                    isToday ? "text-[22px] font-extrabold text-violet-100" : "text-[18px] font-bold text-fg",
                   )}>
                     {weekDates[dow]}
                   </div>
@@ -189,7 +198,7 @@ export function CalendarPage() {
                               type="button"
                               onClick={() => { setEditingId(n.id); setAddingDow(null); setDraft(n.text); }}
                               aria-label="Editează"
-                              className="hidden shrink-0 rounded text-fg-dim hover:text-violet-300 group-hover:inline-flex"
+                              className="inline-flex shrink-0 rounded text-fg-dim hover:text-violet-300 sm:hidden sm:group-hover:inline-flex"
                             >
                               <Pencil size={11} />
                             </button>
@@ -197,7 +206,7 @@ export function CalendarPage() {
                               type="button"
                               onClick={() => remove(n.id)}
                               aria-label="Șterge"
-                              className="hidden shrink-0 rounded text-fg-dim hover:text-rose-300 group-hover:inline-flex"
+                              className="inline-flex shrink-0 rounded text-fg-dim hover:text-rose-300 sm:hidden sm:group-hover:inline-flex"
                             >
                               <Trash2 size={11} />
                             </button>
