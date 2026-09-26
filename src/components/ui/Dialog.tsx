@@ -1,9 +1,47 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useRef, type ReactNode, type TouchEvent } from "react";
 import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+
+const CLOSE_DRAG_PX = 120;
+
+/** Pe telefon (fereastră pe tot ecranul): tras în jos din vârful conținutului → închide. */
+function useSwipeDownToClose(onClose: () => void) {
+  const start = useRef<{ y: number; t: number } | null>(null);
+  const dy = useRef(0);
+  const onTouchStart = (e: TouchEvent<HTMLDivElement>) => {
+    const shell = e.currentTarget;
+    const target = e.target as Element;
+    if (window.innerWidth >= 640 || shell.scrollTop > 0 || e.touches.length !== 1) { start.current = null; return; }
+    if (target.closest("input, textarea, select, [contenteditable='true']")) { start.current = null; return; }
+    start.current = { y: e.touches[0].clientY, t: performance.now() };
+    dy.current = 0;
+  };
+  const onTouchMove = (e: TouchEvent<HTMLDivElement>) => {
+    if (!start.current) return;
+    const d = e.touches[0].clientY - start.current.y;
+    if (d <= 0 || e.currentTarget.scrollTop > 0) { dy.current = 0; e.currentTarget.style.translate = ""; return; }
+    dy.current = d;
+    e.currentTarget.style.transition = "none";
+    e.currentTarget.style.translate = `0 ${d * 0.8}px`;
+  };
+  const onTouchEnd = (e: TouchEvent<HTMLDivElement>) => {
+    if (!start.current) return;
+    const el = e.currentTarget;
+    const v = dy.current / Math.max(1, performance.now() - start.current.t);
+    start.current = null;
+    el.style.transition = "translate 180ms ease-out";
+    if (dy.current > CLOSE_DRAG_PX || (v > 0.6 && dy.current > 40)) {
+      el.style.translate = "0 100dvh";
+      setTimeout(onClose, 160);
+    } else {
+      el.style.translate = "";
+    }
+  };
+  return { onTouchStart, onTouchMove, onTouchEnd, onTouchCancel: onTouchEnd };
+}
 
 export function Dialog({
   open,
@@ -32,6 +70,8 @@ export function Dialog({
     };
   }, [open, onClose]);
 
+  const swipe = useSwipeDownToClose(onClose);
+
   if (!open || typeof document === "undefined") return null;
 
   const width =
@@ -54,7 +94,10 @@ export function Dialog({
           width,
         )}
         onClick={(e) => e.stopPropagation()}
+        {...swipe}
       >
+        {/* Mâner vizual pe telefon: fereastra se poate închide trăgând în jos. */}
+        <div aria-hidden className="mx-auto -mt-2 mb-3 h-1 w-10 rounded-full bg-white/20 sm:hidden" />
         <button
           type="button"
           aria-label="Închide"

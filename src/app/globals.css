@@ -191,6 +191,8 @@ html[data-density="aerisit"] [data-density-row] {
 html,
 body {
   overflow-x: clip;
+  /* Fără pull-to-refresh/bounce nativ — avem gestul nostru (GestureNavigation). */
+  overscroll-behavior-y: none;
   -webkit-text-size-adjust: 100%;
   text-size-adjust: 100%;
 }

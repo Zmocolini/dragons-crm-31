@@ -5,6 +5,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 type UIContextValue = {
   sidebarOpen: boolean;
   toggleSidebar: () => void;
+  openSidebar: () => void;
   closeSidebar: () => void;
   manageNav: boolean;
   toggleManageNav: () => void;
@@ -32,6 +33,7 @@ export function UIProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const toggleSidebar = () => setSidebarOpen((v) => !v);
+  const openSidebar = () => setSidebarOpen(true);
   const closeSidebar = () => setSidebarOpen(false);
   const toggleManageNav = () => setManageNav((v) => !v);
   const toggleHiddenHref = (href: string) => {
@@ -52,6 +54,7 @@ export function UIProvider({ children }: { children: ReactNode }) {
       value={{
         sidebarOpen,
         toggleSidebar,
+        openSidebar,
         closeSidebar,
         manageNav,
         toggleManageNav,

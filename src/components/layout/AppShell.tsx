@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { FaviconApplier } from "./FaviconApplier";
 import { Footer } from "./Footer";
+import { GestureNavigation } from "./GestureNavigation";
 import { GlobalBanners } from "./GlobalBanners";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
@@ -17,6 +18,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       <ThemeApplier />
       <FaviconApplier />
       <Sidebar />
+      <GestureNavigation />
       {/* Backdrop mobil când sidebar-ul e deschis */}
       {sidebarOpen && (
         <button

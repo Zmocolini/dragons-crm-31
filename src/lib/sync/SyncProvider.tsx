@@ -6,6 +6,10 @@ import { syncEngine } from "./engine";
 
 const PULL_INTERVAL_MS = 15_000;
 
+/** Evenimente pentru pull-to-refresh (declanșat din GestureNavigation). */
+export const PULL_REFRESH = "crm:pull-refresh";
+export const PULL_REFRESH_DONE = "crm:pull-refresh-done";
+
 /** Poate fi reîncărcat arborele de date fără să pierdem ce scrie userul acum? */
 function isSafeToRemount(): boolean {
   if (document.querySelector('[role="dialog"], [data-modal-shell]')) return false;
@@ -58,6 +62,18 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     };
     // iOS: revenirea din alt app / din cache-ul Safari nu declanșează mereu visibilitychange.
     const onFocus = () => { void refresh(); };
+    // Pull-to-refresh (GestureNavigation): urc ce e local, aduc tot ce e nou, reîncarc vederea.
+    const onPullRefresh = async () => {
+      try {
+        syncEngine.diffNow();
+        await syncEngine.flush();
+        await syncEngine.pull();
+      } finally {
+        remount();
+        window.dispatchEvent(new Event(PULL_REFRESH_DONE));
+      }
+    };
+    window.addEventListener(PULL_REFRESH, onPullRefresh);
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("focus", onFocus);
     window.addEventListener("pageshow", onFocus);
@@ -68,6 +84,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("focus", onFocus);
       window.removeEventListener("pageshow", onFocus);
+      window.removeEventListener(PULL_REFRESH, onPullRefresh);
       clearInterval(t);
     };
   }, [ready, remount]);
