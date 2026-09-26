@@ -44,10 +44,11 @@ export function Dialog({
       role="dialog"
       aria-modal="true"
       aria-labelledby="dialog-title"
-      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-0 backdrop-blur-sm sm:p-4"
       onClick={onClose}
     >
       <div
+        data-modal-shell
         className={cn(
           "relative w-full max-h-[92dvh] overflow-y-auto rounded-2xl border border-line bg-card p-5 shadow-2xl sm:p-6",
           width,

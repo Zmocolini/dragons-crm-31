@@ -13,7 +13,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { sidebarOpen, closeSidebar } = useUI();
 
   return (
-    <div className="flex min-h-screen bg-app text-fg">
+    <div className="flex min-h-dvh bg-app text-fg">
       <ThemeApplier />
       <FaviconApplier />
       <Sidebar />

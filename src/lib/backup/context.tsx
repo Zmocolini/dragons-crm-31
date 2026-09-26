@@ -9,7 +9,7 @@ const KEY_PREFIX = "crm31-";
 const DEBOUNCE_MS = 4000;
 const HYDRATION_FLAG = "__crm31_backup_hydrated__";
 
-export type BackupInfo = { filename: string; size: number; mtime: string };
+export type BackupInfo = { filename: string; size: number; mtime: string; items?: number; shrunk?: boolean };
 type State = {
   lastBackupIso: string | null;
   busy: boolean;
@@ -39,16 +39,17 @@ function collectCrmKeys(): Record<string, string> {
   return out;
 }
 
-function hasAnyCrmData(): boolean {
-  for (let i = 0; i < localStorage.length; i++) {
-    const k = localStorage.key(i);
-    if (k && k.startsWith(KEY_PREFIX)) {
-      const v = localStorage.getItem(k);
-      // consider empty arrays / empty objects ca "fără date" pentru trigger de auto-restore
-      if (v && v !== "[]" && v !== "{}" && v !== "null" && v !== "") return true;
-    }
-  }
-  return false;
+// Cheile cu datele reale. Restul (settings, profile, schema-version, sesiuni) există mereu
+// pe orice device — nu indică faptul că device-ul are date.
+const CORE_KEYS = ["crm31-couriers", "crm31-payments"];
+
+function hasCoreData(): boolean {
+  return CORE_KEYS.some((k) => {
+    try {
+      const v = JSON.parse(localStorage.getItem(k) ?? "[]");
+      return Array.isArray(v) && v.length > 0;
+    } catch { return false; }
+  });
 }
 
 async function postBackup(keys: Record<string, string>): Promise<void> {
@@ -68,6 +69,9 @@ export function BackupProvider({ children }: { children: ReactNode }) {
   const dirtyRef = useRef(false);
 
   const backupNow = useCallback(async () => {
+    // Device gol (telefon nou, browser curat) nu trimite backup — altfel împinge afară
+    // snapshot-urile bune din rotația de pe server.
+    if (!hasCoreData()) return;
     const keys = collectCrmKeys();
     if (Object.keys(keys).length === 0) return;
     setState((s) => ({ ...s, busy: true, error: null }));
@@ -103,9 +107,12 @@ export function BackupProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const restoreLatest = useCallback(async (): Promise<boolean> => {
-    const list = await listBackups();
+    const list = (await listBackups()).filter((b) => !b.shrunk);
     if (list.length === 0) return false;
-    return await restoreBackup(list[0].filename);
+    // Cel mai nou snapshot care are volum comparabil cu cel mai mare (sare peste snapshot-uri goale).
+    const maxItems = Math.max(...list.map((b) => b.items ?? 0));
+    const good = list.find((b) => (b.items ?? 0) >= maxItems * 0.6) ?? list[0];
+    return await restoreBackup(good.filename);
   }, [listBackups, restoreBackup]);
 
   useEffect(() => {
@@ -115,7 +122,7 @@ export function BackupProvider({ children }: { children: ReactNode }) {
     (async () => {
       if (sessionStorage.getItem(HYDRATION_FLAG)) return; // deja verificat în sesiunea asta
       sessionStorage.setItem(HYDRATION_FLAG, "1");
-      if (hasAnyCrmData()) return;
+      if (hasCoreData()) return;
       const restored = await restoreLatest();
       if (restored && !cancelled) {
         setState((s) => ({ ...s, autoRestored: true }));
@@ -151,7 +158,7 @@ export function BackupProvider({ children }: { children: ReactNode }) {
 
     // Setup 4: backup înainte de închidere via sendBeacon (nu poate fi cancelled)
     const onBeforeUnload = () => {
-      if (!dirtyRef.current) return;
+      if (!dirtyRef.current || !hasCoreData()) return;
       const keys = collectCrmKeys();
       if (Object.keys(keys).length === 0) return;
       const blob = new Blob([JSON.stringify(keys)], { type: "application/json" });

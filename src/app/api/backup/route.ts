@@ -53,13 +53,20 @@ export async function POST(req: NextRequest) {
     isShrunk: shrunk,
   });
 
-  // Cleanup: păstrez ultimele MAX_KEEP snapshot-uri
+  // Cleanup: păstrez ultimele MAX_KEEP snapshot-uri + mereu cel mai mare snapshot bun
+  // (ca un device gol să nu poată roti afară singura copie cu date reale).
   const all = await db
     .select({ id: schema.backupSnapshots.id })
     .from(schema.backupSnapshots)
     .orderBy(desc(schema.backupSnapshots.id));
   if (all.length > MAX_KEEP) {
-    const toDelete = all.slice(MAX_KEEP).map((r) => r.id);
+    const [biggest] = await db
+      .select({ id: schema.backupSnapshots.id })
+      .from(schema.backupSnapshots)
+      .where(eq(schema.backupSnapshots.isShrunk, false))
+      .orderBy(desc(schema.backupSnapshots.itemCount), desc(schema.backupSnapshots.id))
+      .limit(1);
+    const toDelete = all.slice(MAX_KEEP).map((r) => r.id).filter((id) => id !== biggest?.id);
     for (const id of toDelete) {
       await db.delete(schema.backupSnapshots).where(eq(schema.backupSnapshots.id, id));
     }

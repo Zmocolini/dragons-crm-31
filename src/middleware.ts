@@ -17,6 +17,9 @@ const PUBLIC_PREFIXES = [
   "/api/auth/",       // toate endpoint-urile de auth
   "/_next/",          // build assets
   "/favicon",
+  "/manifest.webmanifest",
+  "/icons/",
+  "/sw.js",
   "/robots.txt",
   "/sitemap.xml",
 ];

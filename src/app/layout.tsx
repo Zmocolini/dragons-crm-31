@@ -8,6 +8,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 5,
+  viewportFit: "cover",
   themeColor: "#0b0d12",
 };
 
@@ -25,6 +26,20 @@ export const metadata: Metadata = {
   title: "Dragon Delivery CRM 3.1 — More than delivery",
   description:
     "Premium fleet CRM pentru managementul curierilor, activărilor, plăților și rapoartelor.",
+  applicationName: "Dragons CRM",
+  appleWebApp: {
+    capable: true,
+    title: "Dragons CRM",
+    statusBarStyle: "black",
+  },
+  formatDetection: { telephone: false },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
 };
 
 // Bump când vrei să forțezi wipe-ul datelor test din localStorage la toți userii.
