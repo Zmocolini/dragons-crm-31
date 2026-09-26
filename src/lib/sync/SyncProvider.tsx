@@ -1,10 +1,10 @@
 "use client";
 
-import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useCallback, useEffect, useState, type ReactNode } from "react";
 import { RefreshCw } from "lucide-react";
 import { syncEngine } from "./engine";
 
-const PULL_INTERVAL_MS = 30_000;
+const PULL_INTERVAL_MS = 15_000;
 
 /** Poate fi reîncărcat arborele de date fără să pierdem ce scrie userul acum? */
 function isSafeToRemount(): boolean {
@@ -21,7 +21,6 @@ export function SyncProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
   const [version, setVersion] = useState(0);
   const [staleBanner, setStaleBanner] = useState(false);
-  const hiddenSince = useRef<number | null>(null);
 
   const remount = useCallback(() => {
     setStaleBanner(false);
@@ -43,29 +42,32 @@ export function SyncProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    const refresh = async (fromBackground: boolean) => {
+    const refresh = async () => {
       const changed = await syncEngine.pull();
       if (changed === 0) return;
-      // Revenit în aplicație (ex. telefon scos din buzunar) → actualizez direct dacă e sigur.
-      if (fromBackground && isSafeToRemount()) remount(); else setStaleBanner(true);
+      // Actualizez direct; butonul apare doar dacă userul e în mijlocul unui formular.
+      if (isSafeToRemount()) remount(); else setStaleBanner(true);
     };
     const onVisibility = () => {
       if (document.visibilityState === "hidden") {
-        hiddenSince.current = Date.now();
         syncEngine.diffNow();
         void syncEngine.flush({ keepalive: true });
         return;
       }
-      const wasAway = hiddenSince.current != null && Date.now() - hiddenSince.current > 5_000;
-      hiddenSince.current = null;
-      void refresh(wasAway);
+      void refresh();
     };
+    // iOS: revenirea din alt app / din cache-ul Safari nu declanșează mereu visibilitychange.
+    const onFocus = () => { void refresh(); };
     document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("pageshow", onFocus);
     const t = setInterval(() => {
-      if (document.visibilityState === "visible") void refresh(false);
+      if (document.visibilityState === "visible") void refresh();
     }, PULL_INTERVAL_MS);
     return () => {
       document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("pageshow", onFocus);
       clearInterval(t);
     };
   }, [ready, remount]);
