@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Eye, EyeOff, X } from "lucide-react";
 import { FleetCard } from "./FleetCard";
 import { Logo } from "./Logo";
@@ -23,7 +24,14 @@ export function Sidebar() {
       )}
     >
       <div className="flex items-start justify-between gap-2 px-5 pt-5 pb-3">
-        <Logo />
+        <Link
+          href="/"
+          aria-label="Mergi la Dashboard"
+          onClick={() => { if (window.innerWidth < 1024) closeSidebar(); }}
+          className="rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500/40"
+        >
+          <Logo />
+        </Link>
         <div className="flex items-center gap-1">
         <button
           type="button"
