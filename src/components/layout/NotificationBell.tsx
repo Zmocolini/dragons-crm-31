@@ -48,7 +48,7 @@ export function NotificationBell() {
   const notifs = useMemo<Notif[]>(() => {
     const out: Notif[] = [];
     const prefs = profile.notifications;
-    const now = new Date("2026-09-10").getTime();
+    const now = Date.now();
 
     if (prefs.documents_expired?.in_app) {
       const expiring = fleetDocuments.filter((d) => d.expiryIso && (() => { const dd = (new Date(d.expiryIso).getTime() - now) / 86400000; return dd >= 0 && dd <= 30; })()).length;
@@ -119,7 +119,13 @@ export function NotificationBell() {
       {open && (
         <div
           role="menu"
-          className="absolute right-0 top-full z-40 mt-2 w-[420px] max-w-[calc(100vw-2rem)] overflow-hidden rounded-2xl border border-line bg-card shadow-2xl shadow-black/50"
+          className={cn(
+            "overflow-hidden rounded-2xl border border-line bg-card shadow-2xl shadow-black/50",
+            // Telefon: panou pe toată lățimea, sub header (clopoțelul nu e la marginea ecranului).
+            "fixed inset-x-3 top-[calc(4rem+env(safe-area-inset-top)+0.5rem)] z-50",
+            // Desktop: dropdown ancorat de clopoțel.
+            "sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:z-40 sm:mt-2 sm:w-[420px]",
+          )}
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-line/70 bg-gradient-to-r from-violet-500/[0.08] via-indigo-500/[0.05] to-transparent px-4 py-3">
@@ -145,7 +151,7 @@ export function NotificationBell() {
               <div className="text-[11.5px] text-fg-muted">Nicio notificare nouă în acest moment.</div>
             </div>
           ) : (
-            <div className="max-h-[70vh] overflow-y-auto p-2">
+            <div className="max-h-[calc(100dvh-7rem)] overflow-y-auto overscroll-contain p-2 sm:max-h-[70vh]">
               {notifs.map((n) => {
                 const Icon = n.icon;
                 return (
