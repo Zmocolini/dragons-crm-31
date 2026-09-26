@@ -18,9 +18,11 @@ import { AccommodationsProvider } from "@/lib/accommodations/context";
 import { InvoicesProvider } from "@/lib/invoices/context";
 import { ContractsProvider } from "@/lib/econtracts/context";
 import { ToastProvider } from "@/components/ui/Toast";
+import { SyncProvider } from "@/lib/sync/SyncProvider";
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
+    <SyncProvider>
     <BackupProvider>
     <OwnerScopeProvider>
     <SessionProvider>
@@ -58,5 +60,6 @@ export default function AppLayout({ children }: { children: ReactNode }) {
     </SessionProvider>
     </OwnerScopeProvider>
     </BackupProvider>
+    </SyncProvider>
   );
 }

@@ -5,6 +5,8 @@ import {
   type ReactNode,
 } from "react";
 import type { FleetTenant } from "@/lib/rbac/session";
+import { syncEngine } from "@/lib/sync/engine";
+import { CANONICAL_FLEET_ID } from "@/lib/sync/config";
 import {
   sha256, type AccountUser, type ActiveSessionUser,
   type AcceptInvitationInput, type AuthContextValue, type CreateInvitationInput,
@@ -72,8 +74,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     (async () => {
-      const loadedUsers = safeRead<AccountUser[]>(USERS_KEY, []);
-      const loadedFleets = safeRead<FleetTenant[]>(FLEETS_KEY, []);
+      let loadedUsers = safeRead<AccountUser[]>(USERS_KEY, []);
+      let loadedFleets = safeRead<FleetTenant[]>(FLEETS_KEY, []);
+      // Flota principală are același ID pe toate device-urile (datele sincronizate îl folosesc).
+      const oldFleetId = loadedFleets[0]?.id;
+      if (oldFleetId && oldFleetId !== CANONICAL_FLEET_ID) {
+        loadedFleets = loadedFleets.map((f) => f.id === oldFleetId ? { ...f, id: CANONICAL_FLEET_ID } : f);
+        loadedUsers = loadedUsers.map((u) => u.fleetId === oldFleetId ? { ...u, fleetId: CANONICAL_FLEET_ID } : u);
+        safeWrite(FLEETS_KEY, loadedFleets);
+        safeWrite(USERS_KEY, loadedUsers);
+      }
       const seeded = await seedDemoIfEmpty(loadedUsers, loadedFleets);
       setUsers(seeded.users);
       setFleets(seeded.fleets);
@@ -95,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!serverUser) return null;
     // Folosesc datele DE PE SERVER + o flotă implicită (UI-ul are nevoie de fleet).
     const fleet: FleetTenant = fleets[0] ?? {
-      id: "t_default",
+      id: CANONICAL_FLEET_ID,
       name: "Flota mea",
       slug: "flota-mea",
       city: "—",
@@ -150,7 +160,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (currentFleets.length === 0) {
       // Creez o flotă implicită ca să nu blochez `current` derivation.
       const defaultFleet: FleetTenant = {
-        id: "t_default",
+        id: CANONICAL_FLEET_ID,
         name: "Flota mea",
         slug: "flota-mea",
         city: "—",
@@ -221,7 +231,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const fleet: FleetTenant = {
-      id:            uid("t"),
+      id:            CANONICAL_FLEET_ID,
       name:          input.fleetName.trim(),
       slug:          input.fleetName.toLowerCase().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, ""),
       city:          input.fleetCity.trim() || "—",
@@ -263,7 +273,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setSession(null);
     setServerUser(null);
     safeWrite(SESSION_KEY, null);
-    fetch("/api/auth/logout", { method: "POST" }).catch(() => {});
+    // Urc modificările rămase și șterg datele contului de pe device ÎNAINTE de a invalida sesiunea.
+    void syncEngine.flushAndClear().finally(() => {
+      fetch("/api/auth/logout", { method: "POST", keepalive: true }).catch(() => {});
+    });
   }, []);
 
   // ── Invitații ──────────────────────────────────────────────────────────────

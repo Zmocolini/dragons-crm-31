@@ -7,7 +7,6 @@ import {
 
 const KEY_PREFIX = "crm31-";
 const DEBOUNCE_MS = 4000;
-const HYDRATION_FLAG = "__crm31_backup_hydrated__";
 
 export type BackupInfo = { filename: string; size: number; mtime: string; items?: number; shrunk?: boolean };
 type State = {
@@ -118,18 +117,8 @@ export function BackupProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let cancelled = false;
 
-    // Setup 1: auto-restore la prima încărcare dacă localStorage e gol
-    (async () => {
-      if (sessionStorage.getItem(HYDRATION_FLAG)) return; // deja verificat în sesiunea asta
-      sessionStorage.setItem(HYDRATION_FLAG, "1");
-      if (hasCoreData()) return;
-      const restored = await restoreLatest();
-      if (restored && !cancelled) {
-        setState((s) => ({ ...s, autoRestored: true }));
-        // Reload ca providerii de state (couriers, payments, etc) să rehydreze din localStorage
-        window.location.reload();
-      }
-    })();
+    // Auto-restore-ul a fost înlocuit de sincronizarea per cont (lib/sync): un device nou
+    // primește de la server exact datele contului logat. Restore-ul manual rămâne în BackupBadge.
 
     // Setup 2: patch localStorage.setItem/removeItem ca să detectăm modificări în același tab
     const origSet = localStorage.setItem.bind(localStorage);

@@ -14,3 +14,5 @@ const authToken = process.env.TURSO_AUTH_TOKEN;
 const libsql = createClient({ url, ...(authToken ? { authToken } : {}) });
 export const db = drizzle(libsql, { schema });
 export { schema };
+/** Client libsql brut — pentru batch-uri SQL (ex. /api/sync). */
+export const rawDb = libsql;

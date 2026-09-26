@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Download, FileText, Image as ImageIcon, Loader2, Trash2, Upload } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
+import { syncEngine } from "@/lib/sync/engine";
 
 const DOC_TYPES: Array<{ key: string; label: string }> = [
   { key: "foto",       label: "Poză profil" },
@@ -36,8 +37,8 @@ export function CourierDocumentsSection({ courierId }: { courierId: string }) {
     setLoading(true);
     try {
       const res = await fetch(`/api/documents?courierId=${encodeURIComponent(courierId)}`);
-      const j = await res.json();
-      setDocs(j.documents ?? []);
+      const j = await res.json().catch(() => ({}));
+      setDocs(res.ok ? (j.documents ?? []) : []);
     } finally { setLoading(false); }
   }, [courierId]);
 
@@ -48,6 +49,9 @@ export function CourierDocumentsSection({ courierId }: { courierId: string }) {
     if (file.size > 10 * 1024 * 1024) { setError("Fișier prea mare (max 10 MB)"); return; }
     setUploading(true);
     try {
+      // Curierul trebuie să existe pe server (verificare de acces) înainte de upload.
+      syncEngine.diffNow();
+      await syncEngine.flush();
       const form = new FormData();
       form.append("file", file);
       form.append("courierId", courierId);

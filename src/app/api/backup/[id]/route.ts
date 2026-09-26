@@ -1,9 +1,12 @@
 import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
+import { currentSyncUser } from "@/lib/sync/server";
 
 /** GET /api/backup/:id — returnează un snapshot din DB. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await currentSyncUser();
+  if (!user?.isGlobal) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const { id } = await params;
   const n = Number(id);
   if (!Number.isFinite(n) || n <= 0) return NextResponse.json({ error: "invalid id" }, { status: 400 });
@@ -19,6 +22,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
 /** DELETE /api/backup/:id — șterge un snapshot. */
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const user = await currentSyncUser();
+  if (!user?.isGlobal) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const { id } = await params;
   const n = Number(id);
   if (!Number.isFinite(n) || n <= 0) return NextResponse.json({ error: "invalid id" }, { status: 400 });

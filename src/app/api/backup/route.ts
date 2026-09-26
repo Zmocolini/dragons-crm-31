@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
+import { currentSyncUser } from "@/lib/sync/server";
 
 const TENANT = "fleet_dragons";
 const MAX_KEEP = 50;
@@ -21,6 +22,9 @@ function estimateVolume(keys: Record<string, string>): { items: number; sizeByte
 /** POST /api/backup — salvează un snapshot în DB. Safeguard: dacă payload-ul e mult mai mic
  *  decât ultimul snapshot (>40% pierdere), marchez `is_shrunk=1` și NU-l consider drept "latest bun". */
 export async function POST(req: NextRequest) {
+  // Backup-ul conține datele TUTUROR conturilor → doar Global Owner.
+  const user = await currentSyncUser();
+  if (!user?.isGlobal) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const body = await req.json();
   if (!body || typeof body !== "object") {
     return NextResponse.json({ error: "invalid payload" }, { status: 400 });
@@ -77,6 +81,8 @@ export async function POST(req: NextRequest) {
 
 /** GET /api/backup — listează ultimele snapshot-uri (metadata, fără date). */
 export async function GET() {
+  const user = await currentSyncUser();
+  if (!user?.isGlobal) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const rows = await db
     .select({
       id: schema.backupSnapshots.id,

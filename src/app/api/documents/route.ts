@@ -3,6 +3,7 @@ import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { r2, R2_BUCKET, keyForCourierDoc } from "@/lib/r2/client";
+import { canAccessCourier, currentSyncUser } from "@/lib/sync/server";
 
 const MAX_SIZE_MB = 10;
 
@@ -12,6 +13,9 @@ const ALLOWED_DOC_TYPES = new Set(["ci", "permis", "contract", "medical", "asigu
 export async function GET(req: NextRequest) {
   const courierId = req.nextUrl.searchParams.get("courierId");
   if (!courierId) return NextResponse.json({ error: "courierId required" }, { status: 400 });
+  const user = await currentSyncUser();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await canAccessCourier(user, courierId))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   const rows = await db.select()
     .from(schema.courierDocuments)
     .where(eq(schema.courierDocuments.courierId, courierId))
@@ -29,6 +33,9 @@ export async function POST(req: NextRequest) {
 
   if (!file) return NextResponse.json({ error: "file required" }, { status: 400 });
   if (!courierId) return NextResponse.json({ error: "courierId required" }, { status: 400 });
+  const user = await currentSyncUser();
+  if (!user) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+  if (!(await canAccessCourier(user, courierId))) return NextResponse.json({ error: "forbidden" }, { status: 403 });
   if (!ALLOWED_DOC_TYPES.has(docType)) {
     return NextResponse.json({ error: `docType invalid (permise: ${[...ALLOWED_DOC_TYPES].join(", ")})` }, { status: 400 });
   }

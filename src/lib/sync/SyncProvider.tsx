@@ -1,0 +1,101 @@
+"use client";
+
+import { Fragment, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { RefreshCw } from "lucide-react";
+import { syncEngine } from "./engine";
+
+const PULL_INTERVAL_MS = 30_000;
+
+/** Poate fi reîncărcat arborele de date fără să pierdem ce scrie userul acum? */
+function isSafeToRemount(): boolean {
+  if (document.querySelector('[role="dialog"], [data-modal-shell]')) return false;
+  const el = document.activeElement;
+  return !(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement);
+}
+
+/**
+ * Sincronizează datele CRM cu serverul (per cont). Randează copiii DOAR după ce datele
+ * vizibile contului au ajuns în localStorage — providerii se hidratează apoi normal.
+ */
+export function SyncProvider({ children }: { children: ReactNode }) {
+  const [ready, setReady] = useState(false);
+  const [version, setVersion] = useState(0);
+  const [staleBanner, setStaleBanner] = useState(false);
+  const hiddenSince = useRef<number | null>(null);
+
+  const remount = useCallback(() => {
+    setStaleBanner(false);
+    setVersion((v) => v + 1);
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    syncEngine.onExternalChange = () => {
+      if (isSafeToRemount()) remount(); else setStaleBanner(true);
+    };
+    syncEngine.init().then((r) => {
+      if (cancelled) return;
+      if (r === "unauthorized") { window.location.href = "/login"; return; }
+      setReady(true);
+    });
+    return () => { cancelled = true; syncEngine.onExternalChange = null; };
+  }, [remount]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const refresh = async (fromBackground: boolean) => {
+      const changed = await syncEngine.pull();
+      if (changed === 0) return;
+      // Revenit în aplicație (ex. telefon scos din buzunar) → actualizez direct dacă e sigur.
+      if (fromBackground && isSafeToRemount()) remount(); else setStaleBanner(true);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        hiddenSince.current = Date.now();
+        syncEngine.diffNow();
+        void syncEngine.flush({ keepalive: true });
+        return;
+      }
+      const wasAway = hiddenSince.current != null && Date.now() - hiddenSince.current > 5_000;
+      hiddenSince.current = null;
+      void refresh(wasAway);
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") void refresh(false);
+    }, PULL_INTERVAL_MS);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      clearInterval(t);
+    };
+  }, [ready, remount]);
+
+  if (!ready) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-app text-fg-muted">
+        <div className="flex items-center gap-2 text-[13px]">
+          <RefreshCw size={15} className="animate-spin" />
+          Se sincronizează datele…
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {staleBanner && (
+        <div className="fixed inset-x-0 top-0 z-[120] flex justify-center px-3 pt-[calc(env(safe-area-inset-top)+8px)]">
+          <button
+            type="button"
+            onClick={remount}
+            className="inline-flex items-center gap-2 rounded-full border border-violet-500/40 bg-violet-600 px-4 py-2 text-[12.5px] font-semibold text-white shadow-lg"
+          >
+            <RefreshCw size={14} />
+            Date noi de pe alt dispozitiv — actualizează
+          </button>
+        </div>
+      )}
+      <Fragment key={version}>{children}</Fragment>
+    </>
+  );
+}
