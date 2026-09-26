@@ -16,7 +16,7 @@ export function Sidebar() {
       aria-label="Sidebar"
       className={cn(
         // Mobile: fixed drawer, controlat de state
-        "fixed inset-y-0 left-0 z-50 flex h-dvh w-[260px] pb-[env(safe-area-inset-bottom)] flex-col border-r border-line bg-panel transition-transform duration-200 ease-out",
+        "fixed inset-y-0 left-0 z-50 flex h-dvh w-[85vw] max-w-[360px] pb-[env(safe-area-inset-bottom)] flex-col border-r border-line bg-panel transition-transform duration-200 ease-out",
         sidebarOpen ? "translate-x-0" : "-translate-x-full",
         // Desktop: mereu în flux, mereu vizibil (override total)
         "lg:sticky lg:top-0 lg:z-30 lg:w-[240px] lg:!translate-x-0 lg:transition-none",

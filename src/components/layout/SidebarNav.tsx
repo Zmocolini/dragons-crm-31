@@ -124,7 +124,7 @@ export function SidebarNav() {
             data-density-row
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors",
+              "group relative flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-colors max-lg:py-2.5 max-lg:text-[14.5px]",
               isActive
                 ? "bg-gradient-to-r from-indigo-500/15 via-indigo-500/10 to-transparent text-fg"
                 : "text-fg-muted hover:bg-white/[0.03] hover:text-fg",
