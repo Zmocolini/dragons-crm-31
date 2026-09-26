@@ -40,7 +40,7 @@ export function BackupBadge() {
         onClick={() => setOpen((v) => !v)}
         title="Backup automat CRM"
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors",
+          "inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-md border px-2 text-[11px] font-medium transition-colors sm:h-auto sm:py-1",
           state.error
             ? "border-rose-500/40 bg-rose-500/10 text-rose-200"
             : state.busy
@@ -53,18 +53,26 @@ export function BackupBadge() {
           : state.error
             ? <CloudUpload size={11} />
             : <CheckCircle2 size={11} />}
-        Backup · {label}
+        Backup<span className="hidden sm:inline"> · {label}</span>
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1.5 min-w-[320px] overflow-hidden rounded-lg border border-line bg-card p-2 shadow-lg shadow-black/40">
+        <div
+          className={cn(
+            "overflow-hidden rounded-lg border border-line bg-card p-2 shadow-lg shadow-black/40",
+            // Telefon: panou pe toată lățimea, sub header. Desktop: dropdown ancorat de buton.
+            "fixed inset-x-3 top-[calc(4rem+env(safe-area-inset-top)+0.5rem)] z-50",
+            "sm:absolute sm:inset-x-auto sm:right-0 sm:top-full sm:mt-1.5 sm:min-w-[320px]",
+          )}
+        >
+          <div className="mb-2 text-[11px] text-fg-muted sm:hidden">Ultimul backup: {label}</div>
           <div className="mb-2 flex items-center justify-between">
             <div className="text-[11px] font-bold uppercase tracking-wider text-fg-dim">Backup CRM</div>
             <button
               type="button"
               onClick={() => backupNow()}
               disabled={state.busy}
-              className="inline-flex items-center gap-1 rounded border border-violet-500/40 bg-violet-500/10 px-2 py-0.5 text-[11px] font-semibold text-violet-200 hover:bg-violet-500/15 disabled:opacity-50"
+              className="inline-flex h-9 items-center gap-1 rounded border border-violet-500/40 bg-violet-500/10 px-3 text-[12px] font-semibold text-violet-200 hover:bg-violet-500/15 disabled:opacity-50 sm:h-auto sm:px-2 sm:py-0.5 sm:text-[11px]"
             >
               <CloudUpload size={10} /> Backup acum
             </button>
@@ -77,14 +85,14 @@ export function BackupBadge() {
           <div className="mb-1 flex items-center gap-1 text-[10px] text-fg-dim">
             <History size={9} /> Backup-uri disponibile ({backups.length})
           </div>
-          <div className="max-h-[260px] overflow-y-auto">
+          <div className="max-h-[50dvh] overflow-y-auto overscroll-contain sm:max-h-[260px]">
             {loading ? (
               <div className="px-2 py-3 text-center text-[11px] text-fg-muted">Se încarcă…</div>
             ) : backups.length === 0 ? (
               <div className="px-2 py-3 text-center text-[11px] text-fg-muted">Fără backup-uri</div>
             ) : (
               backups.map((b) => (
-                <div key={b.filename} className="flex items-center justify-between gap-2 rounded px-1.5 py-1 text-[10.5px] hover:bg-white/[0.03]">
+                <div key={b.filename} className="flex items-center justify-between gap-2 rounded px-1.5 py-1.5 text-[12px] hover:bg-white/[0.03] sm:py-1 sm:text-[10.5px]">
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-fg">{formatDate(b.mtime)}</div>
                     <div className="text-fg-dim">{Math.round(b.size / 1024)} KB</div>
@@ -98,7 +106,7 @@ export function BackupBadge() {
                       else alert("Nu s-a putut restaura backup-ul.");
                     }}
                     title="Restaurează acest backup"
-                    className="inline-flex items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-semibold text-amber-200 hover:bg-amber-500/15"
+                    className="inline-flex h-9 items-center gap-1 rounded border border-amber-500/40 bg-amber-500/10 px-3 text-[12px] font-semibold text-amber-200 hover:bg-amber-500/15 sm:h-auto sm:px-1.5 sm:py-0.5 sm:text-[10px]"
                   >
                     <RotateCcw size={9} /> Restore
                   </button>
@@ -107,7 +115,7 @@ export function BackupBadge() {
             )}
           </div>
           <div className="mt-1.5 text-[9.5px] text-fg-dim">
-            Auto-backup la fiecare modificare + înainte de închiderea browserului. Auto-restore dacă localStorage e gol.
+            Datele se sincronizează automat pe toate dispozitivele. Backup-ul e o copie de siguranță suplimentară.
           </div>
         </div>
       )}
