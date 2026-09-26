@@ -2,7 +2,7 @@
 
 import { useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Bot, Download, FileText, ListChecks, Loader2, Mic, Paperclip, Send, Sparkles } from "lucide-react";
+import { ArrowRight, Bot, Download, FileText, ListChecks, Loader2, Mic, Paperclip, Send } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
 import { useSession } from "@/lib/rbac/session";
@@ -184,9 +184,6 @@ ${recentPayments || "—"}`;
         <div>
           <div className="flex items-center gap-2"><h1 className="text-[26px] font-bold tracking-tight text-fg">AI Copilot</h1><span className="rounded-md bg-gradient-to-r from-violet-500 to-fuchsia-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-[0_0_12px_rgba(168,85,247,0.6)]">NOU</span></div>
           <p className="mt-1 max-w-2xl text-[13px] text-fg-muted">Asistentul tău inteligent pentru o flotă mai eficientă. Îți oferă răspunsuri, analize și automatizări în timp real.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center gap-2 rounded-lg border border-line bg-card-hover px-3 py-2 text-[12px] font-medium text-fg"><Sparkles size={13} className="text-[color:var(--color-accent-3)]" /> GPT-OSS 120B (Groq) <span className="ml-1 inline-flex items-center gap-1 text-[color:var(--color-success)]"><span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> Online</span></span>
         </div>
       </header>
 
