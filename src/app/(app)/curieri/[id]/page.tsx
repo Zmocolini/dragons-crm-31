@@ -191,6 +191,7 @@ export default function CourierProfilePage() {
 
       {/* Documente cu preview vizual */}
       <DocumentsGallery
+        courierId={id}
         docs={data.docs}
         badge={COURIER_DOC_STATUS_LABEL[data.docRow.status]}
       />
@@ -207,7 +208,7 @@ type DocItem = {
   expiryIso: string | null;
 };
 
-function DocumentsGallery({ docs, badge }: { docs: Array<{ id: string; file: { name: string; type: string; objectUrl: string | null }; type: string; expiryIso: string | null }>; badge: string }) {
+function DocumentsGallery({ courierId, docs, badge }: { courierId: string; docs: Array<{ id: string; file: { name: string; type: string; objectUrl: string | null }; type: string; expiryIso: string | null }>; badge: string }) {
   const [lightbox, setLightbox] = useState<{ items: DocItem[]; index: number } | null>(null);
 
   useEffect(() => {
@@ -275,7 +276,7 @@ function DocumentsGallery({ docs, badge }: { docs: Array<{ id: string; file: { n
       </Card>
 
       {/* Documente + poze stocate în Cloudflare R2 (persistent, safe) */}
-      <CourierDocumentsSection courierId={id} />
+      <CourierDocumentsSection courierId={courierId} />
 
       {lightbox && typeof document !== "undefined" && createPortal(
         (() => {
