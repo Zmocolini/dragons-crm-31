@@ -51,6 +51,8 @@ export type RecentCourier = {
   status: CourierStatus;
   registeredAt: string;
   avatarUrl: string | null;
+  /** Intern (al flotei noastre) sau al unui subcontractor. Lipsește pentru conturile care nu văd toate conturile. */
+  owner?: { kind: "internal" | "subcontractor"; label: string };
 };
 
 export type RecentCandidate = {

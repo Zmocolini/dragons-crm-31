@@ -3,6 +3,7 @@
 import { useMemo } from "react";
 import { useSession } from "@/lib/rbac/session";
 import { useCouriers } from "@/lib/couriers/context";
+import { courierOwner, useAccountDirectory } from "@/lib/couriers/use-account-directory";
 import { usePayments } from "@/lib/payments/context";
 import { useDocuments } from "@/lib/documents/context";
 import { useSettings } from "@/lib/settings/context";
@@ -112,11 +113,12 @@ export function RecentActivityLive() {
   const { activeFleetId } = useSession();
   const { allRows } = useCouriers();
   const { fleetPayments } = usePayments();
+  const accounts = useAccountDirectory();
 
   const value = useMemo(() => {
     const fleet = allRows.filter((c) => c.tenantId === activeFleetId);
     const courStatus = (s: string): RecentCourier["status"] => s === "active" ? "activ" : s === "in_activation" ? "in_proces" : s === "paused" ? "asteptare" : "documente";
-    const couriers: RecentCourier[] = [...fleet].sort((a, b) => (a.createdAtIso < b.createdAtIso ? 1 : -1)).slice(0, 5).map((c) => ({ id: c.id, name: c.fullName, phone: c.phone, city: c.city, platform: c.platforms[0] ?? "bolt", status: courStatus(c.status), registeredAt: c.createdAtIso.slice(0, 10), avatarUrl: null }));
+    const couriers: RecentCourier[] = [...fleet].sort((a, b) => (a.createdAtIso < b.createdAtIso ? 1 : -1)).slice(0, 5).map((c) => ({ id: c.id, name: c.fullName, phone: c.phone, city: c.city, platform: c.platforms[0] ?? "bolt", status: courStatus(c.status), registeredAt: c.createdAtIso.slice(0, 10), avatarUrl: null, owner: accounts.size > 0 ? courierOwner(c, accounts) : undefined }));
 
     const payMethod = (m: string): RecentPayment["method"] => m === "cash" ? "cash" : m === "bank_transfer" ? "transfer" : "card";
     const payStatus = (s: string): RecentPayment["status"] => s === "paid" ? "platit" : (s === "unpaid" || s === "issue" || s === "blocked") ? "esuat" : "pending";
@@ -127,7 +129,7 @@ export function RecentActivityLive() {
     const issues: RecentIssue[] = tickets.slice(0, 5).map((t) => ({ id: t.id, title: t.subject, severity: sev(t.priority), courierName: t.requesterName, createdAt: t.createdIso.slice(0, 10) }));
 
     return { couriers, payments, issues };
-  }, [allRows, activeFleetId, fleetPayments]);
+  }, [allRows, activeFleetId, fleetPayments, accounts]);
 
   return <RecentActivityTabs couriers={value.couriers} payments={value.payments} issues={value.issues} />;
 }

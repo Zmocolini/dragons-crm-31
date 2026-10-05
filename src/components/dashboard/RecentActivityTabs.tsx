@@ -144,6 +144,7 @@ function RowActionButton() {
 }
 
 function CouriersTable({ rows }: { rows: RecentCourier[] }) {
+  const showOwner = rows.some((r) => r.owner);
   return (
     <table className="w-full min-w-[720px] border-collapse">
       <thead className="border-b border-line/70">
@@ -152,6 +153,7 @@ function CouriersTable({ rows }: { rows: RecentCourier[] }) {
           <TH>Telefon</TH>
           <TH>Oraș</TH>
           <TH>Platformă</TH>
+          {showOwner && <TH>Proveniență</TH>}
           <TH>Status</TH>
           <TH>Data</TH>
           <TH className="text-right pr-6">Acțiuni</TH>
@@ -171,6 +173,15 @@ function CouriersTable({ rows }: { rows: RecentCourier[] }) {
             <TD>
               <PlatformChip platform={r.platform} />
             </TD>
+            {showOwner && (
+              <TD>
+                {r.owner && (
+                  <Badge tone={r.owner.kind === "internal" ? "info" : "warn"} className="whitespace-nowrap">
+                    {r.owner.kind === "internal" ? "Intern" : `Subcontractor · ${r.owner.label}`}
+                  </Badge>
+                )}
+              </TD>
+            )}
             <TD>
               <Badge tone={STATUS_TONE[r.status]}>
                 {STATUS_LABEL[r.status]}

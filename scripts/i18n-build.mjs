@@ -16,9 +16,9 @@ for (let i = 0; i < N; i++) {
   else stats.missing.push(`hi-${i}`);
 }
 const extra = read("i18n/extra.json") || {};
-const xk = Object.keys(extra);
+const xk = read("i18n/chunks/in-extra.json") || []; // cheile traduse de agent (ordinea originală)
 const xo = read("i18n/chunks/out-extra.json");
-for (const k of xk) put("en", k, extra[k]);
+for (const k of Object.keys(extra)) put("en", k, extra[k]);
 if (xo && xo.length === xk.length) xk.forEach((k, j) => { put("ru", k, xo[j][0]); put("hi", k, xo[j][1]); });
 else stats.missing.push("out-extra");
 const xl = read("i18n/extra-lang.json") || {};
