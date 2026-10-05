@@ -26,6 +26,34 @@ let tableReady: Promise<void> | null = null;
 export function ensureSyncTable(): Promise<void> {
   tableReady ??= (async () => {
     await rawDb.batch([
+      `CREATE TABLE IF NOT EXISTS users (
+        id TEXT PRIMARY KEY NOT NULL,
+        email TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        role TEXT NOT NULL DEFAULT 'user',
+        name TEXT NOT NULL DEFAULT '',
+        active INTEGER NOT NULL DEFAULT 1,
+        created_at_iso TEXT NOT NULL DEFAULT (current_timestamp),
+        last_login_iso TEXT,
+        password_hint TEXT
+      )`,
+      `CREATE TABLE IF NOT EXISTS sessions (
+        token TEXT PRIMARY KEY NOT NULL,
+        user_id TEXT NOT NULL,
+        created_at_iso TEXT NOT NULL DEFAULT (current_timestamp),
+        expires_at_iso TEXT NOT NULL,
+        user_agent TEXT,
+        ip TEXT
+      )`,
+      `CREATE TABLE IF NOT EXISTS backup_snapshots (
+        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+        tenant_id TEXT NOT NULL,
+        created_at_iso TEXT NOT NULL DEFAULT (current_timestamp),
+        keys TEXT NOT NULL,
+        item_count INTEGER NOT NULL DEFAULT 0,
+        size_bytes INTEGER NOT NULL DEFAULT 0,
+        is_shrunk INTEGER NOT NULL DEFAULT 0
+      )`,
       `CREATE TABLE IF NOT EXISTS crm_records (
         k TEXT NOT NULL,
         id TEXT NOT NULL,

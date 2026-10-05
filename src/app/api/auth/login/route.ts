@@ -15,6 +15,9 @@ export async function POST(req: NextRequest) {
 
   const idLower = identifier.toLowerCase();
 
+  // Asigură tabelele și datele de sincronizare înainte de query
+  await ensureSyncTable().catch(() => {});
+
   // Match pe email (lowercase) SAU nume (case-insensitive)
   let [u] = await db.select().from(schema.users).where(
     or(
