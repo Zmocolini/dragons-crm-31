@@ -45,7 +45,7 @@ type Tab = "couriers" | "payments" | "issues";
 const TABS: { key: Tab; label: string; href: string }[] = [
   { key: "couriers", label: "Curieri recenți", href: "/curieri" },
   { key: "payments", label: "Plăți recente", href: "/plati" },
-  { key: "issues", label: "Probleme", href: "/probleme" },
+  { key: "issues", label: "Probleme", href: "/ai?tab=issues" },
 ];
 
 type Props = {

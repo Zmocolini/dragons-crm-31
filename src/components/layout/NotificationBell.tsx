@@ -86,7 +86,7 @@ export function NotificationBell() {
         icon: LifeBuoy,
         title: `${openTickets} tichete deschise`,
         body: "Curieri care așteaptă răspuns. Deschide secțiunea Suport pentru a rezolva.",
-        href: "/probleme",
+        href: "/ai?tab=issues",
         tone: "text-sky-300",
         bgTone: "bg-sky-500/15 border-sky-500/30",
         when: "Acum",

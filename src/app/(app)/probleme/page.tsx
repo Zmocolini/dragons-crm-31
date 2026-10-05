@@ -1,7 +1,6 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { IssuesPage } from "@/components/issues/IssuesPage";
-
+// Probleme / Suport s-a mutat în AI Copilot (tab).
 export default function ProblemePage() {
-  return <IssuesPage />;
+  redirect("/ai?tab=issues");
 }

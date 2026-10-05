@@ -25,7 +25,7 @@ const STAT_HREF: Record<StatKey, string> = {
   new_candidates: "/recrutare",
   processed_payments: "/plati",
   completed_activations: "/activari",
-  open_issues: "/probleme",
+  open_issues: "/ai?tab=issues",
 };
 
 export function DashboardStatsLive() {
