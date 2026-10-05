@@ -25,11 +25,14 @@ export async function POST(req: NextRequest) {
   if (!ok) return NextResponse.json({ error: "credențiale invalide" }, { status: 401 });
 
   const token = await createSession(u.id, req.headers.get("user-agent") ?? undefined);
-  // Cookie SESSION-ONLY: fără maxAge/expires → șters la închiderea browserului.
+  // „Ține-mă conectat" (implicit): cookie persistent cât sesiunea din DB. Debifat → cookie de sesiune
+  // (șters la închiderea browserului), pentru calculatoare folosite în comun.
+  const remember = body?.remember !== false;
   (await cookies()).set({
     name: SESSION_COOKIE, value: token,
     httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production",
     path: "/",
+    ...(remember ? { maxAge: SESSION_DAYS * 86400 } : {}),
   });
   // best-effort cleanup — nu blochează răspunsul
   cleanExpiredSessions().catch(() => {});

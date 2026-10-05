@@ -2,34 +2,52 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { AlertCircle, Eye, EyeOff, LogIn } from "lucide-react";
-import { useAuth } from "@/lib/auth/context";
 import { cn } from "@/lib/utils/cn";
 import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 
 export function LoginForm() {
-  const { login } = useAuth();
-  const router = useRouter();
   const searchParams = useSearchParams();
-  const nextPath = searchParams.get("next") ?? "/";
+  // doar căi interne (fără //host sau http:) — altfel ?next= ar fi un open redirect
+  const rawNext = searchParams.get("next") ?? "/";
+  const nextPath = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "/";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [remember, setRemember] = useState(true);
 
-  // NU mai redirect la /register — accesul se acordă manual de admin.
+  // Auto-login: dacă sesiunea e încă validă (cookie persistent), sari direct în aplicație.
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/auth/me").then((r) => r.json()).then((j) => { if (alive && j?.user) window.location.replace(nextPath); }).catch(() => {});
+    return () => { alive = false; };
+  }, [nextPath]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError(null);
-    const res = await login({ email, password });
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email, password, remember }),
+      });
+      if (res.ok) {
+        // navigare completă: contextul de auth se reîncarcă din /api/auth/me, iar managerul de parole vede login-ul reușit
+        window.location.replace(nextPath);
+        return;
+      }
+      const j = await res.json().catch(() => ({}));
+      setError(j.error ?? "Autentificare eșuată.");
+    } catch {
+      setError("Server indisponibil. Încearcă din nou.");
+    }
     setBusy(false);
-    if (res.ok) router.replace(nextPath);
-    else setError(res.error);
   }
 
   return (
@@ -45,6 +63,9 @@ export function LoginForm() {
         </div>
 
         <form
+          id="login-form"
+          method="post"
+          action="/login"
           onSubmit={handleSubmit}
           className="rounded-2xl border border-line bg-card p-6 shadow-2xl shadow-black/40"
         >
@@ -52,8 +73,13 @@ export function LoginForm() {
             <span className="mb-1 block text-[11.5px] font-semibold text-fg-muted">Utilizator (email sau nume)</span>
             <input
               type="text"
-              name="email"
+              id="username"
+              name="username"
               autoComplete="username"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              autoFocus
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
@@ -67,6 +93,7 @@ export function LoginForm() {
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
+                id="password"
                 name="password"
                 autoComplete="current-password"
                 value={password}
@@ -85,6 +112,11 @@ export function LoginForm() {
                 {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
               </button>
             </div>
+          </label>
+
+          <label className="mt-3 flex cursor-pointer items-center gap-2 text-[12px] text-fg-muted">
+            <input type="checkbox" name="remember" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="h-3.5 w-3.5 accent-violet-500" />
+            Ține-mă conectat
           </label>
 
           {error && (
