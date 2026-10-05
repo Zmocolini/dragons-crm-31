@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import Link from "next/link";
 import { useSession } from "@/lib/rbac/session";
 import { useCouriers } from "@/lib/couriers/context";
 import { usePayments } from "@/lib/payments/context";
@@ -54,7 +53,7 @@ export function CourierActivityLive() {
       return { label: `${d.getUTCDate()} ${RO_MONTHS[d.getUTCMonth()]}`, ...v };
     });
   }, [bundle]);
-  return <CardLink href="/curieri"><CourierActivityChart data={data} /></CardLink>;
+  return <CourierActivityChart data={data} />;
 }
 
 export function WeeklyRevenueLive() {
@@ -70,7 +69,7 @@ export function WeeklyRevenueLive() {
     const t: Trend = { direction: pct >= 0 ? "up" : "down", value: `${pct >= 0 ? "+" : ""}${pct}%` };
     return { data: points, trend: t };
   }, [bundle]);
-  return <CardLink href="/plati"><WeeklyRevenueChart data={data} trend={trend} /></CardLink>;
+  return <WeeklyRevenueChart data={data} trend={trend} />;
 }
 
 export function ActivePlatformsLive() {
@@ -106,7 +105,7 @@ export function ExpiringDocumentsLive() {
     const labelFor = (col: string) => DOC_COLUMNS.find((c) => c.key === col)?.label ?? col;
     return Array.from(groups.entries()).map(([col, g]) => ({ id: `exp_${col}`, label: labelFor(col).toLowerCase(), count: g.count, daysUntil: g.minDays, category: "other" as const }));
   }, [fleetDocuments]);
-  return <CardLink href="/documente?tab=expiring"><ExpiringDocumentsCard docs={docs} /></CardLink>;
+  return <ExpiringDocumentsCard docs={docs} />;
 }
 
 export function RecentActivityLive() {
@@ -130,7 +129,7 @@ export function RecentActivityLive() {
     return { couriers, payments, issues };
   }, [allRows, activeFleetId, fleetPayments]);
 
-  return <CardLink href="/curieri"><RecentActivityTabs couriers={value.couriers} payments={value.payments} issues={value.issues} /></CardLink>;
+  return <RecentActivityTabs couriers={value.couriers} payments={value.payments} issues={value.issues} />;
 }
 
 const STATIC_TASKS = [
@@ -141,13 +140,6 @@ const STATIC_TASKS = [
   { id: "t5", title: "Rezolvă problemele deschise", due: "vineri", done: false },
 ];
 export function UpcomingTasksLive() {
-  return <CardLink href="/probleme"><UpcomingTasksCard tasks={STATIC_TASKS} /></CardLink>;
+  return <UpcomingTasksCard tasks={STATIC_TASKS} />;
 }
 
-function CardLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <Link href={href} className="block h-full transition-transform hover:-translate-y-0.5" aria-label={`Deschide ${href}`}>
-      {children}
-    </Link>
-  );
-}

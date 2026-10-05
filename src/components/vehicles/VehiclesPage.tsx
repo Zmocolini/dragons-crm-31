@@ -44,7 +44,7 @@ export function VehiclesPage() {
     activeRentalOf, deleteVehicle, sendToService, markAvailable, retireVehicle,
   } = useVehicles();
 
-  const canManage = can("vehicles.manage") || can("vehicles.view");
+  const canManage = can("vehicles.view");
 
   const [search, setSearch] = useState("");
   const [typeFilter, setTypeFilter] = useState<FleetVehicleType | "all">("all");

@@ -5,12 +5,13 @@ import {
   type ReactNode,
 } from "react";
 import {
-  calculateTotal,
+  calculateTotal, round2, paymentSourceDetail,
   type Payment, type PaymentActivity, type PaymentActivityKind,
   type PaymentBreakdown, type PaymentDocumentRef, type PaymentNote,
-  type PaymentStatus,
+  type PaymentSourceDetail, type PaymentStatus,
 } from "./types";
 import { SEED_PAYMENTS } from "./seed";
+import { MERGED_ID_PREFIX } from "./merge-duplicates";
 import { useSession } from "@/lib/rbac/session";
 import { useOwnerScope } from "@/lib/owner-scope/context";
 
@@ -47,6 +48,11 @@ type PaymentsContextValue = {
   updatePayment: (id: string, patch: Patch, actorName: string) => void;
   addDeduction: (id: string, key: keyof PaymentBreakdown, amount: number, description: string, actorName: string) => void;
   deletePayment: (id: string, actorName: string) => void;
+  deletePayments: (ids: string[], actorName: string) => void;
+  /** Șterge toate plățile dintr-o perioadă/raport, returnând numărul de plăți eliminate. */
+  clearPeriod: (periodStartIso: string, actorName: string, sourceDetail?: PaymentSourceDetail | "all") => number;
+  /** Resetează complet toate plățile importate din orice perioadă. */
+  clearAllImported: (actorName: string) => number;
   /** Verifică dacă un ID de plată e marcat șters (inclusiv pentru sintetice generate live). */
   isDeleted: (id: string) => boolean;
 
@@ -83,6 +89,60 @@ function applyPatch(base: Payment, patch: Patch | undefined): Payment {
     patch.totalCalculated ??
     (patch.breakdown ? calculateTotal(patch.breakdown) : base.totalCalculated);
   return { ...base, ...patch, breakdown, totalCalculated };
+}
+
+/**
+ * Plafonează comisionul și taxa flotei la venitul disponibil pentru a preveni trecerea
+ * artificială pe minus a curierului.
+ * Dacă balanța negativă (cash încasat din comenzi) depășește venitul brut:
+ *  - Nu se percepe comision și nici taxă (0 RON).
+ *  - Minusul reflectă strict datoria reală de cash a curierului față de flotă (ex: 200 - 400 = -200 RON).
+ * Dacă venitul brut este egal cu balanța negativă (ex: 17.61 cu 17.61):
+ *  - Comision = 0, taxă = 0, totalCalculated = 0.00 RON.
+ */
+function sanitizePaymentFee(p: Payment): Payment {
+  const b = p.breakdown;
+  if (!b) return p;
+  const gross = round2((b.grossRevenue || 0) + (b.tips || 0));
+  const ded = Math.max(0, b.deductions || 0);
+  const otherCosts = (b.vehicleCost || 0) + (b.housingCost || 0) + (b.equipmentCost || 0) + (b.guarantee || 0) + (b.penalty || 0) + (b.advance || 0);
+  const rawCashResidual = round2(gross - ded - otherCosts);
+
+  // Cazul 1 & 2: Cash-ul încasat este egal sau mai mare decât venitul brut
+  if (rawCashResidual <= 0) {
+    const rawTotal = rawCashResidual;
+    const totalCalculated = Math.abs(rawTotal) < 0.001 ? 0 : rawTotal;
+    if (b.fleetCommission !== 0 || b.tax !== 0 || totalCalculated !== p.totalCalculated) {
+      return {
+        ...p,
+        breakdown: { ...b, fleetCommission: 0, tax: 0 },
+        totalCalculated,
+      };
+    }
+    return p;
+  }
+
+  // Cazul 3 & 4: Venit disponibil după deducerea cash-ului
+  const available = rawCashResidual;
+  const comm = Math.max(0, b.fleetCommission || 0);
+  const cappedComm = Math.min(comm, available);
+  const availableForTax = Math.max(0, round2(available - cappedComm));
+  const cappedTax = Math.min(Math.max(0, b.tax || 0), availableForTax);
+
+  const rawTotal = round2(availableForTax - cappedTax + (b.correction || 0) + (b.otherAdjustments || 0));
+  const totalCalculated = Math.abs(rawTotal) < 0.001 ? 0 : rawTotal;
+
+  if (cappedTax !== b.tax || cappedComm !== b.fleetCommission || totalCalculated !== p.totalCalculated) {
+    return {
+      ...p,
+      breakdown: { ...b, fleetCommission: cappedComm, tax: cappedTax },
+      totalCalculated,
+      notes: p.notes && !p.notes.includes("plafonată") && b.tax > cappedTax
+        ? `${p.notes} · Taxă contract ${b.tax} RON plafonată la ${cappedTax} RON (venit disponibil).`
+        : p.notes,
+    };
+  }
+  return p;
 }
 
 /** Timeline de bază derivat din câmpurile plății (fără a inventa evenimente). */
@@ -136,8 +196,40 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
     // Hidratare din localStorage (store extern). setState în efect e intenționat aici:
     // evită mismatch-ul de hidratare SSR→client. Pattern comun tuturor providerelor.
     /* eslint-disable react-hooks/set-state-in-effect */
-    setUserPayments(safeRead<Payment[]>(KEY_USER, []));
-    setPatches(safeRead<Record<string, Patch>>(KEY_PATCH, {}));
+    const rawUserPayments = safeRead<Payment[]>(KEY_USER, []);
+    // Migrare automată: aliniem plățile Wolt Gusty importate cu ciclul 16-22 Sep la săptămâna de plată 21-27 Sep
+    const migratedUserPayments = rawUserPayments.map((p) => {
+      const isWoltGusty = (p.reference ?? "").toLowerCase().includes("wolt") || (p.recipient.platform === "wolt");
+      if (isWoltGusty && p.periodStartIso === "2026-09-16") {
+        return {
+          ...p,
+          periodStartIso: "2026-09-21",
+          periodEndIso: "2026-09-27",
+          paymentDateIso: "2026-09-27",
+          reference: (p.reference ?? "").replace("16 – 22 Sep", "21 – 27 Sep").replace("16-22 Sep", "21-27 Sep"),
+        };
+      }
+      return p;
+    });
+    setUserPayments(migratedUserPayments);
+    const rawPatches = safeRead<Record<string, Patch>>(KEY_PATCH, {});
+    const migratedPatches: Record<string, Patch> = {};
+    let hasMerged = false;
+    for (const [patchId, patchVal] of Object.entries(rawPatches)) {
+      if (patchId.startsWith(MERGED_ID_PREFIX)) {
+        hasMerged = true;
+        const subIds = patchId.replace(MERGED_ID_PREFIX, "").split("__");
+        for (const subId of subIds) {
+          migratedPatches[subId] = { ...(migratedPatches[subId] ?? {}), ...patchVal };
+        }
+      } else {
+        migratedPatches[patchId] = { ...(migratedPatches[patchId] ?? {}), ...patchVal };
+      }
+    }
+    if (hasMerged) {
+      try { localStorage.setItem(KEY_PATCH, JSON.stringify(migratedPatches)); } catch {}
+    }
+    setPatches(migratedPatches);
     setActivities(safeRead<Record<string, PaymentActivity[]>>(KEY_ACT, {}));
     setNotesByPayment(safeRead<Record<string, PaymentNote[]>>(KEY_NOTES, {}));
     setDocumentsByPayment(safeRead<Record<string, PaymentDocumentRef[]>>(KEY_DOCS, {}));
@@ -158,7 +250,7 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
     const merged = [...userPayments, ...SEED_PAYMENTS];
     return merged
       .filter((p) => !deletedIds.has(p.id))
-      .map((p) => applyPatch(p, patches[p.id]));
+      .map((p) => sanitizePaymentFee(applyPatch(p, patches[p.id])));
   }, [userPayments, patches, deletedIds]);
 
   const fleetPayments = useMemo(() => {
@@ -187,6 +279,17 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
   );
 
   const patchPayment = useCallback((id: string, patch: Patch) => {
+    if (id.startsWith(MERGED_ID_PREFIX)) {
+      const subIds = id.replace(MERGED_ID_PREFIX, "").split("__");
+      setPatches((prev) => {
+        const next = { ...prev };
+        for (const subId of subIds) {
+          next[subId] = { ...(next[subId] ?? {}), ...patch };
+        }
+        return next;
+      });
+      return;
+    }
     setPatches((prev) => ({ ...prev, [id]: { ...(prev[id] ?? {}), ...patch } }));
   }, []);
 
@@ -208,23 +311,92 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
   }, [payments]);
 
   const setStatus = useCallback((id: string, status: PaymentStatus, actorName: string, reason?: string) => {
+    const isPaid = status === "paid";
+    if (id.startsWith(MERGED_ID_PREFIX)) {
+      const subIds = id.replace(MERGED_ID_PREFIX, "").split("__");
+      for (const subId of subIds) {
+        const current = findPayment(subId);
+        const from = current?.status ?? null;
+        patchPayment(subId, {
+          status,
+          ...(reason ? { overrideReason: reason } : {}),
+          ...(isPaid ? {
+            amountPaid: current?.totalCalculated ?? 0,
+            paidBy: actorName,
+            paidAtIso: nowIso(),
+            operatorName: actorName,
+          } : {
+            amountPaid: 0,
+            paidBy: null,
+            paidAtIso: null,
+          }),
+        });
+        logActivity(subId, "status_changed", `Status: ${from ?? "?"} → ${status}${reason ? ` · ${reason}` : ""}`, actorName, from, status);
+      }
+      return;
+    }
     const current = findPayment(id);
     const from = current?.status ?? null;
-    patchPayment(id, { status, ...(reason ? { overrideReason: reason } : {}) });
+    patchPayment(id, {
+      status,
+      ...(reason ? { overrideReason: reason } : {}),
+      ...(isPaid ? {
+        amountPaid: current?.totalCalculated ?? 0,
+        paidBy: actorName,
+        paidAtIso: nowIso(),
+        operatorName: actorName,
+      } : {
+        amountPaid: 0,
+        paidBy: null,
+        paidAtIso: null,
+      }),
+    });
     logActivity(id, "status_changed", `Status: ${from ?? "?"} → ${status}${reason ? ` · ${reason}` : ""}`, actorName, from, status);
   }, [findPayment, patchPayment, logActivity]);
 
   const approve = useCallback((id: string, actorName: string) => {
-    patchPayment(id, { status: "partial", approvedBy: actorName, approvedAtIso: nowIso(), operatorName: actorName });
+    if (id.startsWith(MERGED_ID_PREFIX)) {
+      const subIds = id.replace(MERGED_ID_PREFIX, "").split("__");
+      for (const subId of subIds) {
+        patchPayment(subId, { status: "partial", approvedBy: actorName, approvedAtIso: nowIso(), operatorName: actorName, amountPaid: 0, paidBy: null, paidAtIso: null });
+        logActivity(subId, "approved", "Plată aprobată → În proces", actorName);
+      }
+      return;
+    }
+    patchPayment(id, { status: "partial", approvedBy: actorName, approvedAtIso: nowIso(), operatorName: actorName, amountPaid: 0, paidBy: null, paidAtIso: null });
     logActivity(id, "approved", "Plată aprobată → În proces", actorName);
   }, [patchPayment, logActivity]);
 
   const markProcessing = useCallback((id: string, actorName: string) => {
-    patchPayment(id, { status: "partial", operatorName: actorName });
+    if (id.startsWith(MERGED_ID_PREFIX)) {
+      const subIds = id.replace(MERGED_ID_PREFIX, "").split("__");
+      for (const subId of subIds) {
+        patchPayment(subId, { status: "partial", operatorName: actorName, amountPaid: 0, paidBy: null, paidAtIso: null });
+        logActivity(subId, "processing", "Marcată în proces", actorName);
+      }
+      return;
+    }
+    patchPayment(id, { status: "partial", operatorName: actorName, amountPaid: 0, paidBy: null, paidAtIso: null });
     logActivity(id, "processing", "Marcată în proces", actorName);
   }, [patchPayment, logActivity]);
 
   const markPaid = useCallback((id: string, actorName: string) => {
+    if (id.startsWith(MERGED_ID_PREFIX)) {
+      const subIds = id.replace(MERGED_ID_PREFIX, "").split("__");
+      for (const subId of subIds) {
+        const p = findPayment(subId);
+        const total = p?.totalCalculated ?? 0;
+        patchPayment(subId, {
+          status: "paid",
+          amountPaid: total,
+          paidBy: actorName,
+          paidAtIso: nowIso(),
+          operatorName: actorName,
+        });
+        logActivity(subId, "paid", `Plată marcată ca efectuată (${Math.round(total)} RON)`, actorName);
+      }
+      return;
+    }
     const p = findPayment(id);
     const total = p?.totalCalculated ?? 0;
     patchPayment(id, {
@@ -238,25 +410,131 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
   }, [findPayment, patchPayment, logActivity]);
 
   const updatePayment = useCallback((id: string, patch: Patch, actorName: string) => {
-    patchPayment(id, patch);
-    const summary = Object.keys(patch).join(", ");
+    const statusClear = patch.status && patch.status !== "paid"
+      ? { amountPaid: 0, paidBy: null, paidAtIso: null }
+      : {};
+    const effectivePatch = { ...patch, ...statusClear };
+
+    if (id.startsWith(MERGED_ID_PREFIX)) {
+      const subIds = id.replace(MERGED_ID_PREFIX, "").split("__");
+      for (const subId of subIds) {
+        patchPayment(subId, effectivePatch);
+        const summary = Object.keys(effectivePatch).join(", ");
+        logActivity(subId, "edited", `Câmpuri modificate: ${summary}`, actorName);
+      }
+      return;
+    }
+    patchPayment(id, effectivePatch);
+    const summary = Object.keys(effectivePatch).join(", ");
     logActivity(id, "edited", `Câmpuri modificate: ${summary}`, actorName);
   }, [patchPayment, logActivity]);
 
   const addDeduction = useCallback((id: string, key: keyof PaymentBreakdown, amount: number, description: string, actorName: string) => {
-    const p = findPayment(id);
+    const targetId = id.startsWith(MERGED_ID_PREFIX) ? id.replace(MERGED_ID_PREFIX, "").split("__")[0] : id;
+    const p = findPayment(targetId);
     if (!p) return;
     const nextBreakdown: PaymentBreakdown = { ...p.breakdown, [key]: (p.breakdown[key] || 0) + amount };
-    patchPayment(id, { breakdown: nextBreakdown });
-    logActivity(id, "deduction_added", `Deducere +${amount} RON (${description || key})`, actorName);
+    patchPayment(targetId, { breakdown: nextBreakdown });
+    logActivity(targetId, "deduction_added", `Deducere +${amount} RON (${description || key})`, actorName);
   }, [findPayment, patchPayment, logActivity]);
 
   const deletePayment = useCallback((id: string, actorName: string) => {
+    if (id.startsWith(MERGED_ID_PREFIX)) {
+      const subIds = id.replace(MERGED_ID_PREFIX, "").split("__");
+      setDeletedIds((prev) => {
+        const next = new Set(prev);
+        for (const subId of subIds) next.add(subId);
+        return next;
+      });
+      setUserPayments((prev) => prev.filter((p) => !subIds.includes(p.id)));
+      for (const subId of subIds) {
+        logActivity(subId, "edited", `Plată ștearsă de ${actorName}`, actorName);
+      }
+      return;
+    }
     setDeletedIds((prev) => new Set(prev).add(id));
+    setUserPayments((prev) => prev.filter((p) => p.id !== id));
     logActivity(id, "edited", `Plată ștearsă de ${actorName}`, actorName);
   }, [logActivity]);
 
+  const deletePayments = useCallback((ids: string[], actorName: string) => {
+    const unrolledIds: string[] = [];
+    for (const id of ids) {
+      if (id.startsWith(MERGED_ID_PREFIX)) {
+        const subIds = id.replace(MERGED_ID_PREFIX, "").split("__");
+        for (const subId of subIds) unrolledIds.push(subId);
+      } else {
+        unrolledIds.push(id);
+      }
+    }
+    const idSet = new Set(unrolledIds);
+    setDeletedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of unrolledIds) next.add(id);
+      return next;
+    });
+    setUserPayments((prev) => {
+      const remaining = prev.filter((p) => !idSet.has(p.id));
+      try { localStorage.setItem(KEY_USER, JSON.stringify(remaining)); } catch {}
+      return remaining;
+    });
+    for (const id of unrolledIds) {
+      logActivity(id, "edited", `Plată ștearsă de ${actorName}`, actorName);
+    }
+  }, [logActivity]);
+
+  const clearPeriod = useCallback((periodStartIso: string, actorName: string, sourceDetail?: PaymentSourceDetail | "all") => {
+    let deletedCount = 0;
+    const removedIds: string[] = [];
+    setUserPayments((prev) => {
+      const remaining = prev.filter((p) => {
+        const matchesPeriod = p.periodStartIso === periodStartIso;
+        const matchesSource = !sourceDetail || sourceDetail === "all" || paymentSourceDetail(p.reference) === sourceDetail;
+        if (matchesPeriod && matchesSource) {
+          deletedCount++;
+          removedIds.push(p.id);
+          return false;
+        }
+        return true;
+      });
+      try { localStorage.setItem(KEY_USER, JSON.stringify(remaining)); } catch {}
+      return remaining;
+    });
+    setDeletedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of removedIds) next.add(id);
+      try { localStorage.setItem(KEY_DEL, JSON.stringify(Array.from(next))); } catch {}
+      return next;
+    });
+    return deletedCount;
+  }, []);
+
+  const clearAllImported = useCallback((actorName: string) => {
+    let count = 0;
+    setUserPayments((prev) => {
+      count = prev.length;
+      try { localStorage.setItem(KEY_USER, JSON.stringify([])); } catch {}
+      return [];
+    });
+    setDeletedIds(new Set());
+    setPatches({});
+    try {
+      localStorage.setItem(KEY_DEL, JSON.stringify([]));
+      localStorage.setItem(KEY_PATCH, JSON.stringify({}));
+    } catch {}
+    return count;
+  }, []);
+
   const addNote = useCallback((id: string, text: string, actorName: string) => {
+    if (id.startsWith(MERGED_ID_PREFIX)) {
+      const subIds = id.replace(MERGED_ID_PREFIX, "").split("__");
+      for (const subId of subIds) {
+        const note: PaymentNote = { id: uid("note"), text, authorName: actorName, createdAtIso: nowIso() };
+        setNotesByPayment((prev) => ({ ...prev, [subId]: [note, ...(prev[subId] ?? [])] }));
+        logActivity(subId, "note_added", "Notiță adăugată", actorName);
+      }
+      return;
+    }
     const note: PaymentNote = { id: uid("note"), text, authorName: actorName, createdAtIso: nowIso() };
     setNotesByPayment((prev) => ({ ...prev, [id]: [note, ...(prev[id] ?? [])] }));
     logActivity(id, "note_added", "Notiță adăugată", actorName);
@@ -267,12 +545,32 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addDocument = useCallback((id: string, doc: Omit<PaymentDocumentRef, "id" | "createdAtIso">) => {
+    if (id.startsWith(MERGED_ID_PREFIX)) {
+      const subIds = id.replace(MERGED_ID_PREFIX, "").split("__");
+      for (const subId of subIds) {
+        const created: PaymentDocumentRef = { ...doc, id: uid("doc"), createdAtIso: nowIso() };
+        setDocumentsByPayment((prev) => ({ ...prev, [subId]: [created, ...(prev[subId] ?? [])] }));
+        logActivity(subId, "document_added", `Document: ${created.label}`, created.createdBy);
+      }
+      return;
+    }
     const created: PaymentDocumentRef = { ...doc, id: uid("doc"), createdAtIso: nowIso() };
     setDocumentsByPayment((prev) => ({ ...prev, [id]: [created, ...(prev[id] ?? [])] }));
     logActivity(id, "document_added", `Document: ${created.label}`, created.createdBy);
   }, [logActivity]);
 
   const getActivities = useCallback((id: string): PaymentActivity[] => {
+    if (id.startsWith(MERGED_ID_PREFIX)) {
+      const subIds = id.replace(MERGED_ID_PREFIX, "").split("__");
+      const list: PaymentActivity[] = [];
+      for (const subId of subIds) {
+        const p = payments.find((x) => x.id === subId);
+        const base = p ? deriveBaseActivities(p) : [];
+        const stored = activities[subId] ?? [];
+        list.push(...stored, ...base);
+      }
+      return list.sort((a, b) => (a.createdAtIso < b.createdAtIso ? 1 : -1));
+    }
     const p = payments.find((x) => x.id === id);
     const base = p ? deriveBaseActivities(p) : [];
     const stored = activities[id] ?? [];
@@ -285,13 +583,15 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
     hydrated,
     payments, fleetPayments,
     addPayment, updatePaymentStatus,
-    setStatus, approve, markProcessing, markPaid, updatePayment, addDeduction, deletePayment,
+    setStatus, approve, markProcessing, markPaid, updatePayment, addDeduction,
+    deletePayment, deletePayments, clearPeriod, clearAllImported,
     isDeleted,
     addNote, removeNote, addDocument,
     notesByPayment, documentsByPayment, getActivities,
   }), [
     hydrated, payments, fleetPayments, addPayment, updatePaymentStatus,
-    setStatus, approve, markProcessing, markPaid, updatePayment, addDeduction, deletePayment,
+    setStatus, approve, markProcessing, markPaid, updatePayment, addDeduction,
+    deletePayment, deletePayments, clearPeriod, clearAllImported,
     isDeleted,
     addNote, removeNote, addDocument, notesByPayment, documentsByPayment, getActivities,
   ]);

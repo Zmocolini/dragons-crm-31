@@ -1,8 +1,9 @@
 "use client";
 
-import { ChevronDown, Copy, Download, FileSpreadsheet, Plus } from "lucide-react";
+import { ChevronDown, Copy, Download, FileSpreadsheet, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { MERGED_ID_PREFIX, getSiblingPaymentsForPerson, mergeDuplicatePayments } from "@/lib/payments/merge-duplicates";
 import { PaymentsKpiCards, type PaymentsKpi } from "@/components/payments/PaymentsKpiCards";
 import { PaymentsFilterBar, EMPTY_PAYMENT_FILTERS, type PaymentFilters } from "@/components/payments/PaymentsFilterBar";
 import {
@@ -15,10 +16,12 @@ import { PaymentDetailsPanel } from "@/components/payments/PaymentDetailsPanel";
 import { WeeklyQuickInput } from "@/components/payments/WeeklyQuickInput";
 import {
   AddDeductionDialog, AddPaymentDialog, BulkConfirmDialog, ChangeStatusDialog,
-  EditPaymentDialog, ExportPaymentsDialog, MarkPaidConfirmDialog,
+  ClearWeekDialog, EditPaymentDialog, ExportPaymentsDialog, MarkPaidConfirmDialog,
 } from "@/components/payments/PaymentsDialogs";
 import { ImportPlatformDialog } from "@/components/payments/ImportPlatformDialog";
 import { DuplicatePairsMenu } from "@/components/payments/DuplicatePairsMenu";
+import { WeekNavigator } from "@/components/payments/WeekNavigator";
+import { extractWeeksFromPayments, type WeekOption } from "@/lib/payments/periods";
 import type { ParserKey } from "@/lib/payments/imports";
 import { useToast } from "@/components/ui/Toast";
 import { usePayments } from "@/lib/payments/context";
@@ -28,13 +31,13 @@ import { downloadPayslip } from "@/lib/payments/payslip";
 import type { PlatformKey } from "@/lib/dashboard/types";
 import {
   DEFAULT_CURRENCY, EMPTY_BREAKDOWN, IN_PROGRESS_STATUSES, PAID_STATUSES, PAYMENT_SOURCE_DETAIL_LABEL,
-  UNPAID_STATUSES,
+  PAYMENT_STATUS_LABEL, UNPAID_STATUSES,
   calculateTotal, deductionsTotal, ibanForCourier, paymentSourceDetail, round2,
   type Currency, type Payment, type PaymentBreakdown, type PaymentSourceDetail, type PaymentStatus,
 } from "@/lib/payments/types";
 import { subcontractorFor } from "@/lib/subcontractors/name-map";
 import { useDuplicatePairs } from "@/lib/subcontractors/duplicate-pairs-context";
-import { mergeDuplicatePayments } from "@/lib/payments/merge-duplicates";
+import { areNamesEquivalent } from "@/lib/utils/name-matching";
 import { cn } from "@/lib/utils/cn";
 
 const PAGE_SIZE = 10;
@@ -106,9 +109,9 @@ function bulkConfirmProps(action: BulkAction | undefined, count: number): {
 } {
   if (action === "delete") {
     return {
-      title: "Ștergi curieri din CRM",
-      message: `Ștergi ${count} curieri împreună cu toate plățile lor. Acțiunea nu poate fi anulată.`,
-      confirmLabel: "Da, șterge curieri",
+      title: "Șterge plăți",
+      message: `Sigur dorești să ștergi ${count} plăți selectate? Acestea vor fi eliminate din tabel.`,
+      confirmLabel: "Da, șterge plățile",
     };
   }
   const label =
@@ -179,6 +182,7 @@ export default function PlatiPage() {
   const [editPayment, setEditPayment] = useState<Payment | null>(null);
   const [deductionPayment, setDeductionPayment] = useState<Payment | null>(null);
   const [bulk, setBulk] = useState<null | { action: Exclude<BulkAction, "export"> }>(null);
+  const [clearDialogOpen, setClearDialogOpen] = useState(false);
 
   // Curierii flotei active (pentru filtre, add, drawer lookup)
   const fleetCouriers = useMemo(() => allRows.filter((c) => c.tenantId === activeFleetId), [allRows, activeFleetId]);
@@ -244,6 +248,45 @@ export default function PlatiPage() {
     [syntheticPayments, realFleetPayments],
   );
 
+  // Extrage toate opțiunile de săptămâni/rapoarte distincte (strict din plăți reale / importate)
+  const availableWeeks = useMemo(() => extractWeeksFromPayments(realFleetPayments), [realFleetPayments]);
+  const [selectedWeek, setSelectedWeek] = useState<string>("auto");
+
+  // Opțiunea activă curentă din navigator (sau cel mai recent raport la "auto")
+  const activeOption = useMemo<WeekOption | null>(() => {
+    if (selectedWeek === "all") return null;
+    if (selectedWeek !== "auto") {
+      return (
+        availableWeeks.find((w) => w.key === selectedWeek) ??
+        availableWeeks.find((w) => w.startIso === selectedWeek) ??
+        availableWeeks[0] ??
+        null
+      );
+    }
+    // La "auto": dacă prima intrare este o săptămână fără plăți calculate (0 RON), dar există rapoarte reale importate, selectăm cel mai recent Cumulat cu plăți reale!
+    const bestRecent =
+      availableWeeks.find((w) => w.sourceDetail === "all" && w.count > 0 && w.totalCalculated > 0) ??
+      availableWeeks.find((w) => w.count > 0 && w.totalCalculated > 0) ??
+      availableWeeks[0] ??
+      null;
+    return bestRecent;
+  }, [selectedWeek, availableWeeks]);
+
+  const activeWeekIso = activeOption?.startIso ?? currentPeriod.startIso;
+  const activeReportSource = activeOption?.sourceDetail ?? "all";
+
+  // Plățile reale din săptămâna activă (pentru count-uri sigure de ștergere, independente de filtre)
+  const currentWeekRealPayments = useMemo(
+    () => realFleetPayments.filter((p) => p.periodStartIso === activeWeekIso),
+    [realFleetPayments, activeWeekIso],
+  );
+  const currentOptionRealPayments = useMemo(
+    () => realFleetPayments.filter(
+      (p) => p.periodStartIso === activeWeekIso && (activeReportSource === "all" || paymentSourceDetail(p.reference) === activeReportSource),
+    ),
+    [realFleetPayments, activeWeekIso, activeReportSource],
+  );
+
   // Materializează o plată sintetică într-o plată reală (o adaugă în context).
   // Se apelează înaintea oricărei acțiuni care mutează plata (approve/paid/edit/etc).
   const materialize = useCallback((p: Payment): Payment => {
@@ -283,6 +326,14 @@ export default function PlatiPage() {
     const amountMax = advanced.amountMax ? Number(advanced.amountMax) : null;
 
     return fleetPayments.filter((p) => {
+      // Izolare pe săptămână: nu aduna sumele între săptămâni diferite decât dacă e selectat explicit "all"
+      if (selectedWeek !== "all" && p.periodStartIso !== activeWeekIso) return false;
+
+      // Izolare pe raport dacă este selectat un raport specific (ex: Raport TTG Bolt vs Raport Gusty Bolt)
+      if (selectedWeek !== "all" && activeReportSource !== "all" && paymentSourceDetail(p.reference) !== activeReportSource) {
+        return false;
+      }
+
       // Basic
       if (q) {
         const hay = `${p.recipient.name} ${p.recipient.city ?? ""} ${p.ibanSnapshot ?? ""}`.toLowerCase();
@@ -321,22 +372,27 @@ export default function PlatiPage() {
       } else if (sourceFilter !== "all" && paymentSourceDetail(p.reference) !== sourceFilter) return false;
       return true;
     });
-  }, [fleetPayments, filters, advanced, fleetCouriers, sourceFilter]);
+  }, [fleetPayments, selectedWeek, activeWeekIso, activeReportSource, filters, advanced, fleetCouriers, sourceFilter]);
 
-  // Contoare per sursă (pentru afișare pe chip-uri)
+  // Contoare per sursă (pentru afișare pe chip-uri, calculate peste plățile din raportul/săptămâna selectată)
   const sourceCounts = useMemo(() => {
     const counts: Record<SourceFilterKey, number> = {
       all: 0, ttg_bolt: 0, gusty_bolt: 0, gusty_wolt: 0, gusty_glovo: 0, manual: 0,
       sub_husein: 0, double: 0,
     };
-    for (const p of fleetPayments) {
+    const scoped = selectedWeek === "all"
+      ? fleetPayments
+      : fleetPayments.filter(
+          (p) => p.periodStartIso === activeWeekIso && (activeReportSource === "all" || paymentSourceDetail(p.reference) === activeReportSource),
+        );
+    for (const p of scoped) {
       counts.all++;
       counts[paymentSourceDetail(p.reference)]++;
       if (subcontractorFor(p.recipient.name) === "HUSEIN") counts.sub_husein++;
       if (duplicateGroupFor(p.recipient.name)) counts.double++;
     }
     return counts;
-  }, [fleetPayments]);
+  }, [fleetPayments, selectedWeek, activeWeekIso, activeReportSource, duplicateGroupFor]);
 
   // ── Tab + sort ──────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
@@ -359,57 +415,122 @@ export default function PlatiPage() {
   }, [filteredNoTab, tab, sort]);
 
   // Ajustez rândurile individuale ale perechilor: taxa și/sau comisionul se
-  // scad o singură dată pe pereche — le pun pe primul rând (după createdAt),
+  // scad o singură dată pe persoană — le pun pe primul rând (după createdAt),
   // celălalt primește 0. Astfel totalul individual + totalul din merge sunt corecte.
   const round2 = (n: number) => Math.round(n * 100) / 100;
   const filteredWithPairAdjustments = useMemo(() => {
-    if (dupPairs.pairs.length === 0) return filtered;
-    const normalize = (s: string) => s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
     const byId = new Map(filtered.map((p) => [p.id, { ...p, breakdown: { ...p.breakdown } }]));
-    for (const pair of dupPairs.pairs) {
-      const a = allRows.find((c) => c.id === pair.aId);
-      const b = allRows.find((c) => c.id === pair.bId);
-      if (!a || !b) continue;
-      const aliasSet = new Set([normalize(a.fullName), normalize(b.fullName)]);
-      // Grupez plățile perechii per perioadă
-      const byPeriod = new Map<string, string[]>();
-      for (const p of filtered) {
-        if (p.recipient.kind !== "courier") continue;
-        if (!aliasSet.has(normalize(p.recipient.name))) continue;
-        const list = byPeriod.get(p.periodStartIso) ?? [];
-        list.push(p.id);
-        byPeriod.set(p.periodStartIso, list);
+
+    // Grupăm plățile per (perioadă, persoană)
+    // Persoana este identificată după grup de cont dublu sau după nume echivalent
+    const clusters: Array<{ items: Payment[]; feeOnce: number | null; commissionPct: number | null }> = [];
+    const assignedIds = new Set<string>();
+
+    for (const p of filtered) {
+      if (p.recipient.kind !== "courier" || assignedIds.has(p.id)) continue;
+      const opts = dupPairs.pairOptionsFor(p.recipient.name);
+
+      // Găsim toate plățile din aceeași săptămână care aparțin aceleiași persoane
+      const siblings = getSiblingPaymentsForPerson(p, filtered, duplicateGroupFor);
+
+      if (siblings.length >= 2) {
+        siblings.forEach((s) => assignedIds.add(s.id));
+        const courier = allRows.find((c) => c.id === p.recipient.id || areNamesEquivalent(c.fullName, p.recipient.name));
+        clusters.push({
+          items: siblings.map((s) => byId.get(s.id)!).filter(Boolean).sort((x, y) => x.createdAtIso.localeCompare(y.createdAtIso)),
+          feeOnce: opts?.feeOnce ?? courier?.weeklyContractFeeRon ?? 210,
+          commissionPct: opts?.commissionPct ?? null,
+        });
       }
-      for (const ids of byPeriod.values()) {
-        if (ids.length < 2) continue; // singur rând → nu are sens
-        // Deterministic: primul e cel mai vechi createdAt
-        const items = ids.map((id) => byId.get(id)!).sort((x, y) => x.createdAtIso.localeCompare(y.createdAtIso));
-        if (pair.feeOnce != null) {
-          items[0].breakdown.tax = round2(pair.feeOnce);
-          for (let i = 1; i < items.length; i++) items[i].breakdown.tax = 0;
-        }
-        if (pair.commissionPct != null) {
-          // FIX: comisionul se aplică pe brut+tips (nu doar pe grossRevenue fără tips).
-          const totalGross = round2(items.reduce((s, p) => s + (p.breakdown.grossRevenue || 0) + (p.breakdown.tips || 0), 0));
-          const commissionTotal = round2(totalGross * (pair.commissionPct / 100));
-          items[0].breakdown.fleetCommission = commissionTotal;
-          for (let i = 1; i < items.length; i++) items[i].breakdown.fleetCommission = 0;
-          items[0].commissionPercentage = pair.commissionPct;
-        }
-        // Recalculez totalCalculated pentru fiecare rând modificat
+    }
+
+    for (const cluster of clusters) {
+      const { items, feeOnce, commissionPct } = cluster;
+
+      // 1. Comision unificat dacă e configurat
+      if (commissionPct != null) {
         for (const it of items) {
-          const b0 = it.breakdown;
-          it.totalCalculated = round2(
-            b0.grossRevenue + b0.tips + b0.correction + b0.otherAdjustments
-            - b0.fleetCommission - b0.tax - b0.advance - b0.deductions
-            - b0.vehicleCost - b0.housingCost - b0.equipmentCost
-            - b0.guarantee - b0.penalty,
-          );
+          const gross = round2((it.breakdown.grossRevenue || 0) + (it.breakdown.tips || 0));
+          it.breakdown.fleetCommission = round2(gross * (commissionPct / 100));
+          it.commissionPercentage = commissionPct;
+        }
+      }
+
+      // 2. Alocare dinamică a taxei unice pe săptămână (se deduce o singură dată per persoană)
+      if (feeOnce != null) {
+        let feeBudget = round2(feeOnce);
+        for (const it of items) {
+          const gross = round2((it.breakdown.grossRevenue || 0) + (it.breakdown.tips || 0));
+          const comm = it.breakdown.fleetCommission || 0;
+          const ded = Math.max(0, it.breakdown.deductions || 0);
+          const otherCosts = (it.breakdown.vehicleCost || 0) + (it.breakdown.housingCost || 0) + (it.breakdown.equipmentCost || 0) + (it.breakdown.guarantee || 0) + (it.breakdown.penalty || 0) + (it.breakdown.advance || 0);
+          const available = Math.max(0, round2(gross - comm - ded - otherCosts));
+          const taxToTake = Math.min(feeBudget, available);
+          it.breakdown.tax = round2(taxToTake);
+          feeBudget = Math.max(0, round2(feeBudget - taxToTake));
+        }
+      }
+
+      // 3. Recalculare totalCalculated
+      for (const it of items) {
+        const b0 = it.breakdown;
+        const rawTotal = round2(
+          b0.grossRevenue + b0.tips + b0.correction + b0.otherAdjustments
+          - b0.fleetCommission - b0.tax - b0.advance - b0.deductions
+          - b0.vehicleCost - b0.housingCost - b0.equipmentCost
+          - b0.guarantee - b0.penalty,
+        );
+        it.totalCalculated = Math.abs(rawTotal) < 0.001 ? 0 : rawTotal;
+      }
+
+      // 4. Compensare automată a balanțelor negative (datorii către flotă) între platformele aceleiași persoane
+      // Exemplu: Curierul are -200 RON pe Wolt și +1731 RON pe Glovo.
+      // Datoria de 200 RON este compensată pe Glovo (netul Glovo devine 1531 RON),
+      // iar datoria Wolt este stinsă (netul Wolt devine 0 RON și este marcat ca plătit/stins).
+      const negativeItems = items.filter((it) => it.totalCalculated < 0);
+      const positiveItems = items.filter((it) => it.totalCalculated > 0)
+        .sort((a, b) => b.totalCalculated - a.totalCalculated);
+
+      if (negativeItems.length > 0 && positiveItems.length > 0) {
+        for (const neg of negativeItems) {
+          let debtToClear = round2(Math.abs(neg.totalCalculated));
+          if (debtToClear <= 0) continue;
+
+          for (const pos of positiveItems) {
+            if (debtToClear <= 0) break;
+            const availableInPos = Math.max(0, pos.totalCalculated);
+            if (availableInPos <= 0) continue;
+
+            const offset = Math.min(debtToClear, availableInPos);
+            if (offset > 0) {
+              pos.breakdown.deductions = round2((pos.breakdown.deductions || 0) + offset);
+              pos.totalCalculated = round2(pos.totalCalculated - offset);
+              const negPlat = neg.recipient.platform ? neg.recipient.platform.toUpperCase() : "altă platformă";
+              const posNote = `Include compensare datorie ${negPlat}: -${offset} RON`;
+              if (!pos.notes?.includes(posNote)) {
+                pos.notes = pos.notes ? `${pos.notes} · ${posNote}` : posNote;
+              }
+
+              neg.breakdown.correction = round2((neg.breakdown.correction || 0) + offset);
+              neg.totalCalculated = round2(neg.totalCalculated + offset);
+              const posPlat = pos.recipient.platform ? pos.recipient.platform.toUpperCase() : "alt raport";
+              const negNote = `Datorie de ${offset} RON stinsă prin compensare pe ${posPlat}`;
+              if (!neg.notes?.includes(negNote)) {
+                neg.notes = neg.notes ? `${neg.notes} · ${negNote}` : negNote;
+              }
+              if (neg.totalCalculated >= 0 && neg.status !== "paid") {
+                neg.status = "paid";
+              }
+
+              debtToClear = round2(debtToClear - offset);
+            }
+          }
         }
       }
     }
+
     return Array.from(byId.values());
-  }, [filtered, dupPairs.pairs, allRows]);
+  }, [filtered, dupPairs, duplicateGroupFor, allRows]);
 
   // Aplic merge pe perechile manuale; resolver-ul întoarce opțiuni per lanț.
   const displayRows = useMemo(
@@ -426,8 +547,17 @@ export default function PlatiPage() {
     }),
     [filteredWithPairAdjustments, mergePairs, dupPairs],
   );
-  // Candidați pentru picker (toate plățile cu badge 2× din pagina curent filtrată)
-  const dupCandidates = useMemo(() => filtered.filter((p) => duplicateGroupFor(p.recipient.name)), [filtered]);
+  // Candidați pentru picker (orice plată cu cont dublu sau plăți multiple pe platforme diferite)
+  const dupCandidates = useMemo(() => {
+    return filtered.filter((p) => {
+      if (duplicateGroupFor(p.recipient.name)) return true;
+      return filtered.some((other) =>
+        other.id !== p.id
+        && other.recipient.kind === "courier"
+        && areNamesEquivalent(other.recipient.name, p.recipient.name),
+      );
+    });
+  }, [filtered, duplicateGroupFor]);
 
   // Paginare (page clamped ca să nu rămână pe o pagină goală după filtrare)
   const pageCount = Math.max(1, Math.ceil(displayRows.length / PAGE_SIZE));
@@ -514,6 +644,17 @@ export default function PlatiPage() {
   }, [fleetPayments, selectedPaymentId, dupPairs]);
   const drawerCourier = useMemo(() => (selectedPayment ? fleetCouriers.find((c) => c.id === selectedPayment.recipient.id) ?? null : null), [selectedPayment, fleetCouriers]);
 
+  // Sibling payments pentru dialogurile de acțiune (marcare ca plătit / schimbare status)
+  const markPaidSiblings = useMemo(() => {
+    if (!markPaidPayment) return [];
+    return getSiblingPaymentsForPerson(markPaidPayment, fleetPayments, duplicateGroupFor);
+  }, [markPaidPayment, fleetPayments, duplicateGroupFor]);
+
+  const changeStatusSiblings = useMemo(() => {
+    if (!changeStatusPayment) return [];
+    return getSiblingPaymentsForPerson(changeStatusPayment, fleetPayments, duplicateGroupFor);
+  }, [changeStatusPayment, fleetPayments, duplicateGroupFor]);
+
   // ── Handlers ─────────────────────────────────────────────────────────────
   const toggleRow = useCallback((id: string) => {
     setSelectedIds((prev) => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
@@ -536,9 +677,9 @@ export default function PlatiPage() {
   }, [payments, user.name, toast]);
 
   const handleRowAction = useCallback((id: string, action: RowAction) => {
-    const p = fleetPayments.find((x) => x.id === id);
+    const p = displayRows.find((x) => x.id === id) ?? fleetPayments.find((x) => x.id === id);
     if (!p) return;
-    const mutates = action === "approve" || action === "processing" || action === "paid"
+    const mutates = action === "approve" || action === "processing" || action === "paid" || action === "unpaid"
       || action === "edit" || action === "add_deduction" || action === "download";
     const persisted = mutates ? materialize(p) : p;
     const pid = persisted.id;
@@ -546,15 +687,53 @@ export default function PlatiPage() {
       case "view":
       case "history":       setSelectedPaymentId(pid); break;
       case "edit":          if (canCreate) setEditPayment(persisted); break;
-      case "approve":       if (canCreate) { payments.approve(pid, user.name); toast.success("Plată aprobată", `${persisted.recipient.name} → În proces`); } break;
-      case "processing":    if (canCreate) { payments.markProcessing(pid, user.name); toast.success("Marcată în proces", persisted.recipient.name); } break;
+      case "approve":
+        if (canCreate) {
+          const siblings = getSiblingPaymentsForPerson(persisted, fleetPayments, duplicateGroupFor);
+          for (const s of siblings) {
+            payments.approve(materialize(s).id, user.name);
+          }
+          const extra = siblings.length > 1 ? ` (${siblings.length} conturi)` : "";
+          toast.success("Plată aprobată", `${persisted.recipient.name} → În proces${extra}`);
+        }
+        break;
+      case "processing":
+        if (canCreate) {
+          const siblings = getSiblingPaymentsForPerson(persisted, fleetPayments, duplicateGroupFor);
+          for (const s of siblings) {
+            payments.markProcessing(materialize(s).id, user.name);
+          }
+          const extra = siblings.length > 1 ? ` (${siblings.length} conturi)` : "";
+          toast.success("Marcată în proces", `${persisted.recipient.name}${extra}`);
+        }
+        break;
       case "paid":          if (canCreate) setMarkPaidPayment(persisted); break;
+      case "unpaid":
+        if (canCreate) {
+          const siblings = getSiblingPaymentsForPerson(persisted, fleetPayments, duplicateGroupFor);
+          const allIds = Array.from(new Set([persisted.id, ...siblings.map((s) => materialize(s).id)]));
+          for (const sid of allIds) {
+            payments.setStatus(sid, "unpaid", user.name);
+          }
+          const extra = allIds.length > 1 ? ` (${allIds.length} conturi conexe)` : "";
+          toast.success("Status actualizat", `Marcat ca neplătit${extra}.`);
+        }
+        break;
+      case "change_status":
+        if (canCreate) setChangeStatusPayment(persisted);
+        break;
       case "add_deduction": if (canCreate) setDeductionPayment(persisted); break;
       case "add_note":      setSelectedPaymentId(pid); break;
       case "download":      handleDownload(persisted); break;
       case "view_courier":  router.push(`/curieri/${persisted.recipient.id}`); break;
+      case "delete":
+        if (canCreate) {
+          payments.deletePayment(pid, user.name);
+          toast.success("Plată ștearsă", `Plata pentru ${persisted.recipient.name} a fost eliminată.`);
+        }
+        break;
     }
-  }, [fleetPayments, canCreate, payments, user.name, toast, handleDownload, router, materialize]);
+  }, [displayRows, fleetPayments, canCreate, payments, user.name, toast, handleDownload, router, materialize, duplicateGroupFor]);
 
   const handleBulk = useCallback((action: BulkAction) => {
     if (selectedIds.size === 0) return;
@@ -566,34 +745,44 @@ export default function PlatiPage() {
     if (!bulk) return;
     const src = fleetPayments;
 
-    // Pentru DELETE: ștergem curierii aferenți din CRM + șterg și plățile reale asociate lor.
-    // Sinteticele dispar automat pentru că nu mai există curier care să le genereze.
+    // Pentru DELETE: ștergem plățile selectate (inclusiv desfacem sinteticele/merged dacă e cazul).
     if (bulk.action === "delete") {
-      const courierIds = new Set<string>();
+      const allIdsToDelete: string[] = [];
       for (const id of selectedIds) {
-        const p = src.find((x) => x.id === id);
-        if (p?.recipient.kind === "courier") courierIds.add(p.recipient.id);
-      }
-      // 1. Șterge plățile reale pentru fiecare curier (nu cele sintetice — dispar singure)
-      for (const p of payments.fleetPayments) {
-        if (p.recipient.kind === "courier" && courierIds.has(p.recipient.id)) {
-          payments.deletePayment(p.id, user.name);
+        if (id.startsWith(MERGED_ID_PREFIX)) {
+          const subIds = id.replace(MERGED_ID_PREFIX, "").split("__");
+          for (const subId of subIds) allIdsToDelete.push(subId);
+        } else {
+          allIdsToDelete.push(id);
         }
       }
-      // 2. Șterge curierii înșiși
-      for (const cid of courierIds) deleteCourier(cid);
-      toast.success("Curieri șterși", `${courierIds.size} curieri eliminați din CRM (împreună cu plățile lor).`);
+      payments.deletePayments(allIdsToDelete, user.name);
+      toast.success("Plăți șterse", `${allIdsToDelete.length} plăți eliminate din listă.`);
       setBulk(null);
       setSelectedIds(new Set());
       return;
     }
 
-    // Restul acțiunilor: aplicate pe plăți (materializează sinteticele dacă e cazul).
-    const ids = Array.from(selectedIds).map((id) => {
-      const p = src.find((x) => x.id === id);
-      return p ? materialize(p).id : id;
-    });
-    for (const id of ids) {
+    // Restul acțiunilor: aplicate pe plăți (inclusiv pe sub-plățile din merged și conturi conexe).
+    const allActionIds = new Set<string>();
+    for (const id of selectedIds) {
+      if (id.startsWith(MERGED_ID_PREFIX)) {
+        const subIds = id.replace(MERGED_ID_PREFIX, "").split("__");
+        for (const subId of subIds) allActionIds.add(subId);
+      } else {
+        const p = src.find((x) => x.id === id);
+        if (p) {
+          const siblings = getSiblingPaymentsForPerson(p, src, duplicateGroupFor);
+          for (const s of siblings) {
+            allActionIds.add(materialize(s).id);
+          }
+        } else {
+          allActionIds.add(id);
+        }
+      }
+    }
+    const actionIdList = Array.from(allActionIds);
+    for (const id of actionIdList) {
       if (bulk.action === "approve") payments.approve(id, user.name);
       else if (bulk.action === "processing") payments.markProcessing(id, user.name);
       else if (bulk.action === "paid") payments.markPaid(id, user.name);
@@ -602,10 +791,10 @@ export default function PlatiPage() {
       bulk.action === "approve"    ? "aprobate" :
       bulk.action === "processing" ? "marcate în proces" :
                                      "marcate ca plătite";
-    toast.success("Operație completă", `${ids.length} plăți ${label}.`);
+    toast.success("Operație completă", `${actionIdList.length} plăți ${label}.`);
     setBulk(null);
     setSelectedIds(new Set());
-  }, [bulk, selectedIds, fleetPayments, materialize, payments, user.name, toast, deleteCourier]);
+  }, [bulk, selectedIds, fleetPayments, materialize, payments, user.name, toast, duplicateGroupFor]);
 
   // Găsește plăți duplicate: același curier + aceeași săptămână. Păstrează pe cea mai recentă.
   const duplicateGroups = useMemo(() => {
@@ -638,6 +827,25 @@ export default function PlatiPage() {
     toast.success("Duplicate șterse", `${totalDupesToDelete} plăți vechi eliminate, păstrate cele mai recente.`);
     setConfirmDedup(false);
   }, [duplicateGroups, payments, user.name, toast, totalDupesToDelete]);
+
+  const handleClearConfirm = useCallback((scope: "option" | "all_week" | "all_history") => {
+    let count = 0;
+    if (scope === "all_history") {
+      count = payments.clearAllImported(user.name);
+      toast.success("Importuri resetate", `Toate cele ${count} plăți importate au fost șterse definitiv.`);
+    } else if (scope === "option" && activeReportSource !== "all") {
+      count = payments.clearPeriod(activeWeekIso, user.name, activeReportSource);
+      toast.success("Raport șters", `Au fost eliminate ${count} plăți din ${activeOption?.reportName ?? "raport"}.`);
+    } else {
+      count = payments.clearPeriod(activeWeekIso, user.name, "all");
+      toast.success("Săptămână resetată", `Toate cele ${count} plăți din săptămâna ${activeOption?.label ?? activeWeekIso} au fost șterse.`);
+    }
+    setSelectedIds(new Set());
+    setSelectedPaymentId(null);
+    setSelectedWeek("auto");
+    setPage(1);
+  }, [payments, user.name, activeWeekIso, activeReportSource, activeOption, toast]);
+
   const exportRows = exportScope === "selected" ? fleetPayments.filter((p) => selectedIds.has(p.id)) : filtered;
 
   // ── Acces restricționat ─────────────────────────────────────────────────
@@ -684,7 +892,7 @@ export default function PlatiPage() {
                   onClick={() => setImportMenuOpen(false)}
                   className="fixed inset-0 z-40 cursor-default"
                 />
-                <div className="absolute right-0 top-full z-50 mt-1.5 min-w-[180px] overflow-hidden rounded-lg border border-line bg-card p-1 shadow-lg shadow-black/40">
+                <div className="absolute right-0 top-full z-50 mt-1.5 min-w-[200px] overflow-hidden rounded-lg border border-line bg-card p-1 shadow-lg shadow-black/40">
                   <ImportMenuItem
                     label="TTG"
                     onClick={() => { setImportGroup("ttg"); setImportPlatformOpen(true); setImportMenuOpen(false); }}
@@ -693,6 +901,15 @@ export default function PlatiPage() {
                     label="Gusty"
                     onClick={() => { setImportGroup("gusty"); setImportPlatformOpen(true); setImportMenuOpen(false); }}
                   />
+                  {currentWeekRealPayments.length > 0 && (
+                    <>
+                      <div className="my-1 border-t border-line/60" />
+                      <ImportMenuItem
+                        label={`Golește rapoartele (${currentWeekRealPayments.length} plăți)`}
+                        onClick={() => { setClearDialogOpen(true); setImportMenuOpen(false); }}
+                      />
+                    </>
+                  )}
                 </div>
               </>
             )}
@@ -703,6 +920,18 @@ export default function PlatiPage() {
               <Copy size={13} /> Curăță {totalDupesToDelete} duplicate
             </button>
           )}
+          {canCreate && selectedWeek !== "all" && currentWeekRealPayments.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setClearDialogOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-[12.5px] font-semibold text-rose-200 hover:bg-rose-500/20"
+              title={activeOption?.reportName ? `Golește ${activeOption.reportName}` : "Golește rapoartele acestei săptămâni"}
+            >
+              <Trash2 size={13} /> {activeOption?.reportName ? `Golește ${activeOption.reportName}` : "Golește săptămâna"} (
+                {currentOptionRealPayments.length > 0 ? currentOptionRealPayments.length : currentWeekRealPayments.length}
+              )
+            </button>
+          )}
           <button type="button" onClick={() => { setExportScope("filtered"); setExportOpen(true); }} disabled={!canExport}
             className={cn("inline-flex items-center gap-1.5 rounded-lg border border-line bg-card-hover px-3 py-2 text-[12.5px] font-medium text-fg hover:bg-white/[0.06]", !canExport && "opacity-50")}>
             <Download size={13} /> Exportă
@@ -710,13 +939,25 @@ export default function PlatiPage() {
         </div>
       </header>
 
+      {/* Selector Săptămână / Raport */}
+      <WeekNavigator
+        selectedWeek={selectedWeek}
+        activeWeekIso={activeWeekIso}
+        activeOption={activeOption}
+        availableWeeks={availableWeeks}
+        onSelectWeek={(w) => {
+          setSelectedWeek(w);
+          setPage(1);
+        }}
+      />
+
       <PaymentsKpiCards kpi={kpi} currency={currency} />
 
-      {canCreate && (
+      {canCreate && selectedWeek !== "all" && (
         <WeeklyQuickInput
-          rows={fleetPayments.filter((p) => p.periodStartIso === currentPeriod.startIso && p.recipient.kind === "courier")}
-          periodStartIso={currentPeriod.startIso}
-          periodEndIso={currentPeriod.endIso}
+          rows={fleetPayments.filter((p) => p.periodStartIso === activeWeekIso && (activeReportSource === "all" || paymentSourceDetail(p.reference) === activeReportSource) && p.recipient.kind === "courier")}
+          periodStartIso={activeWeekIso}
+          periodEndIso={activeOption?.endIso ?? currentPeriod.endIso}
           materialize={materialize}
           updatePayment={payments.updatePayment}
           actorName={user.name}
@@ -747,6 +988,7 @@ export default function PlatiPage() {
           onBulk={handleBulk} onClearSelection={() => setSelectedIds(new Set())}
           mergePairs={mergePairs} dupCandidates={dupCandidates}
           onCreatePair={createMergePair} onSplit={splitMerge}
+          allPayments={fleetPayments}
         />
         <div className="mt-3">
           <PaymentsPagination page={safePage} pageSize={PAGE_SIZE} total={displayRows.length} onPage={setPage} />
@@ -791,6 +1033,10 @@ export default function PlatiPage() {
         open={importPlatformOpen}
         onClose={() => setImportPlatformOpen(false)}
         onlyGroup={importGroup}
+        onImportSuccess={(newStartIso, sourceKey) => {
+          setSelectedWeek(sourceKey ? `${newStartIso}__${sourceKey}` : newStartIso);
+          setPage(1);
+        }}
       />
       <ExportPaymentsDialog
         open={exportOpen} onClose={() => setExportOpen(false)} rows={exportRows} currency={currency}
@@ -798,19 +1044,62 @@ export default function PlatiPage() {
         onExported={(count) => toast.success("Export finalizat", `${count} plăți exportate în CSV.`)}
       />
       <MarkPaidConfirmDialog
-        payment={markPaidPayment} currency={currency}
+        payment={markPaidPayment}
+        siblings={markPaidSiblings}
+        currency={currency}
         onCancel={() => setMarkPaidPayment(null)}
-        onConfirm={(id) => { payments.markPaid(id, user.name); toast.success("Plată efectuată", "Statusul a fost actualizat la Plătit."); setMarkPaidPayment(null); }}
+        onConfirm={(id, allIds) => {
+          const idsToMark = allIds && allIds.length > 0 ? allIds : [id];
+          for (const pid of idsToMark) {
+            const p = fleetPayments.find((x) => x.id === pid);
+            const realId = p ? materialize(p).id : pid;
+            payments.markPaid(realId, user.name);
+          }
+          const extraMsg = idsToMark.length > 1 ? ` (${idsToMark.length} conturi marcate ca plătite)` : "";
+          toast.success("Plată efectuată", `Statusul a fost actualizat la Plătit${extraMsg}.`);
+          setMarkPaidPayment(null);
+        }}
       />
       <ChangeStatusDialog
-        key={changeStatusPayment?.id} payment={changeStatusPayment}
+        key={changeStatusPayment?.id}
+        payment={changeStatusPayment}
+        siblings={changeStatusSiblings}
         onCancel={() => setChangeStatusPayment(null)}
-        onConfirm={(id, status) => { payments.setStatus(id, status, user.name); toast.success("Status actualizat", "Modificarea a intrat în audit log."); setChangeStatusPayment(null); }}
+        onConfirm={(id, status, allIds) => {
+          const idsToUpdate = allIds && allIds.length > 0 ? allIds : [id];
+          for (const pid of idsToUpdate) {
+            const p = fleetPayments.find((x) => x.id === pid);
+            const realId = p ? materialize(p).id : pid;
+            payments.setStatus(realId, status, user.name);
+          }
+          const extraMsg = idsToUpdate.length > 1 ? ` (${idsToUpdate.length} conturi actualizate)` : "";
+          toast.success("Status actualizat", `Statusul a fost schimbat la ${PAYMENT_STATUS_LABEL[status]}${extraMsg}.`);
+          setChangeStatusPayment(null);
+        }}
       />
       <EditPaymentDialog
         key={editPayment?.id} payment={editPayment}
         onCancel={() => setEditPayment(null)}
-        onSave={(id, patch) => { payments.updatePayment(id, patch, user.name); toast.success("Plată actualizată", "Modificările au fost salvate și auditate."); setEditPayment(null); }}
+        onSave={(id, patch) => {
+          const p = fleetPayments.find((x) => x.id === id);
+          const siblings = p ? getSiblingPaymentsForPerson(p, fleetPayments, duplicateGroupFor) : [];
+          const allIds = Array.from(new Set([id, ...siblings.map((s) => materialize(s).id)]));
+
+          if (patch.status) {
+            for (const sid of allIds) {
+              if (sid === id) {
+                payments.updatePayment(sid, patch, user.name);
+              } else {
+                payments.setStatus(sid, patch.status, user.name);
+              }
+            }
+          } else {
+            payments.updatePayment(id, patch, user.name);
+          }
+          const extra = patch.status && allIds.length > 1 ? ` (${allIds.length} conturi conexe)` : "";
+          toast.success("Plată actualizată", `Modificările au fost salvate și auditate${extra}.`);
+          setEditPayment(null);
+        }}
       />
       <AddDeductionDialog
         key={deductionPayment?.id} payment={deductionPayment}
@@ -829,6 +1118,15 @@ export default function PlatiPage() {
         confirmLabel={`Da, șterge ${totalDupesToDelete}`}
         onCancel={() => setConfirmDedup(false)}
         onConfirm={runDedup}
+      />
+      <ClearWeekDialog
+        open={clearDialogOpen}
+        onClose={() => setClearDialogOpen(false)}
+        weekLabel={activeOption?.label ?? activeWeekIso}
+        reportName={activeReportSource !== "all" ? (activeOption?.reportName ?? undefined) : undefined}
+        optionCount={currentOptionRealPayments.length}
+        totalWeekCount={currentWeekRealPayments.length}
+        onConfirmClear={handleClearConfirm}
       />
 
       {/* Filtre avansate */}

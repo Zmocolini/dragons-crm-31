@@ -203,10 +203,12 @@ export const PAYMENT_SOURCE_DETAIL_LABEL: Record<PaymentSourceDetail, string> = 
 
 export function paymentSourceDetail(reference: string | null): PaymentSourceDetail {
   const r = (reference ?? "").toLowerCase();
-  if (r.includes("ttg"))          return "ttg_bolt";
-  if (r.includes("gusty · wolt")  || r.includes("gusty wolt"))  return "gusty_wolt";
-  if (r.includes("gusty · glovo") || r.includes("gusty glovo")) return "gusty_glovo";
-  if (r.includes("gusty"))        return "gusty_bolt";
+  if (r.includes("ttg") || (r.includes("bolt") && !r.includes("gusty"))) return "ttg_bolt";
+  if (r.includes("gusty")) {
+    if (r.includes("wolt"))  return "gusty_wolt";
+    if (r.includes("glovo")) return "gusty_glovo";
+    return "gusty_bolt";
+  }
   return "manual";
 }
 

@@ -1,47 +1,50 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, ClipboardPaste, FileSpreadsheet, Info, Loader2, Search, Upload, UserPlus, Wand2 } from "lucide-react";
+import { AlertTriangle, ArrowRight, Calendar, Check, CheckCircle2, ClipboardPaste, FileSpreadsheet, Info, Loader2, Search, Upload, UserPlus, Wand2 } from "lucide-react";
 import { Dialog, DialogFooter } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
 import { useSession } from "@/lib/rbac/session";
 import { useCouriers } from "@/lib/couriers/context";
 import { usePayments } from "@/lib/payments/context";
+import {
+  getWeekInterval,
+  getPreviousWeekInterval,
+  formatWeekRange,
+  getRecentWoltCycles,
+  type WeekInterval,
+  type WoltCycle,
+} from "@/lib/payments/periods";
 import type { CourierRow } from "@/lib/couriers/mock-seed";
 import type { IncompleteFieldKey } from "@/lib/couriers/types";
-import { EMPTY_BREAKDOWN } from "@/lib/payments/types";
+import { EMPTY_BREAKDOWN, PAYMENT_SOURCE_DETAIL_LABEL, paymentSourceDetail, type Payment, type PaymentSourceDetail } from "@/lib/payments/types";
 import type { PlatformKey } from "@/lib/dashboard/types";
 import {
   PARSERS, autoDetect, autoDetectText, computeImportRowMath, defaultCommissionFor, defaultWeeklyFeeFor, getParser,
+  getSavedCourierRate, saveCourierRate, saveBatchCourierRates,
   type ParserKey, type PlatformImportRow, type PlatformParser,
 } from "@/lib/payments/imports";
+import { subcontractorFor } from "@/lib/subcontractors/name-map";
 import { useDuplicatePairs } from "@/lib/subcontractors/duplicate-pairs-context";
+import { areNamesEquivalent } from "@/lib/utils/name-matching";
 import { cn } from "@/lib/utils/cn";
 
 type Draft = PlatformImportRow & {
   matchedCourierId: string | null;
   matchMethod: "uid" | "name" | "email" | "phone" | "none";
   commissionPct: number;
+  baseFeeRon: number;
   weeklyFeeRon: number;
   grossRon: number;
   commissionRon: number;
+  nominalCommissionRon?: number;
   netRon: number;
+  feeNote?: string;
   /** Marcaj: rândul e ignorat pentru că e duplicat al altui rând din același fișier. */
   duplicateOfUid?: string;
+  debtOffset?: number;
+  negativePaymentsToClear?: Payment[];
 };
-
-/** Perioadă săptămâna curentă (Luni-Duminică) ISO local. */
-function currentWeekIso(): { start: string; end: string } {
-  const d = new Date();
-  const day = d.getDay();
-  const diffToMonday = (day === 0 ? -6 : 1 - day);
-  const monday = new Date(d);
-  monday.setDate(d.getDate() + diffToMonday);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  const iso = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, "0")}-${String(x.getDate()).padStart(2, "0")}`;
-  return { start: iso(monday), end: iso(sunday) };
-}
 
 function normalizeName(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
@@ -58,10 +61,10 @@ function matchCourier(row: PlatformImportRow, platform: PlatformKey, couriers: C
   const uidLc = row.uid.toLowerCase();
   const byUid = fleet.find((c) => platform === "bolt" && c.boltUid?.toLowerCase() === uidLc);
   if (byUid) return { id: byUid.id, method: "uid" };
-  // 2. Nume normalizat (case + diacritice + spații)
+  // 2. Nume normalizat sau inversat (ex: "Manh Cuong Tran" === "Tran Manh Cuong")
   const target = normalizeName(row.fullName);
   if (target) {
-    const byName = fleet.find((c) => normalizeName(c.fullName) === target);
+    const byName = fleet.find((c) => normalizeName(c.fullName) === target || areNamesEquivalent(c.fullName, row.fullName));
     if (byName) return { id: byName.id, method: "name" };
   }
   // 3. Email
@@ -80,25 +83,69 @@ function matchCourier(row: PlatformImportRow, platform: PlatformKey, couriers: C
 }
 
 export function ImportPlatformDialog({
-  open, onClose, onlyGroup,
+  open, onClose, onlyGroup, onImportSuccess,
 }: {
   open: boolean;
   onClose: () => void;
   /** Filtrează parserele afișate doar la grupul specificat (TTG sau Gusty). */
   onlyGroup?: "ttg" | "gusty";
+  /** Notifică pagina părinte despre săptămâna și raportul importat ca să se comute automat pe el. */
+  onImportSuccess?: (periodStartIso: string, sourceDetail?: PaymentSourceDetail) => void;
 }) {
   const toast = useToast();
   const { user, activeFleetId } = useSession();
-  const { allRows, addCourier } = useCouriers();
-  const { addPayment, payments: allPayments } = usePayments();
+  const { allRows, addCourier, updateCourier } = useCouriers();
+  const { addPayment, deletePayment, deletePayments, updatePayment, payments: allPayments } = usePayments();
   const { groupFor: duplicateGroupFor, pairOptionsFor } = useDuplicatePairs();
 
+  const prevWeek = useMemo(() => getPreviousWeekInterval(), []);
+  const currWeek = useMemo(() => getWeekInterval(), []);
+  const [periodType, setPeriodType] = useState<"prev" | "current">("prev");
+
+  // Wolt 4-cycle support
+  const woltCycles = useMemo(() => getRecentWoltCycles(), []);
+  const [selectedWoltIso, setSelectedWoltIso] = useState<string>(() => woltCycles.completedCycle.startIso);
+
   const [platform, setPlatform] = useState<ParserKey | "auto">("auto");
+  const [resolvedParser, setResolvedParser] = useState<PlatformParser | null>(null);
+
+  const isWolt = resolvedParser?.platform === "wolt" && resolvedParser?.group !== "gusty";
+
+  const selectedWoltCycle = useMemo(() => {
+    return woltCycles.allCycles.find((c) => c.startIso === selectedWoltIso) ?? woltCycles.completedCycle;
+  }, [woltCycles, selectedWoltIso]);
+
+  const activePeriod = useMemo(() => {
+    if (isWolt) {
+      return {
+        startIso: selectedWoltCycle.startIso,
+        endIso: selectedWoltCycle.endIso,
+        label: selectedWoltCycle.label,
+        shortBadge: selectedWoltCycle.shortBadge,
+        isCurrent: selectedWoltCycle.startIso === woltCycles.currentCycle.startIso,
+        woltCycle: selectedWoltCycle,
+      };
+    }
+    const w = periodType === "current" ? currWeek : prevWeek;
+    return {
+      startIso: w.startIso,
+      endIso: w.endIso,
+      label: w.label,
+      shortBadge: w.shortBadge,
+      isCurrent: periodType === "current",
+      woltCycle: null as WoltCycle | null,
+    };
+  }, [isWolt, selectedWoltCycle, woltCycles.currentCycle.startIso, periodType, currWeek, prevWeek]);
+
   // Când open devine true sau se schimbă grupul, resetează
   useEffect(() => {
-    if (open) setPlatform("auto");
-  }, [open, onlyGroup]);
-  const [resolvedParser, setResolvedParser] = useState<PlatformParser | null>(null);
+    if (open) {
+      setPlatform("auto");
+      setPeriodType("prev");
+      setSelectedWoltIso(woltCycles.completedCycle.startIso);
+    }
+  }, [open, onlyGroup, woltCycles.completedCycle.startIso]);
+
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
   const [creatingNew, setCreatingNew] = useState<Set<string>>(new Set());
@@ -111,48 +158,135 @@ export function ImportPlatformDialog({
   const handleClose = () => {
     setDrafts([]); setSkipped(new Set()); setCreatingNew(new Set()); setResolvedParser(null);
     setError(null); setStep("upload"); setImported(null); setBusy(false); setPlatform("auto");
+    setPeriodType("prev"); setSelectedWoltIso(woltCycles.completedCycle.startIso);
     onClose();
   };
 
   function buildDrafts(parser: PlatformParser, parsed: PlatformImportRow[]) {
     setResolvedParser(parser);
-    // Perioada curentă (aceeași folosită la confirmImport)
-    const { start: currentStart } = currentWeekIso();
+    const isWoltParser = parser.platform === "wolt" && parser.group !== "gusty";
+    const currentStart = isWoltParser ? selectedWoltCycle.startIso : (periodType === "current" ? currWeek.startIso : prevWeek.startIso);
+
     // Dedupe INTRA-FIȘIER: dacă același UID apare de mai multe ori, îl păstrez pe primul.
     const seenUids = new Set<string>();
-    // Verificare conturi duble: dacă persoana e într-o pereche cu unifyFee=true
-    // și are deja o plată în perioadă pe alt alias, taxa se aplică o singură dată.
-    const feeAlreadyPaidForPerson = (fullName: string): boolean => {
+    const round2 = (n: number) => Math.round(n * 100) / 100;
+
+    // Calcul dinamic al restului de taxă săptămânală pe persoană:
+    // Dacă persoana are deja plăți înregistrate în această perioadă (pe alt raport, ex: Bolt TTG),
+    // scădem din taxa contractuală/țintă (ex: 300 RON) ce s-a reținut deja (ex: 270 RON sau 100 RON),
+    // iar pe raportul curent (ex: Glovo) reținem doar diferența rămasă (ex: 30 RON sau 200 RON).
+    // Dacă s-a atins deja taxa totală, pe raportul curent taxa devine automat 0 RON.
+    const getPersonFeeStatus = (fullName: string, courierId: string | null) => {
       const opts = pairOptionsFor(fullName);
-      if (opts?.feeOnce == null) return false;
       const group = duplicateGroupFor(fullName);
-      if (!group) return false;
-      const aliasNames = new Set(group.aliases.map((a) => normalizeName(a.name)));
-      return allPayments.some((p) =>
-        p.fleetId === activeFleetId
-        && p.periodStartIso === currentStart
-        && p.recipient.kind === "courier"
-        && aliasNames.has(normalizeName(p.recipient.name)),
-      );
+      const aliasNames = group ? new Set(group.aliases.map((a) => normalizeName(a.name))) : new Set<string>();
+      aliasNames.add(normalizeName(fullName));
+
+      const courier = courierId ? allRows.find((c) => c.id === courierId) : allRows.find((c) => areNamesEquivalent(c.fullName, fullName));
+      const savedRate = getSavedCourierRate(fullName);
+      const targetFee = opts?.feeOnce ?? savedRate?.weeklyFeeRon ?? courier?.weeklyContractFeeRon ?? defaultWeeklyFeeFor(fullName);
+
+      // Găsim plățile existente din această perioadă pentru aceeași persoană
+      const matchingPayments = allPayments.filter((p) => {
+        if (p.periodStartIso !== currentStart || p.recipient.kind !== "courier") return false;
+        if (courierId && p.recipient.id === courierId) return true;
+        if (courier && p.recipient.id === courier.id) return true;
+        const pNorm = normalizeName(p.recipient.name);
+        if (aliasNames.has(pNorm)) return true;
+        if (areNamesEquivalent(p.recipient.name, fullName)) return true;
+        return false;
+      });
+
+      const alreadyPaidFee = round2(matchingPayments.reduce((s, p) => s + (p.breakdown.tax || 0), 0));
+      const remainingFee = Math.max(0, round2(targetFee - alreadyPaidFee));
+
+      let feeNote: string | undefined = undefined;
+      if (alreadyPaidFee > 0) {
+        const srcLabels = Array.from(
+          new Set(
+            matchingPayments.map((p) => {
+              const d = paymentSourceDetail(p.reference);
+              return PAYMENT_SOURCE_DETAIL_LABEL[d] ?? "alt raport";
+            }),
+          ),
+        ).join(", ");
+
+        if (remainingFee === 0) {
+          feeNote = `Taxă achitată integral (${alreadyPaidFee} RON pe ${srcLabels})`;
+        } else {
+          feeNote = `Rest taxă: ${remainingFee} RON (${alreadyPaidFee} RON deja reținuți pe ${srcLabels})`;
+        }
+      }
+
+      // Verificăm dacă persoana are balanțe negative (datorii) neachitate de pe alte platforme în aceeași perioadă
+      const negativeMatching = matchingPayments.filter((p) => p.totalCalculated < 0);
+      const priorDebt = round2(negativeMatching.reduce((s, p) => s + Math.abs(p.totalCalculated), 0));
+      let debtSourceLabels: string | undefined = undefined;
+      if (priorDebt > 0) {
+        debtSourceLabels = Array.from(
+          new Set(
+            negativeMatching.map((p) => {
+              const d = paymentSourceDetail(p.reference);
+              return PAYMENT_SOURCE_DETAIL_LABEL[d] ?? p.recipient.platform?.toUpperCase() ?? "alt raport";
+            }),
+          ),
+        ).join(", ");
+      }
+
+      return {
+        alreadyPaidFee,
+        targetFee,
+        remainingFee,
+        feeNote,
+        priorDebt,
+        debtSourceLabels,
+        negativePayments: negativeMatching,
+      };
     };
+
     const nextDrafts: Draft[] = parsed.map((r) => {
       const match = matchCourier(r, parser.platform, allRows, activeFleetId);
       const courier = match ? allRows.find((c) => c.id === match.id) : null;
-      const pct = courier?.commissionPct ?? defaultCommissionFor(r.fullName);
-      const baseFee = courier?.weeklyContractFeeRon ?? defaultWeeklyFeeFor(r.fullName);
-      const fee = feeAlreadyPaidForPerson(r.fullName) ? 0 : baseFee;
-      const derived = computeImportRowMath(r, pct, fee);
+      const savedRate = getSavedCourierRate(r.fullName);
+      const isHusein = subcontractorFor(r.fullName) === "HUSEIN";
+      let pct = savedRate?.commissionPct ?? courier?.commissionPct ?? defaultCommissionFor(r.fullName);
+      if (isHusein && pct === 9) pct = 0; // Protecție seed legacy pe curierii Husein
+      const feeStatus = getPersonFeeStatus(r.fullName, match?.id ?? null);
+      const fee = feeStatus.remainingFee;
+
+      // Calculăm inițial venitul disponibil pe raportul curent
+      const initialMath = computeImportRowMath(r, pct, fee);
+      const availableNet = Math.max(0, initialMath.netRon);
+      const priorDebt = feeStatus.priorDebt || 0;
+      const debtOffset = Math.min(priorDebt, availableNet);
+
+      // Dacă există o datorie de pe altă platformă (ex: Wolt -200 RON), o adăugăm la balanța negativă
+      const effectiveNegativeBalance = round2(r.negativeBalanceRon + debtOffset);
+      const adjustedRow: PlatformImportRow = debtOffset > 0 ? { ...r, negativeBalanceRon: effectiveNegativeBalance } : r;
+      const derived = computeImportRowMath(adjustedRow, pct, fee);
+
+      let finalFeeNote = feeStatus.feeNote;
+      if (debtOffset > 0) {
+        const debtTxt = `Include recuperare datorie ${debtOffset} RON de pe ${feeStatus.debtSourceLabels ?? "alt raport"}`;
+        finalFeeNote = finalFeeNote ? `${finalFeeNote} · ${debtTxt}` : debtTxt;
+      }
+
       const uidKey = r.uid.toLowerCase();
       const isDupInFile = seenUids.has(uidKey);
       if (!isDupInFile) seenUids.add(uidKey);
       return {
         ...r,
+        negativeBalanceRon: effectiveNegativeBalance,
         matchedCourierId: match?.id ?? null,
         matchMethod: match?.method ?? "none",
         commissionPct: pct,
-        weeklyFeeRon: fee,
+        baseFeeRon: fee,
+        weeklyFeeRon: derived.effectiveFeeRon,
+        feeNote: finalFeeNote,
         ...derived,
         duplicateOfUid: isDupInFile ? r.uid : undefined,
+        debtOffset,
+        negativePaymentsToClear: feeStatus.negativePayments,
       };
     });
     // Marchez auto skip pentru duplicate din fișier
@@ -246,9 +380,33 @@ export function ImportPlatformDialog({
   function updateDraft(uid: string, patch: Partial<Pick<Draft, "commissionPct" | "weeklyFeeRon">>) {
     setDrafts((prev) => prev.map((d) => {
       if (d.uid !== uid) return d;
-      const merged = { ...d, ...patch };
-      const derived = computeImportRowMath(merged, merged.commissionPct, merged.weeklyFeeRon);
-      return { ...merged, ...derived };
+      const newPct = patch.commissionPct !== undefined ? patch.commissionPct : d.commissionPct;
+      const requestedFee = patch.weeklyFeeRon !== undefined ? patch.weeklyFeeRon : d.baseFeeRon;
+      const derived = computeImportRowMath(d, newPct, requestedFee);
+
+      // Persistă rata în cache-ul persistent de preferințe curier
+      if (d.fullName) {
+        saveCourierRate(d.fullName, {
+          ...(patch.commissionPct !== undefined ? { commissionPct: newPct } : {}),
+          ...(patch.weeklyFeeRon !== undefined ? { weeklyFeeRon: requestedFee } : {}),
+        });
+      }
+
+      // Dacă curierul e deja creat/mapat în CRM, actualizează profilul în context
+      if (d.matchedCourierId) {
+        updateCourier(d.matchedCourierId, {
+          ...(patch.commissionPct !== undefined ? { commissionPct: newPct } : {}),
+          ...(patch.weeklyFeeRon !== undefined ? { weeklyContractFeeRon: requestedFee } : {}),
+        });
+      }
+
+      return {
+        ...d,
+        commissionPct: newPct,
+        weeklyFeeRon: derived.effectiveFeeRon,
+        baseFeeRon: patch.weeklyFeeRon !== undefined ? requestedFee : d.baseFeeRon,
+        ...derived,
+      };
     }));
   }
 
@@ -263,7 +421,8 @@ export function ImportPlatformDialog({
     const active = drafts.filter((d) => !skipped.has(d.uid));
     const totalGross = active.reduce((s, d) => s + d.grossRon, 0);
     const totalCommission = active.reduce((s, d) => s + d.commissionRon, 0);
-    const totalNet = active.reduce((s, d) => s + d.netRon, 0);
+    const totalNet = active.reduce((s, d) => s + Math.max(0, d.netRon), 0);
+    const totalCashDebt = active.reduce((s, d) => s + (d.netRon < 0 ? Math.abs(d.netRon) : 0), 0);
     const matched = active.filter((d) => d.matchedCourierId).length;
     const willCreate = active.filter((d) => !d.matchedCourierId && creatingNew.has(d.uid)).length;
     const noMatchIgnored = active.filter((d) => !d.matchedCourierId && !creatingNew.has(d.uid)).length;
@@ -271,6 +430,7 @@ export function ImportPlatformDialog({
       totalRows: drafts.length, active: active.length, skipped: skipped.size,
       matched, willCreate, noMatchIgnored,
       totalGross: round2(totalGross), totalCommission: round2(totalCommission), totalNet: round2(totalNet),
+      totalCashDebt: round2(totalCashDebt),
     };
   }, [drafts, skipped, creatingNew]);
 
@@ -279,8 +439,30 @@ export function ImportPlatformDialog({
     setBusy(true);
     let newCouriers = 0;
     let paymentsCount = 0;
-    const { start: periodStart, end: periodEnd } = currentWeekIso();
+    const periodStart = activePeriod.startIso;
+    const periodEnd = activePeriod.endIso;
     const platformKey = resolvedParser.platform;
+    const paymentDate = resolvedParser.platform === "wolt" && activePeriod.woltCycle
+      ? activePeriod.woltCycle.invoiceDateIso
+      : periodEnd;
+
+    // Curăță plăți existente anterior din acest raport pentru aceeași săptămână/ciclu (evităm dublarea la re-import)
+    const targetSource =
+      resolvedParser.group === "ttg" ? "ttg_bolt" :
+      resolvedParser.platform === "wolt" ? "gusty_wolt" :
+      resolvedParser.platform === "glovo" ? "gusty_glovo" : "gusty_bolt";
+
+    const existingMatches = allPayments.filter(
+      (p) => p.fleetId === activeFleetId
+        && p.periodStartIso === periodStart
+        && (paymentSourceDetail(p.reference) === targetSource || (p.reference ?? "").toLowerCase().includes(resolvedParser.label.toLowerCase())),
+    );
+    if (existingMatches.length > 0) {
+      deletePayments(existingMatches.map((p) => p.id), user.name);
+    }
+
+    const ratesToBatchSave: Array<{ fullName: string; commissionPct: number; weeklyFeeRon: number }> = [];
+
     for (const d of drafts) {
       if (skipped.has(d.uid)) continue;
       let courierId = d.matchedCourierId;
@@ -291,6 +473,20 @@ export function ImportPlatformDialog({
         newCouriers++;
       }
       if (!courierId) continue;
+
+      // Actualizăm și persistăm profilul curierului cu comisionul % și taxa contract din acest import
+      updateCourier(courierId, {
+        commissionPct: d.commissionPct,
+        weeklyContractFeeRon: d.baseFeeRon,
+      });
+      if (d.fullName) {
+        ratesToBatchSave.push({
+          fullName: d.fullName,
+          commissionPct: d.commissionPct,
+          weeklyFeeRon: d.baseFeeRon,
+        });
+      }
+
       const courier = allRows.find((c) => c.id === courierId);
       if (courier) courierCity = courier.city;
       addPayment({
@@ -307,7 +503,7 @@ export function ImportPlatformDialog({
         type: "courier_pay",
         periodStartIso: periodStart,
         periodEndIso: periodEnd,
-        paymentDateIso: periodEnd,
+        paymentDateIso: paymentDate,
         method: "bank_transfer",
         breakdown: {
           ...EMPTY_BREAKDOWN,
@@ -320,8 +516,8 @@ export function ImportPlatformDialog({
         amountPaid: 0,
         totalCalculated: d.netRon,
         status: "unpaid",
-        reference: `${resolvedParser.label} import · UID ${d.uid}`,
-        notes: `Import automat din raport ${resolvedParser.label} (perioada ${periodStart} → ${periodEnd}).`,
+        reference: `${resolvedParser.label} · ${activePeriod.shortBadge} · UID ${d.uid}`,
+        notes: `Import raport ${resolvedParser.label} (perioada ${periodStart} → ${periodEnd}${activePeriod.woltCycle ? `, factură emisă ${activePeriod.woltCycle.invoiceDateIso}` : ""})${d.feeNote ? ` · ${d.feeNote}` : ""}${d.baseFeeRon > d.weeklyFeeRon ? ` · Taxă contract ${d.baseFeeRon} RON plafonată la ${d.weeklyFeeRon} RON (venit disponibil)` : ""}${d.nominalCommissionRon !== undefined && d.nominalCommissionRon > d.commissionRon ? ` · Comision contractual ${d.nominalCommissionRon.toFixed(2)} RON redus la ${d.commissionRon.toFixed(2)} RON (venit disponibil)` : ""}${d.netRon < 0 ? ` · Curierul datorează cash flotei: ${Math.abs(d.netRon).toFixed(2)} RON` : ""}.`,
         overrideReason: null,
         ordersCount: d.ordersCount,
         platforms: [platformKey],
@@ -329,13 +525,56 @@ export function ImportPlatformDialog({
         currency: "RON",
         ibanSnapshot: courier?.iban ?? null,
         operatorName: user.name,
+        createdBy: user.name || "Sistem",
       });
       paymentsCount++;
+
+      // Stingere datorii anterioare de pe alte rapoarte dacă au fost recuperate din acest import
+      if (d.debtOffset && d.debtOffset > 0 && d.negativePaymentsToClear && d.negativePaymentsToClear.length > 0) {
+        let remainingOffset = d.debtOffset;
+        for (const negP of d.negativePaymentsToClear) {
+          if (remainingOffset <= 0) break;
+          const negDebt = round2(Math.abs(negP.totalCalculated));
+          const take = Math.min(remainingOffset, negDebt);
+          if (take > 0) {
+            const newTotal = round2(negP.totalCalculated + take);
+            updatePayment(
+              negP.id,
+              {
+                breakdown: {
+                  ...negP.breakdown,
+                  correction: round2((negP.breakdown.correction || 0) + take),
+                },
+                totalCalculated: newTotal,
+                status: newTotal >= 0 ? "paid" : negP.status,
+                notes: `${negP.notes || ""} · Datorie de ${take} RON stinsă prin compensare pe raportul ${resolvedParser.label} (UID ${d.uid})`.trim(),
+              },
+              user.name || "Sistem",
+            );
+            remainingOffset = round2(remainingOffset - take);
+          }
+        }
+      }
     }
+
+    if (ratesToBatchSave.length > 0) {
+      saveBatchCourierRates(ratesToBatchSave);
+    }
+
     setImported({ paymentsCount, newCouriers });
     setStep("done");
     setBusy(false);
     toast.success("Import finalizat", `${paymentsCount} plăți create, ${newCouriers} curieri noi.`);
+    const parserKey = resolvedParser.key;
+    const reportSourceDetail: PaymentSourceDetail =
+      resolvedParser.group === "ttg" || parserKey === "bolt_ttg"
+        ? "ttg_bolt"
+        : parserKey === "wolt_gusty"
+        ? "gusty_wolt"
+        : parserKey === "glovo_gusty"
+        ? "gusty_glovo"
+        : "gusty_bolt";
+    onImportSuccess?.(periodStart, reportSourceDetail);
   }
 
   return (
@@ -356,6 +595,15 @@ export function ImportPlatformDialog({
       {step === "preview" && resolvedParser && (
         <PreviewStep
           parserLabel={resolvedParser.label}
+          isWolt={isWolt}
+          activePeriod={activePeriod}
+          periodType={periodType}
+          onPeriodTypeChange={setPeriodType}
+          prevWeek={prevWeek}
+          currWeek={currWeek}
+          woltCycles={woltCycles}
+          selectedWoltIso={selectedWoltIso}
+          onWoltCycleChange={setSelectedWoltIso}
           drafts={drafts}
           skipped={skipped}
           creatingNew={creatingNew}
@@ -598,14 +846,25 @@ function PlatformChip({ active, onClick, label, icon, ready }: {
 }
 
 function PreviewStep({
-  parserLabel, drafts, skipped, creatingNew, summary,
+  parserLabel, isWolt, activePeriod, periodType, onPeriodTypeChange, prevWeek, currWeek,
+  woltCycles, selectedWoltIso, onWoltCycleChange,
+  drafts, skipped, creatingNew, summary,
   onUpdate, onToggleSkip, onToggleCreate, onBack, onConfirm, busy,
 }: {
   parserLabel: string;
+  isWolt: boolean;
+  activePeriod: { startIso: string; endIso: string; label: string; shortBadge: string; isCurrent?: boolean; woltCycle?: WoltCycle | null };
+  periodType: "prev" | "current";
+  onPeriodTypeChange: (t: "prev" | "current") => void;
+  prevWeek: WeekInterval;
+  currWeek: WeekInterval;
+  woltCycles: { completedCycle: WoltCycle; currentCycle: WoltCycle; allCycles: WoltCycle[] };
+  selectedWoltIso: string;
+  onWoltCycleChange: (iso: string) => void;
   drafts: Draft[];
   skipped: Set<string>;
   creatingNew: Set<string>;
-  summary: { totalRows: number; active: number; skipped: number; matched: number; willCreate: number; noMatchIgnored: number; totalGross: number; totalCommission: number; totalNet: number };
+  summary: { totalRows: number; active: number; skipped: number; matched: number; willCreate: number; noMatchIgnored: number; totalGross: number; totalCommission: number; totalNet: number; totalCashDebt: number };
   onUpdate: (uid: string, patch: Partial<Pick<Draft, "commissionPct" | "weeklyFeeRon">>) => void;
   onToggleSkip: (uid: string) => void;
   onToggleCreate: (uid: string) => void;
@@ -614,13 +873,148 @@ function PreviewStep({
   busy: boolean;
 }) {
   const [search, setSearch] = useState("");
-  const filtered = drafts.filter((d) => {
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    return d.fullName.toLowerCase().includes(q) || d.uid.toLowerCase().includes(q);
-  });
+  const [focusedUid, setFocusedUid] = useState<string | null>(null);
+  const [configuredUids, setConfiguredUids] = useState<Set<string>>(new Set());
+  const [onlyNew, setOnlyNew] = useState(false);
+
+  const newCouriers = useMemo(() => {
+    return drafts.filter((d) => !d.matchedCourierId && !d.duplicateOfUid && !skipped.has(d.uid));
+  }, [drafts, skipped]);
+
+  const handleUpdate = (uid: string, patch: Partial<Pick<Draft, "commissionPct" | "weeklyFeeRon">>) => {
+    setConfiguredUids((prev) => new Set(prev).add(uid));
+    onUpdate(uid, patch);
+  };
+
+  const handleScrollToCourier = (uid: string) => {
+    setFocusedUid(uid);
+    if (search.trim()) setSearch("");
+    setTimeout(() => {
+      const rowEl = document.getElementById(`draft-row-${uid}`);
+      if (rowEl) {
+        rowEl.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+      const inputEl = document.getElementById(`draft-comm-${uid}`) as HTMLInputElement;
+      if (inputEl) {
+        inputEl.focus();
+        inputEl.select();
+      }
+    }, 60);
+  };
+
+  const filtered = useMemo(() => {
+    return drafts.filter((d) => {
+      if (onlyNew && (d.matchedCourierId || d.duplicateOfUid)) return false;
+      const q = search.trim().toLowerCase();
+      if (!q) return true;
+      return d.fullName.toLowerCase().includes(q) || d.uid.toLowerCase().includes(q);
+    });
+  }, [drafts, onlyNew, search]);
   return (
     <div className="flex flex-col gap-3">
+      {/* Selector Perioadă Raport */}
+      <div className={cn(
+        "flex flex-wrap items-center justify-between gap-3 rounded-xl border p-3",
+        isWolt
+          ? "border-sky-500/40 bg-gradient-to-r from-sky-950/40 via-card to-card"
+          : "border-violet-500/40 bg-gradient-to-r from-violet-950/40 via-card to-card",
+      )}>
+        <div className="flex items-center gap-2.5">
+          <div className={cn(
+            "flex h-9 w-9 shrink-0 items-center justify-center rounded-lg",
+            isWolt ? "bg-sky-500/20 text-sky-300" : "bg-violet-500/20 text-violet-300",
+          )}>
+            <Calendar size={18} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-[12.5px] font-bold text-fg">
+                {isWolt ? "Ciclu Wolt: " : "Perioada raportului: "}
+                <span className={isWolt ? "text-sky-300" : "text-violet-300"}>{activePeriod.label}</span>
+              </span>
+              {isWolt && (
+                <span className="rounded-full border border-sky-500/40 bg-sky-500/10 px-2 py-0.5 text-[10px] font-semibold text-sky-300">
+                  4 cicluri / lună
+                </span>
+              )}
+            </div>
+            <div className="text-[11px] text-fg-muted">
+              {isWolt
+                ? "Wolt emite autofacturi pe 8, 16, 23 și 1 a lunii. Plățile sunt calculate strict pe ciclu."
+                : "Plățile vor fi înregistrate strict în această săptămână și nu se vor cumula cu rapoartele anterioare."}
+            </div>
+          </div>
+        </div>
+
+        {isWolt ? (
+          <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-line bg-card-2 p-1">
+            <button
+              type="button"
+              onClick={() => onWoltCycleChange(woltCycles.completedCycle.startIso)}
+              title={`Autofactură emisă pe ${woltCycles.completedCycle.invoiceDateIso}`}
+              className={cn(
+                "rounded-md px-3 py-1 text-[11.5px] font-medium transition-colors",
+                selectedWoltIso === woltCycles.completedCycle.startIso
+                  ? "bg-sky-600 font-semibold text-white shadow-sm"
+                  : "text-fg-muted hover:text-fg",
+              )}
+            >
+              Ciclu facturat ({woltCycles.completedCycle.shortBadge})
+            </button>
+            <button
+              type="button"
+              onClick={() => onWoltCycleChange(woltCycles.currentCycle.startIso)}
+              className={cn(
+                "rounded-md px-3 py-1 text-[11.5px] font-medium transition-colors",
+                selectedWoltIso === woltCycles.currentCycle.startIso
+                  ? "bg-sky-600 font-semibold text-white shadow-sm"
+                  : "text-fg-muted hover:text-fg",
+              )}
+            >
+              Ciclu în curs ({woltCycles.currentCycle.shortBadge})
+            </button>
+            <select
+              value={selectedWoltIso}
+              onChange={(e) => onWoltCycleChange(e.target.value)}
+              className="rounded-md border border-line bg-card px-2 py-1 text-[11.5px] font-medium text-fg focus:outline-none cursor-pointer"
+            >
+              {woltCycles.allCycles.map((c) => (
+                <option key={c.startIso} value={c.startIso}>
+                  {c.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 rounded-lg border border-line bg-card-2 p-1">
+            <button
+              type="button"
+              onClick={() => onPeriodTypeChange("prev")}
+              className={cn(
+                "rounded-md px-3 py-1 text-[11.5px] font-medium transition-colors",
+                periodType === "prev"
+                  ? "bg-violet-600 font-semibold text-white shadow-sm"
+                  : "text-fg-muted hover:text-fg",
+              )}
+            >
+              Săpt. anterioară ({prevWeek.shortBadge})
+            </button>
+            <button
+              type="button"
+              onClick={() => onPeriodTypeChange("current")}
+              className={cn(
+                "rounded-md px-3 py-1 text-[11.5px] font-medium transition-colors",
+                periodType === "current"
+                  ? "bg-violet-600 font-semibold text-white shadow-sm"
+                  : "text-fg-muted hover:text-fg",
+              )}
+            >
+              Săpt. curentă ({currWeek.shortBadge})
+            </button>
+          </div>
+        )}
+      </div>
+
       <div className="text-[11.5px] text-fg-muted">
         Sursă: <b className="text-fg">{parserLabel}</b>
       </div>
@@ -628,7 +1022,12 @@ function PreviewStep({
         <SummaryCard label="Rânduri" value={String(summary.active)} sub={`din ${summary.totalRows}`} tone="sky" />
         <SummaryCard label="Brut total" value={`${summary.totalGross.toFixed(2)}`} sub="RON" tone="emerald" />
         <SummaryCard label="Comision total" value={`${summary.totalCommission.toFixed(2)}`} sub="RON" tone="amber" />
-        <SummaryCard label="Net de plată" value={`${summary.totalNet.toFixed(2)}`} sub="RON" tone="violet" />
+        <SummaryCard
+          label="Net de plată"
+          value={`${summary.totalNet.toFixed(2)}`}
+          sub={summary.totalCashDebt > 0 ? `RON · ${summary.totalCashDebt.toFixed(2)} datorii cash` : "RON"}
+          tone="violet"
+        />
       </div>
       <div className="flex flex-wrap gap-2 text-[11px]">
         <StatusChip icon={<CheckCircle2 size={11} />} label={`${summary.matched} găsiți`} tone="emerald" />
@@ -638,16 +1037,41 @@ function PreviewStep({
       </div>
 
       {/* Panou dedicat: curieri noi care vor fi adăugați în baza de date */}
-      <NewCouriersPanel drafts={drafts} skipped={skipped} creatingNew={creatingNew} onToggleCreate={onToggleCreate} />
-      <div className="relative">
-        <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-dim" />
-        <input
-          type="text"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Caută nume sau UID…"
-          className="w-full rounded-md border border-line bg-card-2 py-1.5 pl-8 pr-2.5 text-[12px] text-fg placeholder:text-fg-dim focus:border-violet-500/60 focus:outline-none"
-        />
+      <NewCouriersPanel
+        drafts={drafts}
+        skipped={skipped}
+        creatingNew={creatingNew}
+        onToggleCreate={onToggleCreate}
+        onSelectCourier={handleScrollToCourier}
+        focusedUid={focusedUid}
+        configuredUids={configuredUids}
+      />
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-fg-dim" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Caută nume sau UID…"
+            className="w-full rounded-md border border-line bg-card-2 py-1.5 pl-8 pr-2.5 text-[12px] text-fg placeholder:text-fg-dim focus:border-violet-500/60 focus:outline-none"
+          />
+        </div>
+        {newCouriers.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setOnlyNew((v) => !v)}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-[11.5px] font-semibold transition-all whitespace-nowrap cursor-pointer",
+              onlyNew
+                ? "border-amber-400 bg-amber-400/20 text-amber-200 shadow-sm"
+                : "border-line bg-card-2 text-fg-muted hover:border-amber-400/50 hover:text-amber-200",
+            )}
+          >
+            <UserPlus size={13} />
+            {onlyNew ? "Afișează toți" : `Doar curieri noi (${newCouriers.length})`}
+          </button>
+        )}
       </div>
       <div className="max-h-[50vh] overflow-auto rounded-lg border border-line">
         <table className="w-full min-w-[720px] text-[11.5px]">
@@ -667,31 +1091,153 @@ function PreviewStep({
               const isSkipped = skipped.has(d.uid);
               const willCreate = !d.matchedCourierId && creatingNew.has(d.uid);
               const noMatchNoCreate = !d.matchedCourierId && !creatingNew.has(d.uid);
+              const isFocused = focusedUid === d.uid;
               return (
-                <tr key={d.uid} className={cn("border-b border-line/60", isSkipped && "opacity-40")}>
+                <tr
+                  key={d.uid}
+                  id={`draft-row-${d.uid}`}
+                  className={cn(
+                    "border-b border-line/60 transition-colors duration-300",
+                    isSkipped && "opacity-40",
+                    isFocused && "bg-amber-500/[0.14] ring-2 ring-inset ring-amber-400/90 shadow-md",
+                  )}
+                >
                   <td className="px-2 py-1.5">
-                    <div className="font-semibold text-fg">{d.fullName}</div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-semibold text-fg">{d.fullName}</span>
+                      {willCreate && (
+                        <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9.5px] font-bold text-amber-300 uppercase tracking-wider">
+                          Nou
+                        </span>
+                      )}
+                    </div>
                     <div className="font-mono text-[10px] text-fg-dim">{d.uid}</div>
+                    <div className="mt-1 flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleUpdate(d.uid, { commissionPct: 0, weeklyFeeRon: 0 })}
+                        title="Setează 0% comision + 0 RON taxă (ex. Husein / acord special — reținut pentru viitor)"
+                        className={cn(
+                          "rounded px-1.5 py-0.5 text-[9px] font-semibold transition-all cursor-pointer",
+                          d.commissionPct === 0 && d.baseFeeRon === 0
+                            ? "bg-emerald-500/30 border border-emerald-400 text-emerald-200 shadow-sm"
+                            : "bg-card border border-line text-fg-muted hover:text-emerald-200 hover:border-emerald-500/50",
+                        )}
+                      >
+                        0% + 0
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdate(d.uid, { commissionPct: 3, weeklyFeeRon: 0 })}
+                        title="Setează acord special: 3% comision + 0 RON taxă (reținut pentru viitor)"
+                        className={cn(
+                          "rounded px-1.5 py-0.5 text-[9px] font-semibold transition-all cursor-pointer",
+                          d.commissionPct === 3 && d.weeklyFeeRon === 0
+                            ? "bg-sky-500/30 border border-sky-400 text-sky-200 shadow-sm"
+                            : "bg-card border border-line text-fg-muted hover:text-sky-200 hover:border-sky-500/50",
+                        )}
+                      >
+                        3% + 0
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdate(d.uid, { commissionPct: 10, weeklyFeeRon: 210 })}
+                        title="Setează standard flotă: 10% comision + 210 RON taxă"
+                        className={cn(
+                          "rounded px-1.5 py-0.5 text-[9px] font-semibold transition-all cursor-pointer",
+                          d.commissionPct === 10 && d.baseFeeRon === 210
+                            ? "bg-violet-500/30 border border-violet-400 text-violet-200 shadow-sm"
+                            : "bg-card border border-line text-fg-muted hover:text-violet-200 hover:border-violet-500/50",
+                        )}
+                      >
+                        10% + 210
+                      </button>
+                    </div>
                   </td>
                   <td className="px-2 py-1.5 text-right font-mono tabular-nums text-fg">{d.grossRon.toFixed(2)}</td>
                   <td className="px-2 py-1.5 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <input type="number" min={0} max={100} step={0.5} value={d.commissionPct}
-                        onChange={(e) => onUpdate(d.uid, { commissionPct: Number(e.target.value) })}
-                        className="w-12 rounded border border-line bg-card-2 px-1 py-0.5 text-right font-mono text-[11px] text-fg" />
-                      <span className="font-mono text-[10.5px] tabular-nums text-fg-muted whitespace-nowrap">
-                        = {d.commissionRon.toFixed(2)}
-                      </span>
+                    <div className="flex flex-col items-end">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <input
+                          id={`draft-comm-${d.uid}`}
+                          type="number"
+                          min={0}
+                          max={100}
+                          step={0.5}
+                          value={d.commissionPct}
+                          onChange={(e) => handleUpdate(d.uid, { commissionPct: Number(e.target.value) })}
+                          className="w-12 rounded border border-line bg-card-2 px-1 py-0.5 text-right font-mono text-[11px] text-fg focus:border-amber-400 focus:outline-none"
+                        />
+                        <span className={cn(
+                          "font-mono text-[10.5px] tabular-nums whitespace-nowrap",
+                          d.nominalCommissionRon !== undefined && d.nominalCommissionRon > d.commissionRon
+                            ? "text-amber-300 font-semibold"
+                            : "text-fg-muted",
+                        )}>
+                          = {d.commissionRon.toFixed(2)}
+                        </span>
+                      </div>
+                      {d.nominalCommissionRon !== undefined && d.nominalCommissionRon > d.commissionRon && (
+                        <span
+                          className="mt-0.5 text-[9px] font-medium text-amber-300/90 whitespace-nowrap"
+                          title={`Comisionul procentual ar fi fost de ${d.nominalCommissionRon.toFixed(2)} RON, dar este redus la ${d.commissionRon.toFixed(2)} RON din lipsă de venit disponibil.`}
+                        >
+                          din {d.nominalCommissionRon.toFixed(2)}
+                        </span>
+                      )}
                     </div>
                   </td>
                   <td className="px-2 py-1.5 text-right">
-                    <input type="number" min={0} step={10} value={d.weeklyFeeRon}
-                      onChange={(e) => onUpdate(d.uid, { weeklyFeeRon: Number(e.target.value) })}
-                      className="w-16 rounded border border-line bg-card-2 px-1 py-0.5 text-right font-mono text-[11px] text-fg" />
+                    <div className="flex flex-col items-end">
+                      <input
+                        type="number"
+                        min={0}
+                        step={1}
+                        value={d.weeklyFeeRon}
+                        onChange={(e) => handleUpdate(d.uid, { weeklyFeeRon: Number(e.target.value) })}
+                        className={cn(
+                          "w-16 rounded border px-1 py-0.5 text-right font-mono text-[11px] focus:border-amber-400 focus:outline-none",
+                          d.feeNote
+                            ? "border-cyan-500/60 bg-cyan-500/15 text-cyan-200 font-semibold"
+                            : d.baseFeeRon > d.weeklyFeeRon
+                            ? "border-amber-500/50 bg-amber-500/10 text-amber-200"
+                            : "border-line bg-card-2 text-fg",
+                        )}
+                      />
+                      {d.feeNote ? (
+                        <span
+                          className="mt-0.5 max-w-[125px] truncate text-[8.5px] font-semibold text-cyan-300 whitespace-nowrap cursor-help"
+                          title={d.feeNote}
+                        >
+                          {d.feeNote}
+                        </span>
+                      ) : d.baseFeeRon > d.weeklyFeeRon ? (
+                        <span
+                          className="mt-0.5 text-[9px] font-medium text-amber-300/90 whitespace-nowrap"
+                          title={`Taxa contractuală este de ${d.baseFeeRon} RON, dar a fost reținută doar suma disponibilă de ${d.weeklyFeeRon} RON pentru a nu trece curierul pe minus.`}
+                        >
+                          din {d.baseFeeRon}
+                        </span>
+                      ) : null}
+                    </div>
                   </td>
                   <td className="px-2 py-1.5 text-right font-mono tabular-nums text-fg-muted">{d.negativeBalanceRon.toFixed(2)}</td>
-                  <td className={cn("px-2 py-1.5 text-right font-mono tabular-nums font-bold", d.netRon < 0 ? "text-rose-300" : "text-emerald-300")}>
-                    {d.netRon.toFixed(2)}
+                  <td className="px-2 py-1.5 text-right font-mono tabular-nums font-bold">
+                    <div className="flex flex-col items-end">
+                      <span className={cn(
+                        d.netRon < 0 ? "text-rose-400 font-bold" : d.netRon === 0 ? "text-fg-muted font-normal" : "text-emerald-300",
+                      )}>
+                        {d.netRon.toFixed(2)}
+                      </span>
+                      {d.netRon < 0 && (
+                        <span
+                          className="mt-0.5 rounded bg-rose-500/15 px-1 py-0.5 text-[8.5px] font-bold uppercase tracking-wider text-rose-300 border border-rose-500/30 whitespace-nowrap"
+                          title={`Curierul a încasat numerar din comenzi de ${d.negativeBalanceRon.toFixed(2)} RON, depășind venitul realizat de ${d.grossRon.toFixed(2)} RON. Diferența de ${Math.abs(d.netRon).toFixed(2)} RON reprezintă bani pe care curierul trebuie să-i predea flotei.`}
+                        >
+                          datorie cash
+                        </span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-2 py-1.5 text-center">
                     {d.matchedCourierId ? (
@@ -792,49 +1338,87 @@ function StatusChip({ icon, label, tone }: { icon: React.ReactNode; label: strin
 
 function round2(n: number): number { return Math.round(n * 100) / 100; }
 
-/** Panou dedicat: arată clar ce curieri NOI se vor adăuga în baza de date. */
+/** Panou dedicat: arată curierii NOI de pe raport, cu click pentru salt direct și setare tarife. */
 function NewCouriersPanel({
-  drafts, skipped, creatingNew, onToggleCreate,
+  drafts, skipped, creatingNew, onToggleCreate, onSelectCourier, focusedUid, configuredUids,
 }: {
   drafts: Draft[];
   skipped: Set<string>;
   creatingNew: Set<string>;
   onToggleCreate: (uid: string) => void;
+  onSelectCourier: (uid: string) => void;
+  focusedUid: string | null;
+  configuredUids: Set<string>;
 }) {
   const newOnes = drafts.filter(
     (d) => !skipped.has(d.uid) && !d.matchedCourierId && creatingNew.has(d.uid) && !d.duplicateOfUid,
   );
   if (newOnes.length === 0) return null;
+
   return (
-    <div className="rounded-xl border border-violet-500/40 bg-violet-500/[0.06] p-3">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-violet-100">
-          <UserPlus size={13} /> {newOnes.length} curieri noi vor fi adăugați în CRM
+    <div className="rounded-xl border border-amber-500/50 bg-gradient-to-r from-amber-500/15 via-amber-500/5 to-card p-3 shadow-md">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 text-[13px] font-bold text-amber-200">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-500/25 text-amber-300">
+            <UserPlus size={13} />
+          </span>
+          <span>
+            {newOnes.length} {newOnes.length === 1 ? "curier nou găsit" : "curieri noi găsiți"} pe raport (nu există încă în CRM)
+          </span>
         </div>
-        <div className="text-[10.5px] text-fg-muted">
-          Se salvează cu datele din raport. Poți completa profilul (IBAN, oraș etc.) ulterior din pagina Curieri.
+        <div className="text-[11px] text-amber-300/80">
+          Apasă pe un curier ca să mergi direct pe rândul lui și să-i setezi comisionul:
         </div>
       </div>
-      <ul className="grid gap-1 sm:grid-cols-2">
-        {newOnes.map((d) => (
-          <li key={d.uid} className="flex items-center gap-2 rounded-md border border-violet-500/25 bg-card-2/50 px-2 py-1.5 text-[11.5px]">
-            <span className="min-w-0 flex-1">
-              <span className="block truncate font-semibold text-fg">{d.fullName || d.uid}</span>
-              <span className="block truncate text-[10px] text-fg-dim">
-                {d.uid} · {d.city ?? "fără oraș"}{d.phone ? ` · ${d.phone}` : ""}
-              </span>
-            </span>
-            <button
-              type="button"
-              onClick={() => onToggleCreate(d.uid)}
-              className="rounded border border-line bg-card px-1.5 py-0.5 text-[9.5px] font-semibold text-fg-muted hover:text-fg"
-              title="Nu crea acest curier"
+
+      <div className="mt-2.5 flex flex-wrap gap-2">
+        {newOnes.map((d) => {
+          const isConfigured = configuredUids.has(d.uid) || d.commissionPct !== 10 || d.baseFeeRon !== 210;
+          const isFocused = focusedUid === d.uid;
+          return (
+            <div
+              key={d.uid}
+              className={cn(
+                "group flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[11.5px] transition-all",
+                isFocused
+                  ? "border-amber-400 bg-amber-400/25 text-white ring-2 ring-amber-400/60 shadow-md shadow-amber-500/20 scale-[1.02]"
+                  : isConfigured
+                  ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-100 hover:bg-emerald-500/25 hover:border-emerald-400"
+                  : "border-amber-500/50 bg-amber-500/15 text-amber-100 hover:bg-amber-500/25 hover:border-amber-400",
+              )}
             >
-              nu crea
-            </button>
-          </li>
-        ))}
-      </ul>
+              <button
+                type="button"
+                onClick={() => onSelectCourier(d.uid)}
+                className="flex items-center gap-1.5 font-medium hover:underline text-left cursor-pointer"
+                title="Apasă pentru a merge la rândul acestui curier"
+              >
+                {isConfigured ? (
+                  <Check size={12} className="text-emerald-400 font-bold" />
+                ) : (
+                  <UserPlus size={12} className="text-amber-400" />
+                )}
+                <span className="font-semibold text-fg">{d.fullName || d.uid}</span>
+                <span className={cn(
+                  "rounded px-1.5 py-0.2 font-mono text-[10px]",
+                  isConfigured ? "bg-emerald-500/25 text-emerald-200" : "bg-black/40 text-amber-200",
+                )}>
+                  {d.commissionPct}% · {d.weeklyFeeRon} RON
+                </span>
+                <ArrowRight size={10} className="text-fg-dim opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-transform" />
+              </button>
+              <button
+                type="button"
+                onClick={() => onToggleCreate(d.uid)}
+                className="ml-1 text-[10px] text-fg-dim hover:text-rose-300"
+                title="Nu crea acest curier"
+              >
+                ×
+              </button>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -850,14 +1434,14 @@ function buildCourierFromDraft(d: Draft, platformKey: PlatformKey, tenantId: str
     fullName: d.fullName || d.uid,
     phone:    d.phone ?? "",
     email:    d.email,
-    nationality: "RO" as const,
+    nationality: "ro" as const,
     city:     d.city ?? "",
     platforms: [platformKey],
     vehicleType: "scooter" as const,
-    vehicleOwnership: "personal" as const,
-    collaboration: "pfa" as const,
+    vehicleOwnership: "own" as const,
+    collaboration: "collaboration" as const,
     commissionPct: d.commissionPct,
-    weeklyContractFeeRon: d.weeklyFeeRon,
+    weeklyContractFeeRon: d.baseFeeRon,
     status: "active" as const,
     incompleteFields,
     createdBy,

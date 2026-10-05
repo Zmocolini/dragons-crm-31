@@ -99,9 +99,6 @@ export function CouriersPage() {
       case "upload_doc":
         setUploadFor(row);
         break;
-      case "create_activation":
-        toast.info("Creează activare", `Fluxul de activare pentru ${row.fullName} vine în roadmap.`);
-        break;
       case "record_payment":
         setPaymentFor(row);
         break;

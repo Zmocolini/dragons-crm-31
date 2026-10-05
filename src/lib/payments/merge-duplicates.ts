@@ -5,6 +5,8 @@
 
 import type { PlatformKey } from "@/lib/dashboard/types";
 import type { Payment, PaymentBreakdown } from "./types";
+import { areNamesEquivalent, normalizeBase } from "@/lib/utils/name-matching";
+import type { DuplicateGroup } from "@/lib/subcontractors/duplicate-accounts";
 
 /** Opțiuni de unificare aplicate la construirea plății sintetice. */
 export type MergeOptions = {
@@ -106,10 +108,6 @@ export function mergeDuplicatePayments(
     // Breakdown de bază: sumă simplă
     const breakdown = mergeBreakdowns(items);
 
-    // Unificare taxă: în loc de suma din toate rândurile, folosesc valoarea specificată (RON) o singură dată.
-    if (opts.feeOnce != null) {
-      breakdown.tax = round2(opts.feeOnce);
-    }
     // Unificare comision: recalculat pe totalul brut cu procentul specificat, o singură dată.
     if (opts.commissionPct != null) {
       // FIX: comisionul se aplică pe brut+tips (nu doar pe grossRevenue care e fără tips).
@@ -117,13 +115,25 @@ export function mergeDuplicatePayments(
       breakdown.fleetCommission = round2(totalGross * (opts.commissionPct / 100));
     }
 
+    // Unificare taxă: în loc de suma din toate rândurile, folosesc valoarea specificată (RON) o singură dată,
+    // dar plafonată la venitul disponibil pentru a nu trece pe minus din cauza taxei.
+    if (opts.feeOnce != null) {
+      const gross = round2(breakdown.grossRevenue + breakdown.tips);
+      const comm = breakdown.fleetCommission || 0;
+      const ded = Math.max(0, breakdown.deductions || 0);
+      const otherCosts = (breakdown.vehicleCost || 0) + (breakdown.housingCost || 0) + (breakdown.equipmentCost || 0) + (breakdown.guarantee || 0) + (breakdown.penalty || 0) + (breakdown.advance || 0);
+      const available = Math.max(0, round2(gross - comm - ded - otherCosts));
+      breakdown.tax = Math.min(round2(opts.feeOnce), available);
+    }
+
     // Recalculez totalul din breakdown (evită incoerențe dintre breakdown modificat și totalCalculated).
-    const totalCalculated = round2(
+    const rawTotal = round2(
       breakdown.grossRevenue + breakdown.tips + breakdown.correction + breakdown.otherAdjustments
       - breakdown.fleetCommission - breakdown.tax - breakdown.advance - breakdown.deductions
       - breakdown.vehicleCost - breakdown.housingCost - breakdown.equipmentCost
       - breakdown.guarantee - breakdown.penalty,
     );
+    const totalCalculated = Math.abs(rawTotal) < 0.001 ? 0 : rawTotal;
 
     merged.push({
       ...first,
@@ -146,3 +156,75 @@ export function mergeDuplicatePayments(
   const passthrough = payments.filter((p) => !consumed.has(p.id));
   return [...passthrough, ...merged];
 }
+
+/**
+ * Găsește toate plățile conexe (aceeași persoană/curier + aceeași săptămână),
+ * fie prin aliasuri de cont dublu (ex: Magar Thapa Glovo ↔ Ahtasham Haider Bolt),
+ * fie prin nume echivalente (inversate/identice), fie prin același recipient.id.
+ */
+export function getSiblingPaymentsForPerson(
+  targetPayment: Payment | null | undefined,
+  allPayments: Payment[],
+  dupGroupFor: (name: string) => DuplicateGroup | null,
+): Payment[] {
+  if (!targetPayment) return [];
+
+  // 1. Dacă plata țintă este un rând sintetic (merged), extragem componentele sale originale
+  if (targetPayment.id.startsWith(MERGED_ID_PREFIX)) {
+    const subIds = new Set(targetPayment.id.replace(MERGED_ID_PREFIX, "").split("__"));
+    return allPayments.filter((p) => subIds.has(p.id));
+  }
+
+  const group = dupGroupFor(targetPayment.recipient.name);
+  const targetNorm = normalizeBase(targetPayment.recipient.name);
+  const aliasNorms = new Set<string>();
+  if (group) {
+    for (const a of group.aliases) {
+      aliasNorms.add(normalizeBase(a.name));
+    }
+  }
+
+  // Căutăm doar plăți din aceeași săptămână ISO
+  const matches = allPayments.filter((other) => {
+    if (other.recipient.kind !== "courier") return false;
+    if (other.periodStartIso !== targetPayment.periodStartIso) return false;
+    if (other.id === targetPayment.id) return true;
+
+    const otherNorm = normalizeBase(other.recipient.name);
+
+    // Potrivire cu un alias din grupul contului dublu
+    if (aliasNorms.has(otherNorm)) return true;
+
+    // Verificăm dacă celălalt curier are un grup de cont dublu care include numele curent
+    const otherGroup = dupGroupFor(other.recipient.name);
+    if (otherGroup) {
+      if (
+        otherGroup.aliases.some(
+          (a) => normalizeBase(a.name) === targetNorm || areNamesEquivalent(a.name, targetPayment.recipient.name),
+        )
+      ) {
+        return true;
+      }
+    }
+
+    // Nume echivalente (ex: "Ahmed Sauod" pe ambele platforme sau nume inversate)
+    if (areNamesEquivalent(other.recipient.name, targetPayment.recipient.name)) {
+      return true;
+    }
+
+    // Același profil de curier dacă recipient.id există
+    if (other.recipient.id && targetPayment.recipient.id && other.recipient.id === targetPayment.recipient.id) {
+      return true;
+    }
+
+    return false;
+  });
+
+  // Ne asigurăm că plata țintă este inclusă în listă chiar dacă a fost sintetică
+  if (!matches.some((m) => m.id === targetPayment.id)) {
+    matches.unshift(targetPayment);
+  }
+
+  return matches;
+}
+

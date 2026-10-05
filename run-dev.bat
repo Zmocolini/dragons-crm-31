@@ -1,3 +1,3 @@
 @echo off
-cd /d "C:\Users\Ioan Varga\Desktop\crm-3.1"
-npm run dev > dev.log 2>&1
+cd /d "%~dp0"
+npm run dev

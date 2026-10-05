@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { AlertTriangle, Users, Wallet } from "lucide-react";
+import { AlertTriangle, FileCheck, UserPlus, Users, Wallet } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { StatCard } from "./StatCard";
 import type { Stat, StatKey } from "@/lib/dashboard/types";
@@ -14,13 +14,17 @@ import { formatRon } from "@/lib/reports/analytics";
 
 const STAT_ICON: Record<StatKey, LucideIcon> = {
   active_couriers: Users,
+  new_candidates: UserPlus,
   processed_payments: Wallet,
+  completed_activations: FileCheck,
   open_issues: AlertTriangle,
 };
 
 const STAT_HREF: Record<StatKey, string> = {
   active_couriers: "/curieri",
+  new_candidates: "/recrutare",
   processed_payments: "/plati",
+  completed_activations: "/activari",
   open_issues: "/probleme",
 };
 

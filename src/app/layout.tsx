@@ -78,12 +78,13 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="ro"
+      suppressHydrationWarning
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: dataMigrationScript }} />
       </head>
-      <body className="min-h-full bg-app text-fg">
+      <body className="min-h-full bg-app text-fg" suppressHydrationWarning>
         <RootAuthProvider>{children}</RootAuthProvider>
         <CookieBanner />
       </body>

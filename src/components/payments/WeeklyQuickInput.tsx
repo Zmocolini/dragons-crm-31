@@ -33,7 +33,7 @@ function formatPeriodLabel(startIso: string, endIso: string): string {
 
 export function WeeklyQuickInput({ rows, periodStartIso, periodEndIso, materialize, updatePayment, actorName }: Props) {
   const toast = useToast();
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   // Draft: id → string (input local). Când e undefined, câmpul afișează valoarea salvată din breakdown.grossRevenue.
   const [draft, setDraft] = useState<Record<string, string>>({});
 

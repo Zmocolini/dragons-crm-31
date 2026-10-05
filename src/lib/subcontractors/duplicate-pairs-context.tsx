@@ -5,6 +5,7 @@ import {
   type ReactNode,
 } from "react";
 import { useCouriers } from "@/lib/couriers/context";
+import { areNamesEquivalent, detectCourierDuplicates, type DuplicateSuggestion } from "@/lib/utils/name-matching";
 import type { DuplicateGroup, DuplicateAlias } from "./duplicate-accounts";
 
 // TODO(real-users): mută în tabel `duplicate_courier_pairs` cu (courier_a_id, courier_b_id, tenant_id, unify_fee, unify_commission).
@@ -28,6 +29,9 @@ type Ctx = {
   addPair: (aId: string, bId: string, opts: PairOptions) => void;
   removePair: (aId: string, bId: string) => void;
   updatePair: (aId: string, bId: string, opts: Partial<PairOptions>) => void;
+  detectedSuggestions: DuplicateSuggestion[];
+  acceptSuggestion: (s: DuplicateSuggestion) => void;
+  acceptAllSuggestions: () => void;
   /** Rezolvă un curier după nume → grup dinamic (sau null). */
   groupFor: (name: string) => DuplicateGroup | null;
   /** Opțiunile pentru perechea unei anumite plăți/curier (după nume). */
@@ -40,9 +44,24 @@ function normalize(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, " ").trim();
 }
 
-function pickPlatform(courier: { boltUid?: string | null }): DuplicateAlias["platform"] {
-  return courier.boltUid ? "bolt" : "wolt";
+function pickPlatform(courier: { boltUid?: string | null; platforms?: DuplicateAlias["platform"][] }): DuplicateAlias["platform"] {
+  if (courier.platforms && courier.platforms.length > 0) {
+    return courier.platforms[0];
+  }
+  return courier.boltUid ? "bolt" : "glovo";
 }
+
+export const KNOWN_ALIAS_PAIRS: Array<{
+  nameA: string;
+  platformA: DuplicateAlias["platform"];
+  nameB: string;
+  platformB: DuplicateAlias["platform"];
+  feeOnce?: number;
+  commissionPct?: number;
+}> = [
+  { nameA: "Ahtasham Haider", platformA: "bolt", nameB: "Magar Thapa", platformB: "glovo", feeOnce: 210, commissionPct: 10 },
+  { nameA: "Ahtasham Haide",  platformA: "bolt", nameB: "Magar Thapa", platformB: "glovo", feeOnce: 210, commissionPct: 10 },
+];
 
 export function DuplicatePairsProvider({ children }: { children: ReactNode }) {
   const [pairs, setPairs] = useState<DynamicDuplicatePair[]>([]);
@@ -118,6 +137,8 @@ export function DuplicatePairsProvider({ children }: { children: ReactNode }) {
   const { nameToGroup, nameToOpts } = useMemo(() => {
     const nameToGroup = new Map<string, DuplicateGroup>();
     const nameToOpts = new Map<string, PairOptions>();
+
+    // 1. Perechi manuale salvate de utilizator (au prioritate absolută)
     for (const p of pairs) {
       const a = allRows.find((c) => c.id === p.aId);
       const b = allRows.find((c) => c.id === p.bId);
@@ -133,22 +154,148 @@ export function DuplicatePairsProvider({ children }: { children: ReactNode }) {
         nameToOpts.set(normalize(al.name), opts);
       }
     }
+
+    // 2. Perechi cunoscute din cerințele operaționale (ex: Ahtasham Haider Bolt ↔ Magar Thapa Glovo)
+    for (const kp of KNOWN_ALIAS_PAIRS) {
+      const normA = normalize(kp.nameA);
+      const normB = normalize(kp.nameB);
+      if (!nameToGroup.has(normA) || !nameToGroup.has(normB)) {
+        const group: DuplicateGroup = {
+          personId: kp.nameA,
+          aliases: [
+            { name: kp.nameA, platform: kp.platformA },
+            { name: kp.nameB, platform: kp.platformB },
+          ],
+        };
+        const opts: PairOptions = { feeOnce: kp.feeOnce ?? 210, commissionPct: kp.commissionPct ?? 10 };
+        if (!nameToGroup.has(normA)) { nameToGroup.set(normA, group); nameToOpts.set(normA, opts); }
+        if (!nameToGroup.has(normB)) { nameToGroup.set(normB, group); nameToOpts.set(normB, opts); }
+      }
+    }
+
+    // 3. Curieri cu același nume (sau nume inversat) între platforme diferite din allRows
+    for (let i = 0; i < allRows.length; i++) {
+      const cA = allRows[i];
+      for (let j = i + 1; j < allRows.length; j++) {
+        const cB = allRows[j];
+        if (cA.id === cB.id) continue;
+        if (areNamesEquivalent(cA.fullName, cB.fullName)) {
+          const platA = pickPlatform(cA);
+          const platB = pickPlatform(cB);
+          const normA = normalize(cA.fullName);
+          const normB = normalize(cB.fullName);
+          if (!nameToGroup.has(normA) && !nameToGroup.has(normB)) {
+            const aliases: DuplicateAlias[] = [
+              { name: cA.fullName, platform: platA },
+              { name: cB.fullName, platform: platB },
+            ];
+            const group: DuplicateGroup = { personId: cA.fullName, aliases };
+            const opts: PairOptions = {
+              feeOnce: cA.weeklyContractFeeRon ?? cB.weeklyContractFeeRon ?? 210,
+              commissionPct: cA.commissionPct ?? cB.commissionPct ?? null,
+            };
+            nameToGroup.set(normA, group);
+            nameToGroup.set(normB, group);
+            nameToOpts.set(normA, opts);
+            nameToOpts.set(normB, opts);
+          }
+        }
+      }
+    }
+
+    // 4. Curieri unici care au salvate direct multiple platforme în profil (ex: ['bolt', 'glovo'])
+    for (const c of allRows) {
+      if (c.platforms && c.platforms.length > 1) {
+        const norm = normalize(c.fullName);
+        if (!nameToGroup.has(norm)) {
+          const group: DuplicateGroup = {
+            personId: c.fullName,
+            aliases: c.platforms.map((pl) => ({ name: c.fullName, platform: pl })),
+          };
+          const opts: PairOptions = {
+            feeOnce: c.weeklyContractFeeRon ?? 210,
+            commissionPct: c.commissionPct ?? null,
+          };
+          nameToGroup.set(norm, group);
+          nameToOpts.set(norm, opts);
+        }
+      }
+    }
+
     return { nameToGroup, nameToOpts };
   }, [pairs, allRows]);
 
   const groupFor = useCallback((name: string): DuplicateGroup | null => {
     if (!name) return null;
-    return nameToGroup.get(normalize(name)) ?? null;
+    const direct = nameToGroup.get(normalize(name));
+    if (direct) return direct;
+    for (const [keyName, group] of nameToGroup.entries()) {
+      if (areNamesEquivalent(name, keyName)) return group;
+    }
+    return null;
   }, [nameToGroup]);
 
   const pairOptionsFor = useCallback((name: string): PairOptions | null => {
     if (!name) return null;
-    return nameToOpts.get(normalize(name)) ?? null;
+    const direct = nameToOpts.get(normalize(name));
+    if (direct) return direct;
+    for (const [keyName, opts] of nameToOpts.entries()) {
+      if (areNamesEquivalent(name, keyName)) return opts;
+    }
+    return null;
   }, [nameToOpts]);
 
+  // Sugestii detectate automat pentru curieri cu conturi duplicate
+  const existingPairIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of pairs) {
+      set.add(`${p.aId}__${p.bId}`);
+      set.add(`${p.bId}__${p.aId}`);
+    }
+    return set;
+  }, [pairs]);
+
+  const detectedSuggestions = useMemo(() => {
+    return detectCourierDuplicates(allRows, existingPairIds);
+  }, [allRows, existingPairIds]);
+
+  const acceptSuggestion = useCallback((s: DuplicateSuggestion) => {
+    const fee = s.courierA.weeklyContractFeeRon ?? s.courierB.weeklyContractFeeRon ?? 210;
+    const comm = s.courierA.commissionPct ?? s.courierB.commissionPct ?? 10;
+    addPair(s.courierA.id, s.courierB.id, { feeOnce: fee, commissionPct: comm });
+  }, [addPair]);
+
+  const acceptAllSuggestions = useCallback(() => {
+    for (const s of detectedSuggestions) {
+      const fee = s.courierA.weeklyContractFeeRon ?? s.courierB.weeklyContractFeeRon ?? 210;
+      const comm = s.courierA.commissionPct ?? s.courierB.commissionPct ?? 10;
+      addPair(s.courierA.id, s.courierB.id, { feeOnce: fee, commissionPct: comm });
+    }
+  }, [detectedSuggestions, addPair]);
+
   const value = useMemo<Ctx>(
-    () => ({ pairs, addPair, removePair, updatePair, groupFor, pairOptionsFor }),
-    [pairs, addPair, removePair, updatePair, groupFor, pairOptionsFor],
+    () => ({
+      pairs,
+      addPair,
+      removePair,
+      updatePair,
+      detectedSuggestions,
+      acceptSuggestion,
+      acceptAllSuggestions,
+      groupFor,
+      pairOptionsFor,
+    }),
+    [
+      pairs,
+      addPair,
+      removePair,
+      updatePair,
+      detectedSuggestions,
+      acceptSuggestion,
+      acceptAllSuggestions,
+      groupFor,
+      pairOptionsFor,
+    ],
   );
   return <DuplicatePairsContext.Provider value={value}>{children}</DuplicatePairsContext.Provider>;
 }

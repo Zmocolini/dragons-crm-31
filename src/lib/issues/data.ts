@@ -4,14 +4,14 @@ import type { PlatformKey } from "@/lib/dashboard/types";
 // Modul Probleme / Support — tichete derivate DETERMINIST din roster.
 // TODO(real-users): tabele `tickets` + `ticket_messages` + `ticket_activity`.
 
-export type TicketCategory = "platform" | "payments" | "equipment" | "accommodation" | "documents" | "contracts" | "legal" | "admin";
+export type TicketCategory = "platform" | "payments" | "equipment" | "accommodation" | "documents" | "contracts" | "legal" | "admin" | "other";
 export const CATEGORY_LABEL: Record<TicketCategory, string> = {
   platform: "Platformă", payments: "Plăți", equipment: "Echipamente", accommodation: "Cazare",
-  documents: "Documente", contracts: "Contracte", legal: "Legal", admin: "Administrativ",
+  documents: "Documente", contracts: "Contracte", legal: "Legal", admin: "Administrativ", other: "Altele",
 };
 export const CATEGORY_COLOR: Record<TicketCategory, string> = {
   platform: "#3b82f6", payments: "#22c55e", equipment: "#f59e0b", accommodation: "#ec4899",
-  documents: "#eab308", contracts: "#8b5cf6", legal: "#ef4444", admin: "#64748b",
+  documents: "#eab308", contracts: "#8b5cf6", legal: "#ef4444", admin: "#64748b", other: "#94a3b8",
 };
 
 export type TicketPriority = "normal" | "high" | "urgent";

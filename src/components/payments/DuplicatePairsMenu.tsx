@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ChevronDown, Copy, Plus, Trash2 } from "lucide-react";
+import { ChevronDown, Copy, Plus, Sparkles, Trash2 } from "lucide-react";
 import { useCouriers } from "@/lib/couriers/context";
 import { useDuplicatePairs } from "@/lib/subcontractors/duplicate-pairs-context";
 import { AddDuplicatePairDialog } from "./AddDuplicatePairDialog";
@@ -9,7 +9,7 @@ import { cn } from "@/lib/utils/cn";
 
 /** Buton + dropdown pentru gestionarea perechilor de cont dublu. */
 export function DuplicatePairsMenu() {
-  const { pairs, removePair, updatePair } = useDuplicatePairs();
+  const { pairs, removePair, updatePair, detectedSuggestions, acceptSuggestion, acceptAllSuggestions } = useDuplicatePairs();
   const { allRows } = useCouriers();
   const [open, setOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
@@ -35,20 +35,64 @@ export function DuplicatePairsMenu() {
       >
         <Copy size={13} /> Cont dublu
         {pairs.length > 0 && <span className="rounded bg-black/40 px-1 text-[10px] font-mono">{pairs.length}</span>}
+        {detectedSuggestions.length > 0 && (
+          <span className="flex items-center gap-0.5 rounded-full bg-cyan-500/30 px-1.5 py-0.2 text-[9.5px] font-bold text-cyan-300">
+            <Sparkles size={9} /> {detectedSuggestions.length}
+          </span>
+        )}
         <ChevronDown size={12} className={cn("transition-transform", open && "rotate-180")} />
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-1.5 min-w-[340px] overflow-hidden rounded-lg border border-line bg-card p-1 shadow-lg shadow-black/40">
+        <div className="absolute right-0 top-full z-50 mt-1.5 min-w-[360px] max-w-[420px] overflow-hidden rounded-lg border border-line bg-card p-1 shadow-lg shadow-black/40">
           <button
             type="button"
             onClick={() => { setAddOpen(true); setOpen(false); }}
             className="flex w-full items-center gap-2 rounded px-2.5 py-2 text-left text-[12.5px] font-semibold text-emerald-200 hover:bg-emerald-500/10"
           >
-            <Plus size={13} /> Adaugă pereche
+            <Plus size={13} /> Adaugă pereche manual
           </button>
+
+          {/* Sugestii detectate automat */}
+          {detectedSuggestions.length > 0 && (
+            <div className="my-1 rounded-md border border-cyan-500/30 bg-cyan-500/10 p-2">
+              <div className="mb-1.5 flex items-center justify-between gap-1">
+                <span className="flex items-center gap-1 text-[11px] font-bold text-cyan-200">
+                  <Sparkles size={11} className="text-cyan-400" />
+                  {detectedSuggestions.length} {detectedSuggestions.length === 1 ? "cont dublu detectat" : "conturi duble detectate"}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => acceptAllSuggestions()}
+                  className="rounded bg-cyan-600/80 px-2 py-0.5 text-[10px] font-semibold text-white hover:bg-cyan-500"
+                >
+                  Asociază tot
+                </button>
+              </div>
+              <div className="flex max-h-[140px] flex-col gap-1 overflow-y-auto">
+                {detectedSuggestions.map((s, idx) => (
+                  <div key={idx} className="flex items-center justify-between gap-2 rounded bg-black/40 px-2 py-1 text-[11px]">
+                    <div className="min-w-0">
+                      <div className="truncate font-semibold text-fg">
+                        {s.courierA.fullName} ↔ {s.courierB.fullName}
+                      </div>
+                      <div className="text-[9.5px] text-cyan-300/80">{s.explanation}</div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => acceptSuggestion(s)}
+                      className="shrink-0 rounded border border-cyan-500/40 bg-cyan-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-cyan-100 hover:bg-cyan-500/30"
+                    >
+                      + Asociază
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {pairs.length > 0 && <div className="my-1 border-t border-line/60" />}
-          {pairs.length === 0 ? (
+          {pairs.length === 0 && detectedSuggestions.length === 0 ? (
             <div className="px-2.5 py-2 text-[11.5px] text-fg-muted">Nicio pereche adăugată încă.</div>
           ) : (
             <div className="max-h-[320px] overflow-y-auto">

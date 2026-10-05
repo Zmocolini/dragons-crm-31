@@ -113,9 +113,9 @@ function safeRead(): SettingsState {
             operator_recruitment:"hr",
           };
           return raw.map((m) => {
-            if (VALID_TEAM_ROLES.includes(m.role)) return m;
-            const fixed = RBAC_FIX[m.role] ?? "viewer";
-            return { ...m, role: fixed };
+            if (VALID_TEAM_ROLES.includes(m.role)) return m as TeamMember;
+            const fixed = (RBAC_FIX[m.role] ?? "viewer") as TeamRoleKey;
+            return { ...m, role: fixed } as TeamMember;
           });
         })(),
         invitations: (parsed.team?.invitations && !parsed.team.invitations.some((i) => ["inv_1","inv_2"].includes(i.id))) ? parsed.team.invitations : DEFAULT_SETTINGS.team.invitations,

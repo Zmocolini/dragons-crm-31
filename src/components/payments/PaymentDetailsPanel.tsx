@@ -9,6 +9,9 @@ import type { CourierRow } from "@/lib/couriers/mock-seed";
 import { VEHICLE_TYPE_LABEL } from "@/lib/couriers/types";
 import type { Permission } from "@/lib/rbac/roles";
 import { formatShortDateTime } from "@/lib/utils/date";
+import { useDuplicatePairs } from "@/lib/subcontractors/duplicate-pairs-context";
+import { areNamesEquivalent } from "@/lib/utils/name-matching";
+import { isMergedPayment } from "@/lib/payments/merge-duplicates";
 import {
   BREAKDOWN_META, PAYMENT_ACTIVITY_DOT, PAYMENT_ACTIVITY_LABEL,
   PAYMENT_METHOD_LABEL, PAYMENT_STATUS_LABEL, PAYMENT_STATUS_STYLE,
@@ -47,6 +50,14 @@ export function PaymentDetailsPanel({
   const canFinance = can("payments.create");
   const iban = payment.ibanSnapshot ?? "—";
 
+  const { groupFor: duplicateGroupFor, pairOptionsFor } = useDuplicatePairs();
+  const duplicateGroup = duplicateGroupFor(payment.recipient.name);
+  const pairOpts = pairOptionsFor(payment.recipient.name);
+  const isMerged = isMergedPayment(payment.id);
+  const groupPlatforms = duplicateGroup
+    ? Array.from(new Set(duplicateGroup.aliases.map((a) => a.platform)))
+    : (payment.platforms ?? (payment.recipient.platform ? [payment.recipient.platform] : []));
+
   const copyIban = async () => {
     if (!payment.ibanSnapshot) return;
     try {
@@ -70,6 +81,12 @@ export function PaymentDetailsPanel({
               <span className="font-mono">ID: #{payment.recipient.id.toUpperCase()}</span>
               {payment.recipient.status && (
                 <span className="rounded bg-emerald-500/15 px-1.5 py-0.5 font-medium text-emerald-300">Activ</span>
+              )}
+              {duplicateGroup && (
+                <span className="inline-flex items-center gap-1 rounded border border-cyan-500/40 bg-cyan-500/15 px-1.5 py-0.5 font-bold text-cyan-200">
+                  <Copy size={10} />
+                  {isMerged ? "1× Combinat" : "2× Cont dublu"} ({groupPlatforms.map((p) => p.toUpperCase()).join(" + ")})
+                </span>
               )}
             </div>
             <div className="mt-1.5 flex flex-wrap items-center gap-1">
@@ -116,6 +133,46 @@ export function PaymentDetailsPanel({
               </span>
             </div>
 
+            {/* Cont dublu (Glovo + Bolt) info banner */}
+            {duplicateGroup && (
+              <div className="rounded-xl border border-cyan-500/40 bg-cyan-500/10 p-3 text-left">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-[12.5px] font-bold text-cyan-200">
+                    <Copy size={13} className="text-cyan-400" />
+                    Cont dublu: {groupPlatforms.map((a) => a.toUpperCase()).join(" + ")}
+                  </div>
+                  <span className={cn(
+                    "rounded px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase",
+                    isMerged ? "bg-emerald-500/20 text-emerald-200 border border-emerald-500/30" : "bg-cyan-500/20 text-cyan-200 border border-cyan-500/30"
+                  )}>
+                    {isMerged ? "1× Combinat" : "2× Activ"}
+                  </span>
+                </div>
+                <div className="mt-2 space-y-1">
+                  {duplicateGroup.aliases.map((a, idx) => {
+                    const isCurrent = areNamesEquivalent(a.name, payment.recipient.name);
+                    return (
+                      <div key={idx} className="flex items-center justify-between rounded bg-black/40 px-2 py-1 text-[11px]">
+                        <span className="font-medium text-fg">
+                          {a.name}
+                          {isCurrent && <span className="ml-1 text-[9.5px] text-cyan-300 font-normal">(contul curent)</span>}
+                        </span>
+                        <span className="rounded bg-white/10 px-1.5 py-0.2 font-mono text-[9.5px] uppercase text-fg-dim">
+                          {a.platform}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-cyan-500/20 pt-2 text-[10.5px] text-fg-muted">
+                  <span>Taxă săptămânală: <b className="text-fg">{pairOpts?.feeOnce != null ? `${pairOpts.feeOnce} RON` : "Standard"} (o singură dată pe pereche)</b></span>
+                  {pairOpts?.commissionPct != null && (
+                    <span>Comision: <b className="text-fg">{pairOpts.commissionPct}%</b></span>
+                  )}
+                </div>
+              </div>
+            )}
+
             {/* Breakdown */}
             <div className="rounded-lg border border-line/60">
               <Line label="Total comenzi" value={String(payment.ordersCount ?? "—")} plain />
@@ -129,8 +186,15 @@ export function PaymentDetailsPanel({
                 return <Line key={m.key} label={label} value={display} negative={m.sign === "-" && raw > 0} />;
               })}
               <div className="flex items-center justify-between border-t border-line/60 px-3 py-2.5">
-                <span className="text-[13px] font-bold text-fg">SUMĂ DE PLATĂ</span>
-                <span className="text-[16px] font-bold text-emerald-300 tabular-nums">{formatMoney(payment.totalCalculated, currency)}</span>
+                <span className="text-[13px] font-bold text-fg">
+                  {payment.totalCalculated < 0 ? "DATORIE CĂTRE FLOTĂ" : "SUMĂ DE PLATĂ"}
+                </span>
+                <span className={cn(
+                  "text-[16px] font-bold tabular-nums",
+                  payment.totalCalculated < 0 ? "text-rose-400" : payment.totalCalculated === 0 ? "text-fg-muted" : "text-emerald-300",
+                )}>
+                  {formatMoney(payment.totalCalculated, currency)}
+                </span>
               </div>
             </div>
 

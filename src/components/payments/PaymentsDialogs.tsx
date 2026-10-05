@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AlertTriangle, Check, Upload } from "lucide-react";
+import { AlertTriangle, Check, Copy, Upload } from "lucide-react";
 import { Dialog, DialogFooter } from "@/components/ui/Dialog";
 import type { CourierRow } from "@/lib/couriers/mock-seed";
 import {
@@ -392,30 +392,87 @@ export function ExportPaymentsDialog({
 // MARCHEAZĂ CA PLĂTIT (confirmare)
 // ═══════════════════════════════════════════════════════════════════════════
 export function MarkPaidConfirmDialog({
-  payment, currency, onCancel, onConfirm,
+  payment,
+  siblings,
+  currency,
+  onCancel,
+  onConfirm,
 }: {
   payment: Payment | null;
+  siblings?: Payment[];
   currency: Currency;
   onCancel: () => void;
-  onConfirm: (id: string) => void;
+  onConfirm: (id: string, allIds?: string[]) => void;
 }) {
   if (!payment) return null;
+
+  const allPaymentsList = siblings && siblings.length > 1 ? siblings : [payment];
+  const isMultiAccount = allPaymentsList.length > 1;
+  const allIds = allPaymentsList.map((s) => s.id);
+  const totalCombined = round2(allPaymentsList.reduce((sum, s) => sum + s.totalCalculated, 0));
+
   return (
     <Dialog open={!!payment} onClose={onCancel} title="Confirmă plata efectuată" size="sm">
       <p className="text-[12.5px] text-fg-muted">
-        Confirmi că plata de <b className="text-fg">{formatMoney(payment.totalCalculated, currency)}</b> către <b className="text-fg">{payment.recipient.name}</b> a fost efectuată?
+        {isMultiAccount ? (
+          <>
+            Confirmi că plata către curierul <b className="text-fg">{payment.recipient.name}</b> a fost efectuată?
+          </>
+        ) : (
+          <>
+            Confirmi că plata de <b className="text-fg">{formatMoney(payment.totalCalculated, currency)}</b> către <b className="text-fg">{payment.recipient.name}</b> a fost efectuată?
+          </>
+        )}
       </p>
-      <div className="mt-3 space-y-1.5 rounded-lg border border-line/60 bg-card-hover p-3 text-[12px]">
-        <Row k="Curier" v={payment.recipient.name} />
-        <Row k="Sumă" v={formatMoney(payment.totalCalculated, currency)} />
-        <Row k="IBAN" v={payment.ibanSnapshot ?? "—"} mono />
-        <Row k="Metodă" v={PAYMENT_METHOD_LABEL[payment.method]} />
-        <Row k="Perioadă" v={`${payment.periodStartIso} → ${payment.periodEndIso}`} />
-      </div>
+
+      {isMultiAccount ? (
+        <div className="mt-3 space-y-2 rounded-lg border border-cyan-500/40 bg-cyan-500/10 p-3 text-[12px]">
+          <div className="flex items-center gap-1.5 font-bold text-cyan-200">
+            <Copy size={13} className="shrink-0" />
+            Cont dublu detectat ({allPaymentsList.length} platforme)
+          </div>
+          <p className="text-[11.5px] text-cyan-200/90 leading-relaxed">
+            Acest curier are conturi active pe platforme diferite în această săptămână. Confirmarea va marca automat ca <b className="text-emerald-300">Plătit</b> pe toate conturile conexe:
+          </p>
+          <div className="space-y-1.5 pt-1">
+            {allPaymentsList.map((s) => {
+              const plat = (s.platforms?.[0] || s.recipient.platform || "Platformă").toUpperCase();
+              return (
+                <div key={s.id} className="flex items-center justify-between rounded border border-line/40 bg-black/40 px-2.5 py-1.5 text-[12px]">
+                  <div className="flex items-center gap-2">
+                    <span className="rounded bg-violet-500/20 border border-violet-500/40 px-1.5 py-0.5 text-[10px] font-bold text-violet-200">
+                      {plat}
+                    </span>
+                    <span className="font-semibold text-fg">{s.recipient.name}</span>
+                  </div>
+                  <span className="font-bold tabular-nums text-emerald-400">
+                    {formatMoney(s.totalCalculated, currency)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="flex items-center justify-between border-t border-cyan-500/30 pt-2 text-[12.5px] font-bold text-fg">
+            <span>Total cumulat de plată:</span>
+            <span className="text-[14px] text-emerald-400 tabular-nums">
+              {formatMoney(totalCombined, currency)}
+            </span>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-3 space-y-1.5 rounded-lg border border-line/60 bg-card-hover p-3 text-[12px]">
+          <Row k="Curier" v={payment.recipient.name} />
+          <Row k="Sumă" v={formatMoney(payment.totalCalculated, currency)} />
+          <Row k="IBAN" v={payment.ibanSnapshot ?? "—"} mono />
+          <Row k="Metodă" v={PAYMENT_METHOD_LABEL[payment.method]} />
+          <Row k="Perioadă" v={`${payment.periodStartIso} → ${payment.periodEndIso}`} />
+        </div>
+      )}
+
       <DialogFooter>
         <button type="button" onClick={onCancel} className="rounded-lg border border-line bg-card-hover px-3 py-1.5 text-[12.5px] font-medium text-fg hover:bg-white/[0.05]">Anulează</button>
-        <button type="button" onClick={() => onConfirm(payment.id)} className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 px-4 py-1.5 text-[12.5px] font-semibold text-white">
-          <Check size={14} /> Confirmă plata
+        <button type="button" onClick={() => onConfirm(payment.id, allIds)} className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 px-4 py-1.5 text-[12.5px] font-semibold text-white shadow-sm hover:brightness-110">
+          <Check size={14} /> {isMultiAccount ? `Confirmă plata (${allPaymentsList.length} conturi · ${formatMoney(totalCombined, currency)})` : "Confirmă plata"}
         </button>
       </DialogFooter>
     </Dialog>
@@ -435,16 +492,29 @@ function Row({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
 // SCHIMBĂ STATUS
 // ═══════════════════════════════════════════════════════════════════════════
 export function ChangeStatusDialog({
-  payment, onCancel, onConfirm,
+  payment,
+  siblings,
+  onCancel,
+  onConfirm,
 }: {
   payment: Payment | null;
+  siblings?: Payment[];
   onCancel: () => void;
-  onConfirm: (id: string, status: PaymentStatus) => void;
+  onConfirm: (id: string, status: PaymentStatus, allIds?: string[]) => void;
 }) {
   const [status, setStatus] = useState<PaymentStatus>(payment?.status ?? "in_review");
   if (!payment) return null;
+  const isMultiAccount = siblings && siblings.length > 1;
+  const allIds = siblings && siblings.length > 1 ? siblings.map((s) => s.id) : [payment.id];
+
   return (
     <Dialog open={!!payment} onClose={onCancel} title="Schimbă statusul plății" size="sm">
+      {isMultiAccount && (
+        <div className="mb-3 flex items-center gap-1.5 rounded-lg border border-cyan-500/30 bg-cyan-500/10 px-2.5 py-1.5 text-[11.5px] text-cyan-200">
+          <Copy size={12} className="shrink-0" />
+          <span>Cont dublu: modificarea va actualiza toate cele <b>{siblings.length} conturi conexe</b>.</span>
+        </div>
+      )}
       <div className="space-y-1.5">
         {PAYMENT_STATUS_ORDER.map((s) => (
           <button key={s} type="button" onClick={() => setStatus(s)}
@@ -457,7 +527,7 @@ export function ChangeStatusDialog({
       </div>
       <DialogFooter>
         <button type="button" onClick={onCancel} className="rounded-lg border border-line bg-card-hover px-3 py-1.5 text-[12.5px] font-medium text-fg hover:bg-white/[0.05]">Anulează</button>
-        <button type="button" onClick={() => onConfirm(payment.id, status)} className="rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 px-4 py-1.5 text-[12.5px] font-semibold text-white">Salvează</button>
+        <button type="button" onClick={() => onConfirm(payment.id, status, allIds)} className="rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 px-4 py-1.5 text-[12.5px] font-semibold text-white">Salvează</button>
       </DialogFooter>
     </Dialog>
   );
@@ -678,3 +748,118 @@ export function BulkConfirmDialog({
     </Dialog>
   );
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// GOLEȘTE / RESETEAZĂ RAPOARTELE SĂPTĂMÂNII
+// ═══════════════════════════════════════════════════════════════════════════
+export function ClearWeekDialog({
+  open,
+  onClose,
+  weekLabel,
+  reportName,
+  optionCount,
+  totalWeekCount,
+  onConfirmClear,
+}: {
+  open: boolean;
+  onClose: () => void;
+  weekLabel: string;
+  reportName?: string;
+  optionCount: number;
+  totalWeekCount: number;
+  onConfirmClear: (scope: "option" | "all_week" | "all_history") => void;
+}) {
+  const [scope, setScope] = useState<"option" | "all_week" | "all_history">("all_week");
+
+  if (!open) return null;
+
+  const isSpecificReport = !!reportName && !reportName.toLowerCase().includes("cumulat");
+
+  return (
+    <Dialog open={open} onClose={onClose} title="Golește / Resetează rapoartele" size="md">
+      <div className="space-y-4">
+        <div className="flex items-start gap-3 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-rose-200">
+          <AlertTriangle size={20} className="shrink-0 text-rose-400 mt-0.5" />
+          <div className="text-[12.5px] leading-relaxed">
+            <span className="font-semibold text-white">Atenție:</span> Această acțiune șterge plățile importate din Excel pentru a-ți permite să re-încarci fișierele de la zero.
+          </div>
+        </div>
+
+        <div className="space-y-2 text-[13px]">
+          <div className="font-medium text-fg">Alege opțiunea de ștergere:</div>
+
+          {isSpecificReport && (
+            <label className="flex items-start gap-2.5 rounded-lg border border-line bg-card-hover p-3 cursor-pointer hover:border-violet-500/50">
+              <input
+                type="radio"
+                name="clear-scope"
+                checked={scope === "option"}
+                onChange={() => setScope("option")}
+                className="mt-1"
+              />
+              <div>
+                <div className="font-semibold text-fg">Doar {reportName} ({optionCount} plăți)</div>
+                <div className="text-[11.5px] text-fg-dim">
+                  Șterge strict plățile din acest raport ({weekLabel}). Celelalte rapoarte rămân neatinse.
+                </div>
+              </div>
+            </label>
+          )}
+
+          <label className="flex items-start gap-2.5 rounded-lg border border-line bg-card-hover p-3 cursor-pointer hover:border-violet-500/50">
+            <input
+              type="radio"
+              name="clear-scope"
+              checked={scope === "all_week"}
+              onChange={() => setScope("all_week")}
+              className="mt-1"
+            />
+            <div>
+              <div className="font-semibold text-fg">Toată săptămâna {weekLabel} ({totalWeekCount} plăți)</div>
+              <div className="text-[11.5px] text-fg-dim">
+                Șterge toate rapoartele importate în această săptămână (TTG, Gusty Bolt, Wolt, Glovo). Resetează complet săptămâna la 0 plăți.
+              </div>
+            </div>
+          </label>
+
+          <label className="flex items-start gap-2.5 rounded-lg border border-line bg-card-hover p-3 cursor-pointer hover:border-rose-500/50">
+            <input
+              type="radio"
+              name="clear-scope"
+              checked={scope === "all_history"}
+              onChange={() => setScope("all_history")}
+              className="mt-1"
+            />
+            <div>
+              <div className="font-semibold text-rose-300">Golește toate importurile din toate săptămânile</div>
+              <div className="text-[11.5px] text-fg-dim">
+                Reset total: șterge toate plățile importate vreodată din Excel.
+              </div>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <DialogFooter>
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg border border-line bg-card-hover px-3 py-1.5 text-[12.5px] font-medium text-fg hover:bg-white/[0.05]"
+        >
+          Anulează
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onConfirmClear(scope);
+            onClose();
+          }}
+          className="rounded-lg bg-rose-600 px-4 py-1.5 text-[12.5px] font-semibold text-white hover:bg-rose-500 transition-colors"
+        >
+          Da, șterge definitiv
+        </button>
+      </DialogFooter>
+    </Dialog>
+  );
+}
+

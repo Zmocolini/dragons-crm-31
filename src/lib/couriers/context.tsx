@@ -9,6 +9,7 @@ import { SEED_COURIERS, type CourierRow } from "./mock-seed";
 import { useAuth } from "@/lib/auth/context";
 import { useOwnerScope } from "@/lib/owner-scope/context";
 import { useCandidates } from "@/lib/candidates/context";
+import { saveCourierRate } from "@/lib/payments/imports";
 
 // TODO(real-users): server actions + Drizzle table `couriers`; duplicate detection
 // pe phone/email normalizat server-side per tenantId.
@@ -78,7 +79,17 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration from localStorage; codebase-wide pattern in all providers.
-      if (raw) setCouriers(JSON.parse(raw) as Courier[]);
+      if (raw) {
+        const parsed = JSON.parse(raw) as Courier[];
+        // Migrare curieri: Haani San (și oricare curier Husein cu comision legacy) se corectează la 0% și 0 taxă
+        const migrated = parsed.map((c) => {
+          if (c.fullName?.toLowerCase().trim() === "haani san" && (c.commissionPct === 9 || c.commissionPct === undefined)) {
+            return { ...c, commissionPct: 0, weeklyContractFeeRon: 0 };
+          }
+          return c;
+        });
+        setCouriers(migrated);
+      }
       const rawDel = localStorage.getItem(DELETED_KEY);
       if (rawDel) setDeletedIds(JSON.parse(rawDel) as string[]);
     } catch {}
@@ -103,12 +114,41 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
       id: `courier_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       createdAtIso: new Date().toISOString(),
     };
+    if (c.fullName && (c.commissionPct !== undefined || c.weeklyContractFeeRon !== undefined)) {
+      saveCourierRate(c.fullName, {
+        commissionPct: c.commissionPct,
+        weeklyFeeRon: c.weeklyContractFeeRon,
+      });
+    }
     setCouriers((prev) => [created, ...prev]);
     return created;
   }, []);
 
   const updateCourier = useCallback((id: string, patch: Partial<Omit<Courier, "id" | "createdAtIso" | "tenantId">>) => {
-    setCouriers((prev) => prev.map((c) => c.id === id ? { ...c, ...patch } : c));
+    setCouriers((prev) => {
+      const idx = prev.findIndex((c) => c.id === id);
+      if (idx !== -1) {
+        const target = prev[idx];
+        if (target.fullName && (patch.commissionPct !== undefined || patch.weeklyContractFeeRon !== undefined)) {
+          saveCourierRate(target.fullName, {
+            commissionPct: patch.commissionPct,
+            weeklyFeeRon: patch.weeklyContractFeeRon,
+          });
+        }
+        return prev.map((c, i) => (i === idx ? { ...c, ...patch } : c));
+      }
+      const fromSeed = SEED_COURIERS.find((c) => c.id === id);
+      if (fromSeed) {
+        if (fromSeed.fullName && (patch.commissionPct !== undefined || patch.weeklyContractFeeRon !== undefined)) {
+          saveCourierRate(fromSeed.fullName, {
+            commissionPct: patch.commissionPct,
+            weeklyFeeRon: patch.weeklyContractFeeRon,
+          });
+        }
+        return [{ ...fromSeed, ...patch }, ...prev];
+      }
+      return prev;
+    });
   }, []);
 
   const deleteCourier = useCallback((id: string) => {

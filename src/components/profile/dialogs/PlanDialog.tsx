@@ -84,7 +84,7 @@ export function PlanDialog({
       return;
     }
     toast.info("Plată online în curând", `Contactează contact@dragonsalliance.eu pentru upgrade la ${tier.name}.`);
-    logActivity?.({ kind: "info", title: `Upgrade cerut: ${tier.name}` });
+    logActivity?.("preferences.update", `Upgrade cerut: ${tier.name}`);
   };
 
   const pct = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0;
