@@ -23,7 +23,7 @@ import { AccountsPanel } from "./AccountsPanel";
 import { usePersistentList } from "@/lib/utils/use-persistent-list";
 
 const PAGE = 10;
-function fmt(iso: string): string { const [y, m, d] = iso.split("-"); return `${d}.${m}.${y}`; }
+function fmt(iso: string): string { if (!iso) return "—"; const [y, m, d] = iso.split("-"); return `${d}.${m}.${y}`; }
 const TABS: Array<[SubStatus | "all", string]> = [["all", "Toți"], ["active", "Activi"], ["evaluation", "În evaluare"], ["inactive", "Inactivi"]];
 
 export function SubcontractorsPage() {

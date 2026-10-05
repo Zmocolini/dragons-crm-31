@@ -1,16 +1,18 @@
 // Traducere în runtime, 100% locală: înlocuiește textele românești cu cele din dicționarul /i18n/<lang>.json.
 // Fără servicii externe — datele din CRM nu pleacă nicăieri. Textele netraduse rămân în română.
-export type Lang = "ro" | "en";
+export type Lang = "ro" | "en" | "ru" | "hi";
 export const LANGS: Array<{ code: Lang; label: string; name: string }> = [
   { code: "ro", label: "RO", name: "Română" },
   { code: "en", label: "EN", name: "English" },
+  { code: "ru", label: "RU", name: "Русский" },
+  { code: "hi", label: "HI", name: "हिन्दी (India)" },
 ];
 export const LANG_KEY = "crm31-lang";
 
 export function readLang(): Lang {
   try {
     const v = localStorage.getItem(LANG_KEY);
-    if (v === "en") return v;
+    if (v === "en" || v === "ru" || v === "hi") return v;
   } catch {}
   return "ro";
 }
@@ -23,15 +25,55 @@ const norm = (s: string) => s.replace(/\s+/g, " ").trim();
 
 type Pattern = { re: RegExp; out: string; len: number };
 
-const DAYS: Record<string, string> = { luni: "Monday", marți: "Tuesday", marti: "Tuesday", miercuri: "Wednesday", joi: "Thursday", vineri: "Friday", sâmbătă: "Saturday", sambata: "Saturday", duminică: "Sunday", duminica: "Sunday" };
-const MONTHS: Record<string, string> = { ianuarie: "January", februarie: "February", martie: "March", aprilie: "April", mai: "May", iunie: "June", iulie: "July", august: "August", septembrie: "September", octombrie: "October", noiembrie: "November", decembrie: "December" };
-const cap = (from: string, to: string) => (from[0] === from[0].toUpperCase() ? to : to.toLowerCase());
-/** Zile și luni românești → engleză (doar cu context de dată, ca „luni\"/„mai\" ca cuvinte obișnuite să rămână). */
-function dateWords(s: string): string {
-  const m = Object.keys(MONTHS).join("|");
+const RO_M = ["ianuarie", "februarie", "martie", "aprilie", "mai", "iunie", "iulie", "august", "septembrie", "octombrie", "noiembrie", "decembrie"];
+const RO_MS = ["ian", "feb", "mar", "apr", "mai", "iun", "iul", "aug", "sep", "oct", "noi", "dec"];
+const RO_DS = ["lun", "mar", "mie", "joi", "vin", "sam", "dum"];
+const RO_D = ["luni", "marti", "miercuri", "joi", "vineri", "sambata", "duminica"];
+type DateNames = { monthsNom: string[]; monthsGen: string[]; days: string[]; monthsShort: string[]; daysShort: string[] };
+const DATE_NAMES: Record<Exclude<Lang, "ro">, DateNames> = {
+  en: {
+    monthsNom: ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"],
+    monthsGen: [],
+    days: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+    monthsShort: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+    daysShort: ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+  },
+  ru: {
+    monthsNom: ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"],
+    monthsGen: ["января", "февраля", "марта", "апреля", "мая", "июня", "июля", "августа", "сентября", "октября", "ноября", "декабря"],
+    days: ["Понедельник", "Вторник", "Среда", "Четверг", "Пятница", "Суббота", "Воскресенье"],
+    monthsShort: ["янв", "фев", "мар", "апр", "мая", "июн", "июл", "авг", "сен", "окт", "ноя", "дек"],
+    daysShort: ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"],
+  },
+  hi: {
+    monthsNom: ["जनवरी", "फ़रवरी", "मार्च", "अप्रैल", "मई", "जून", "जुलाई", "अगस्त", "सितंबर", "अक्टूबर", "नवंबर", "दिसंबर"],
+    monthsGen: [],
+    days: ["सोमवार", "मंगलवार", "बुधवार", "गुरुवार", "शुक्रवार", "शनिवार", "रविवार"],
+    monthsShort: ["जन", "फ़र", "मार्च", "अप्रैल", "मई", "जून", "जुल", "अग", "सित", "अक्टू", "नव", "दिस"],
+    daysShort: ["सोम", "मंगल", "बुध", "गुरु", "शुक्र", "शनि", "रवि"],
+  },
+};
+const strip = (w: string) => w.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+const cap = (from: string, to: string, lang: Lang) => (lang === "hi" || from[0] === from[0].toUpperCase() ? to : to.toLowerCase());
+
+/** Zile și luni românești → limba aleasă (doar cu context de dată, ca „luni"/„mai" ca cuvinte obișnuite să rămână). */
+export function dateWords(s: string, lang: Exclude<Lang, "ro">): string {
+  const N = DATE_NAMES[lang];
+  const mi = (w: string) => RO_M.indexOf(strip(w));
+  const m = RO_M.join("|");
   return s
-    .replace(new RegExp(`(\\d{1,2}\\s+(?:-\\s+\\d{1,2}\\s+)?)(${m})\\b|\\b(${m})(\\s+\\d{4})`, "gi"), (_x, d, mo1, mo2, y) => (d ? d + cap(mo1, MONTHS[mo1.toLowerCase()]) : cap(mo2, MONTHS[mo2.toLowerCase()]) + y))
-    .replace(/(^|[^\d\p{L}]\s*)(luni|mar[țt]i|miercuri|joi|vineri|s[âa]mb[ăa]t[ăa]|duminic[ăa])(?=$|[^\p{L}])/giu, (x, pre, w, off, str) => (/\d\s$/.test(str.slice(0, off + pre.length)) ? x : pre + cap(w, DAYS[w.toLowerCase()])));
+    // abrevieri: „Lun, 05 oct" și „05 – 11 Oct" (doar lângă o cifră, ca „mar"/„mai" obișnuite să rămână)
+    .replace(new RegExp(`(\\d{1,2}(?:\\s*[–-]\\s*\\d{1,2})?\\s+)(${RO_MS.join("|")})\\b\\.?`, "gi"), (x, d, mo) => d + N.monthsShort[RO_MS.indexOf(strip(mo))])
+    .replace(new RegExp(`\\b(${RO_DS.join("|")})(?=\\.?,?\\s+\\d{1,2}\\s)`, "gi"), (x, d) => N.daysShort[RO_DS.indexOf(strip(d))])
+    .replace(new RegExp(`(\\d{1,2}\\s+(?:-\\s+\\d{1,2}\\s+)?)(${m})\\b|\\b(${m})(\\s+\\d{4})`, "gi"), (_x, d, mo1, mo2, y) => {
+      if (d) { const i = mi(mo1); return d + cap(mo1, (N.monthsGen[i] ?? N.monthsNom[i]), lang); }
+      return cap(mo2, N.monthsNom[mi(mo2)], lang) + y;
+    })
+    .replace(/(^|[^\d\p{L}]\s*)(\p{L}+)(?=$|[^\p{L}])/gu, (x, pre, w, off, str) => {
+      const di = RO_D.indexOf(strip(w));
+      if (di === -1 || /\d\s$/.test(str.slice(0, off + pre.length))) return x;
+      return pre + cap(w, N.days[di], lang);
+    });
 }
 
 export function startTranslator(lang: Lang, dict: Record<string, string>): () => void {
@@ -57,7 +99,7 @@ export function startTranslator(lang: Lang, dict: Record<string, string>): () =>
         if (m) { let i = 1; res = p.out.replace(/\{n\}/g, () => { const c = m[i++] ?? ""; return lookup(c) ?? c; }); break; }
       }
     }
-    res = dateWords(res ?? key);
+    res = dateWords(res ?? key, lang as Exclude<Lang, "ro">);
     if (res === key) res = null;
     if (cache.size > 5000) cache.clear();
     cache.set(key, res);

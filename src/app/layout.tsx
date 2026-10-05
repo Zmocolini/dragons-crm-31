@@ -80,7 +80,7 @@ const langScript = `
 (function(){
   try {
     var l = localStorage.getItem('crm31-lang');
-    if (l === 'en') {
+    if (l === 'en' || l === 'ru' || l === 'hi') {
       var h = document.documentElement;
       h.setAttribute('data-i18n-pending', '1');
       setTimeout(function(){ h.removeAttribute('data-i18n-pending'); }, 2000);

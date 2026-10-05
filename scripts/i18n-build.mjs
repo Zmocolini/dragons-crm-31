@@ -1,21 +1,28 @@
-// Compilează i18n/chunks/out-*.json (+ extra.json, la nevoie) în public/i18n/en.json (doar intrările diferite de original).
+// Compilează i18n/chunks (out-N: [en, ru]; hi-N: hindi) + extra.json (+ out-extra: [ru, hi]) în public/i18n/{en,ru,hi}.json.
 import fs from "node:fs";
-const keys = Object.keys(JSON.parse(fs.readFileSync("i18n/ro.json", "utf8")));
 const N = fs.readdirSync("i18n/chunks").filter((f) => /^in-\d+\.json$/.test(f)).length;
-const en = {}; let bad = 0, missing = 0;
+const dicts = { en: {}, ru: {}, hi: {} };
+const stats = { badChunks: 0, missing: [] };
+const ph = (s) => (s.match(/\{n\}/g) || []).length;
+const put = (lang, k, v) => { if (typeof v === "string" && v && v !== k && ph(v) === ph(k)) dicts[lang][k] = v; };
+const read = (f) => (fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, "utf8")) : null);
 for (let i = 0; i < N; i++) {
-  const inp = JSON.parse(fs.readFileSync(`i18n/chunks/in-${i}.json`, "utf8"));
-  const f = `i18n/chunks/out-${i}.json`;
-  if (!fs.existsSync(f)) { missing += inp.length; continue; }
-  const out = JSON.parse(fs.readFileSync(f, "utf8"));
-  if (out.length !== inp.length) { console.error(`chunk ${i}: ${out.length} != ${inp.length}`); bad++; continue; }
-  inp.forEach((k, j) => {
-    const [e] = out[j];
-    const ph = (k.match(/\{n\}/g) || []).length;
-    if (typeof e === "string" && e !== k && (e.match(/\{n\}/g) || []).length === ph) en[k] = e;
-  });
+  const inp = read(`i18n/chunks/in-${i}.json`);
+  const out = read(`i18n/chunks/out-${i}.json`);
+  const hi = read(`i18n/chunks/hi-${i}.json`);
+  if (out && out.length === inp.length) inp.forEach((k, j) => { put("en", k, out[j][0]); put("ru", k, out[j][1]); });
+  else stats.missing.push(`out-${i}`);
+  if (hi && hi.length === inp.length) inp.forEach((k, j) => put("hi", k, hi[j]));
+  else stats.missing.push(`hi-${i}`);
 }
-if (fs.existsSync("i18n/extra.json")) Object.assign(en, JSON.parse(fs.readFileSync("i18n/extra.json", "utf8")));
+const extra = read("i18n/extra.json") || {};
+const xk = Object.keys(extra);
+const xo = read("i18n/chunks/out-extra.json");
+for (const k of xk) put("en", k, extra[k]);
+if (xo && xo.length === xk.length) xk.forEach((k, j) => { put("ru", k, xo[j][0]); put("hi", k, xo[j][1]); });
+else stats.missing.push("out-extra");
+const xl = read("i18n/extra-lang.json") || {};
+for (const [k, v] of Object.entries(xl)) for (const l of Object.keys(v)) put(l, k, v[l]);
 fs.mkdirSync("public/i18n", { recursive: true });
-fs.writeFileSync("public/i18n/en.json", JSON.stringify(en));
-console.log(JSON.stringify({ keys: keys.length, en: Object.keys(en).length, badChunks: bad, missingStrings: missing }));
+for (const [l, d] of Object.entries(dicts)) fs.writeFileSync(`public/i18n/${l}.json`, JSON.stringify(d));
+console.log(JSON.stringify({ en: Object.keys(dicts.en).length, ru: Object.keys(dicts.ru).length, hi: Object.keys(dicts.hi).length, ...stats }));
