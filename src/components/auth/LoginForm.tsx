@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AlertCircle, Eye, EyeOff, LogIn } from "lucide-react";
 import { useAuth } from "@/lib/auth/context";
 import { cn } from "@/lib/utils/cn";
+import { LanguageSwitcher } from "@/components/layout/LanguageSwitcher";
 
 export function LoginForm() {
   const { login } = useAuth();
@@ -33,6 +34,7 @@ export function LoginForm() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-app via-panel to-app p-4">
+      <div className="fixed right-3 top-3 z-50"><LanguageSwitcher /></div>
       <div className="w-full max-w-[420px]">
         <div className="mb-6 text-center">
           <div className="mx-auto mb-3 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-600 to-blue-600 text-white shadow-lg">

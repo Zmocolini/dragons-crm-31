@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { RootAuthProvider } from "@/components/auth/RootAuthProvider";
 import { CookieBanner } from "@/components/layout/CookieBanner";
+import { I18nRuntime } from "@/components/layout/I18nRuntime";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -74,6 +75,20 @@ const dataMigrationScript = `
 })();
 `;
 
+// Ascunde pagina până se aplică traducerea (evită clipirea în română); după 2s se arată oricum.
+const langScript = `
+(function(){
+  try {
+    var l = localStorage.getItem('crm31-lang');
+    if (l === 'en') {
+      var h = document.documentElement;
+      h.setAttribute('data-i18n-pending', '1');
+      setTimeout(function(){ h.removeAttribute('data-i18n-pending'); }, 2000);
+    }
+  } catch(e){}
+})();
+`;
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
@@ -83,10 +98,12 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     >
       <head>
         <script dangerouslySetInnerHTML={{ __html: dataMigrationScript }} />
+        <script dangerouslySetInnerHTML={{ __html: langScript }} />
       </head>
       <body className="min-h-full bg-app text-fg" suppressHydrationWarning>
         <RootAuthProvider>{children}</RootAuthProvider>
         <CookieBanner />
+        <I18nRuntime />
       </body>
     </html>
   );

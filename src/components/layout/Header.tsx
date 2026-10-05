@@ -7,6 +7,7 @@ import { UserMenu } from "./UserMenu";
 import { NotificationBell } from "./NotificationBell";
 import { useProfile } from "@/lib/profile/context";
 import { BackupBadge } from "./BackupBadge";
+import { LanguageSwitcher } from "./LanguageSwitcher";
 
 export function Header() {
   const { sidebarOpen, toggleSidebar } = useUI();
@@ -32,6 +33,8 @@ export function Header() {
         <HeaderClock />
 
         <div className="mx-1 hidden h-6 w-px bg-line md:block" />
+
+        <LanguageSwitcher />
 
         <button
           type="button"

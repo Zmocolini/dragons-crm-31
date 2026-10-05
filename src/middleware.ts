@@ -19,6 +19,7 @@ const PUBLIC_PREFIXES = [
   "/favicon",
   "/manifest.webmanifest",
   "/icons/",
+  "/i18n/",           // dicționare de traducere (statice, fără date)
   "/sw.js",
   "/robots.txt",
   "/sitemap.xml",

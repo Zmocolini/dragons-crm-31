@@ -255,3 +255,6 @@ aside[aria-label="Sidebar"] {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+/* i18n: ascunde pagina până se aplică traducerea (setat de scriptul din <head>). */
+html[data-i18n-pending] body { opacity: 0; }
