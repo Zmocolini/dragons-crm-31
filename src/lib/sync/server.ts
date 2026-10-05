@@ -18,24 +18,60 @@ export async function currentSyncUser(): Promise<SyncUser | null> {
   return { ...user, emailLc: user.email.trim().toLowerCase(), isGlobal: user.role === "global_owner" };
 }
 
+import seedRows from "./seed-data.json";
+import seedBackup from "./seed-backup.json";
+
 let tableReady: Promise<void> | null = null;
 
 export function ensureSyncTable(): Promise<void> {
-  tableReady ??= rawDb.batch([
-    `CREATE TABLE IF NOT EXISTS crm_records (
-      k TEXT NOT NULL,
-      id TEXT NOT NULL,
-      kind TEXT NOT NULL,
-      owner TEXT NOT NULL,
-      data TEXT,
-      del INTEGER NOT NULL DEFAULT 0,
-      ts INTEGER NOT NULL,
-      updated_by TEXT NOT NULL DEFAULT '',
-      PRIMARY KEY (k, id)
-    )`,
-    `CREATE INDEX IF NOT EXISTS crm_records_owner_ts ON crm_records(owner, ts)`,
-    `CREATE INDEX IF NOT EXISTS crm_records_ts ON crm_records(ts)`,
-  ], "write").then(() => undefined).catch((e) => { tableReady = null; throw e; });
+  tableReady ??= (async () => {
+    await rawDb.batch([
+      `CREATE TABLE IF NOT EXISTS crm_records (
+        k TEXT NOT NULL,
+        id TEXT NOT NULL,
+        kind TEXT NOT NULL,
+        owner TEXT NOT NULL,
+        data TEXT,
+        del INTEGER NOT NULL DEFAULT 0,
+        ts INTEGER NOT NULL,
+        updated_by TEXT NOT NULL DEFAULT '',
+        PRIMARY KEY (k, id)
+      )`,
+      `CREATE INDEX IF NOT EXISTS crm_records_owner_ts ON crm_records(owner, ts)`,
+      `CREATE INDEX IF NOT EXISTS crm_records_ts ON crm_records(ts)`,
+    ], "write");
+
+    try {
+      const check = await rawDb.execute("SELECT count(*) as c FROM crm_records");
+      const count = Number(check.rows[0]?.c ?? 0);
+      if (count === 0 && Array.isArray(seedRows) && seedRows.length > 0) {
+        for (let i = 0; i < seedRows.length; i += 100) {
+          const chunk = seedRows.slice(i, i + 100);
+          const stmts = chunk.map((r: any) => ({
+            sql: "INSERT OR REPLACE INTO crm_records (k, id, kind, owner, data, del, ts, updated_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            args: [r.k, r.id, r.kind, r.owner, r.data, r.del ? 1 : 0, r.ts, r.updated_by ?? ""]
+          }));
+          await rawDb.batch(stmts, "write");
+        }
+      }
+    } catch (err) {
+      console.error("[Sync] Seed crm_records error:", err);
+    }
+
+    try {
+      const checkSnap = await rawDb.execute("SELECT count(*) as c FROM backup_snapshots");
+      const countSnap = Number(checkSnap.rows[0]?.c ?? 0);
+      if (countSnap === 0 && seedBackup && (seedBackup as any).keys) {
+        const snap = seedBackup as any;
+        await rawDb.execute({
+          sql: "INSERT INTO backup_snapshots (tenant_id, created_at_iso, keys, item_count, size_bytes, is_shrunk) VALUES (?, ?, ?, ?, ?, ?)",
+          args: [snap.tenant_id ?? "fleet_dragons", snap.created_at_iso ?? new Date().toISOString(), snap.keys, snap.item_count ?? 684, snap.size_bytes ?? 188901, 0]
+        });
+      }
+    } catch (err) {
+      console.error("[Sync] Seed backup_snapshots error:", err);
+    }
+  })().catch((e) => { tableReady = null; throw e; });
   return tableReady;
 }
 
