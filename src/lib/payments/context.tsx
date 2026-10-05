@@ -100,7 +100,7 @@ function applyPatch(base: Payment, patch: Patch | undefined): Payment {
  * Dacă venitul brut este egal cu balanța negativă (ex: 17.61 cu 17.61):
  *  - Comision = 0, taxă = 0, totalCalculated = 0.00 RON.
  */
-function sanitizePaymentFee(p: Payment): Payment {
+export function sanitizePaymentFee(p: Payment): Payment {
   const b = p.breakdown;
   if (!b) return p;
   const gross = round2((b.grossRevenue || 0) + (b.tips || 0));
@@ -110,7 +110,7 @@ function sanitizePaymentFee(p: Payment): Payment {
 
   // Cazul 1 & 2: Cash-ul încasat este egal sau mai mare decât venitul brut
   if (rawCashResidual <= 0) {
-    const rawTotal = rawCashResidual;
+    const rawTotal = round2(rawCashResidual + (b.correction || 0) + (b.otherAdjustments || 0));
     const totalCalculated = Math.abs(rawTotal) < 0.001 ? 0 : rawTotal;
     if (b.fleetCommission !== 0 || b.tax !== 0 || totalCalculated !== p.totalCalculated) {
       return {
