@@ -14,7 +14,7 @@ import {
   Sparkles,
   Trophy,
   Handshake,
-  UserCog,
+
   Wallet,
 } from "lucide-react";
 import type { Permission } from "@/lib/rbac/roles";
@@ -37,7 +37,6 @@ export const NAV_ITEMS: NavItem[] = [
   { href: "/vehicule", label: "Vehicule", icon: Car, permission: "vehicles.view" },
   { href: "/cazari", label: "Cazări", icon: Hotel, permission: "cazari.view" },
   { href: "/subcontractori", label: "Subcontractori", icon: Trophy, permission: "subcontractors.view" },
-  { href: "/utilizatori", label: "Utilizatori", icon: UserCog, permission: "users.view" },
   { href: "/rapoarte", label: "Rapoarte", icon: BarChart3, permission: "reports.view" },
   { href: "/probleme", label: "Probleme / Suport", icon: LifeBuoy, permission: "issues.view" },
   { href: "/calendar", label: "Calendar", icon: CalendarDays, permission: "calendar.view" },

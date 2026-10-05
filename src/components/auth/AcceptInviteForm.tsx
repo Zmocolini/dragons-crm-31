@@ -1,19 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import { CheckCircle2, MailCheck, ShieldAlert, UserPlus } from "lucide-react";
-import { useAuth } from "@/lib/auth/context";
-import { ROLE_LABELS } from "@/lib/rbac/roles";
 import { cn } from "@/lib/utils/cn";
 
+type InviteInfo = { status: "pending" | "accepted" | "expired" | "revoked" | "missing"; email?: string; name?: string };
+
 export function AcceptInviteForm() {
-  const { findInvitation, acceptInvitation } = useAuth();
-  const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get("token") ?? "";
-  const invitation = useMemo(() => findInvitation(token), [findInvitation, token]);
+  const [invitation, setInvitation] = useState<InviteInfo | null>(null);
 
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -22,22 +20,36 @@ export function AcceptInviteForm() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (invitation?.name && !name) setName(invitation.name);
-  }, [invitation, name]);
+    if (!token) { setInvitation({ status: "missing" }); return; }
+    fetch(`/api/auth/invitation/${encodeURIComponent(token)}`)
+      .then((r) => r.json())
+      .then((j: InviteInfo) => { setInvitation(j); if (j.name) setName(j.name); })
+      .catch(() => setInvitation({ status: "missing" }));
+  }, [token]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (password.length < 8) { setError("Parola trebuie să aibă minim 8 caractere."); return; }
     if (password !== password2) { setError("Parolele nu coincid."); return; }
     setBusy(true);
     setError(null);
-    const res = await acceptInvitation({ token, name, password });
-    setBusy(false);
-    if (res.ok) router.replace("/");
-    else setError(res.error);
+    try {
+      const res = await fetch(`/api/auth/invitation/${encodeURIComponent(token)}/accept`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name, password }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (res.ok) { window.location.replace("/"); return; }
+      setError(j.error ?? "Nu s-a putut crea contul.");
+    } finally {
+      setBusy(false);
+    }
   }
 
-  const isExpired = invitation && new Date(invitation.expiresAtIso).getTime() < Date.now();
-  const isUsed = invitation?.acceptedAtIso != null;
+  const status = invitation?.status;
+  const isUsed = status === "accepted";
+  const isExpired = status === "expired" || status === "revoked";
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-app via-panel to-app p-4">
@@ -50,7 +62,7 @@ export function AcceptInviteForm() {
           <p className="mt-1 text-[12.5px] text-fg-muted">Setează parola pentru a intra în echipă.</p>
         </div>
 
-        {!invitation && (
+        {invitation && status === "missing" && (
           <ErrorCard
             title="Invitație inexistentă"
             body="Token-ul din link nu se regăsește. Cere-i owner-ului o invitație nouă."
@@ -66,20 +78,20 @@ export function AcceptInviteForm() {
           />
         )}
 
-        {invitation && !isUsed && isExpired && (
+        {invitation && isExpired && (
           <ErrorCard
-            title="Invitație expirată"
-            body="Perioada de 7 zile a trecut. Cere-i owner-ului o invitație nouă."
+            title={status === "revoked" ? "Invitație anulată" : "Invitație expirată"}
+            body="Linkul nu mai este valabil. Cere-i administratorului o invitație nouă."
           />
         )}
 
-        {invitation && !isUsed && !isExpired && (
+        {invitation && status === "pending" && (
           <form onSubmit={handleSubmit} className="rounded-2xl border border-line bg-card p-6 shadow-2xl shadow-black/40">
             <div className="mb-4 rounded-lg border border-violet-500/30 bg-violet-500/[0.06] p-3">
               <div className="text-[11px] font-semibold text-violet-200">Ai fost invitat/ă</div>
               <div className="mt-1 text-[13px] font-bold text-fg">{invitation.email}</div>
               <div className="text-[11px] text-fg-muted">
-                Rol: <b className="text-fg">{ROLE_LABELS[invitation.role]}</b>
+                Rol: <b className="text-fg">Subcontractor</b>
               </div>
             </div>
 
@@ -97,7 +109,7 @@ export function AcceptInviteForm() {
             </label>
 
             <label className="mt-3 block">
-              <span className="mb-1 block text-[11.5px] font-semibold text-fg-muted">Parolă (min. 6 caractere)</span>
+              <span className="mb-1 block text-[11.5px] font-semibold text-fg-muted">Parolă (min. 8 caractere)</span>
               <input
                 type="password"
                 autoComplete="new-password"

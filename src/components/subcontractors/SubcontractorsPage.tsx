@@ -19,6 +19,7 @@ import {
   type SubStatus, type Subcontractor, type SubcontractorContractFile,
 } from "@/lib/subcontractors/data";
 import { cn } from "@/lib/utils/cn";
+import { AccountsPanel } from "./AccountsPanel";
 import { usePersistentList } from "@/lib/utils/use-persistent-list";
 
 const PAGE = 10;
@@ -73,6 +74,7 @@ export function SubcontractorsPage() {
   const list = useMemo(() => [...userSubs, ...added, ...seed], [userSubs, added, seed]);
 
   const [q, setQ] = useState(""); const [tab, setTab] = useState<SubStatus | "all">("all"); const [city, setCity] = useState("all"); const [platform, setPlatform] = useState("all"); const [type, setType] = useState("all");
+  const [view, setView] = useState<"list" | "accounts">("list");
   const [page, setPage] = useState(1); const [selected, setSelected] = useState<Subcontractor | null>(null); const [addOpen, setAddOpen] = useState(false);
 
   const cities = useMemo(() => Array.from(new Set(list.flatMap((s) => s.cities))).sort(), [list]);
@@ -115,6 +117,16 @@ export function SubcontractorsPage() {
         <div><h1 className="text-[26px] font-bold tracking-tight text-fg">Subcontractori</h1><p className="mt-1 max-w-2xl text-[13px] text-fg-muted">Gestionează partenerii și subcontractorii. Monitorizează performanța, contractele și curierii alocați.</p></div>
         <div className="flex items-center gap-2"><button type="button" onClick={exportXlsx} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card-hover px-3 py-2 text-[12.5px] font-medium text-fg hover:bg-white/[0.06]"><Download size={14} className="text-fg-dim" /> Exportă</button><button type="button" onClick={() => setAddOpen(true)} disabled={!canManage} className={cn("inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-4 py-2 text-[13px] font-semibold text-white", !canManage && "opacity-50")}><Plus size={15} /> Adaugă subcontractor</button></div>
       </header>
+
+      {canManage && (
+        <div role="tablist" className="inline-flex w-fit rounded-lg border border-line bg-card-2 p-0.5 text-[12.5px] font-medium">
+          {([["list", "Subcontractori"], ["accounts", "Conturi și invitații"]] as const).map(([k, l]) => (
+            <button key={k} type="button" role="tab" aria-selected={view === k} onClick={() => setView(k)} className={cn("rounded-md px-3 py-1.5", view === k ? "bg-white/[0.08] text-fg" : "text-fg-muted hover:text-fg")}>{l}</button>
+          ))}
+        </div>
+      )}
+
+      {view === "accounts" && canManage ? <AccountsPanel /> : (<>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         <Kpi icon={Briefcase} tint="bg-info/12" color="text-[color:var(--color-info)]" label="Total subcontractori" value={kpi.total} />
@@ -172,6 +184,7 @@ export function SubcontractorsPage() {
           }}
         />
       )}
+      </>)}
       <AddSubDialog open={addOpen} onClose={() => setAddOpen(false)} onAdd={(s) => { setAdded((p) => [s, ...p]); toast.success("Subcontractor adăugat", s.company); }} tenantId={activeFleetId} />
     </div>
   );

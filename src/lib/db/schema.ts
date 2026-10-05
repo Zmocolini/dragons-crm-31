@@ -105,6 +105,21 @@ export const sessions = sqliteTable("sessions", {
   ip: text("ip"),
 });
 
+// ── INVITAȚII (subcontractori invitați pe email; tokenul se stochează doar ca hash) ──
+export const invitations = sqliteTable("invitations", {
+  id: text("id").primaryKey(),
+  tokenHash: text("token_hash").notNull().unique(),
+  email: text("email").notNull(),
+  name: text("name").notNull().default(""),
+  role: text("role").notNull().default("subcontractor_owner"),
+  invitedBy: text("invited_by").notNull(),
+  createdAtIso: text("created_at_iso").notNull().default(sql`(current_timestamp)`),
+  expiresAtIso: text("expires_at_iso").notNull(),
+  acceptedAtIso: text("accepted_at_iso"),
+  revokedAtIso: text("revoked_at_iso"),
+  emailSentAtIso: text("email_sent_at_iso"),
+});
+
 // ── TICKETS (probleme / suport) ────────────────────────────────────────────
 export const tickets = sqliteTable("tickets", {
   id: text("id").primaryKey(),
