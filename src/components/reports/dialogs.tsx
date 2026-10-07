@@ -17,7 +17,7 @@ const REPORT_TYPE_OPTIONS = (
 ).map((t) => ({ value: t, label: REPORT_TYPE_LABEL[t] }));
 const STATUS_OPTIONS: Array<{ value: CourierStatus | "all"; label: string }> = [
   { value: "all", label: "Toate statusurile" },
-  ...(["active", "in_activation", "paused", "stopped", "draft"] as CourierStatus[]).map((s) => ({ value: s, label: COURIER_STATUS_LABEL[s] })),
+  ...(["pending", "active", "rejected", "in_activation", "paused", "stopped", "draft"] as CourierStatus[]).map((s) => ({ value: s, label: COURIER_STATUS_LABEL[s] })),
 ];
 
 // ── Rapoarte salvate ─────────────────────────────────────────────────────────

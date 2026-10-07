@@ -784,9 +784,11 @@ function SummaryRow({
 
 function StatusBadge({ status }: { status: CourierStatus }) {
   const cls = {
+    pending:        "bg-amber-500/15 text-amber-300",
     draft:          "bg-white/[0.05] text-fg-dim",
     in_activation:  "bg-emerald-500/15 text-emerald-300",
     active:         "bg-emerald-500/15 text-emerald-300",
+    rejected:       "bg-rose-500/15 text-rose-300",
     paused:         "bg-amber-500/15 text-amber-300",
     stopped:        "bg-rose-500/15 text-rose-300",
   }[status];

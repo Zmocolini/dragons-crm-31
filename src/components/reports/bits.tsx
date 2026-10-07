@@ -28,9 +28,11 @@ export function CourierAvatar({ name, size = 24 }: { name: string; size?: number
 }
 
 const STATUS_COLOR: Record<CourierStatus, string> = {
+  pending: "#f59e0b",
   active: "#22c55e",
+  rejected: "#ef4444",
   in_activation: "#3b82f6",
-  paused: "#f59e0b",
+  paused: "#64748b",
   stopped: "#ef4444",
   draft: "#64748b",
 };

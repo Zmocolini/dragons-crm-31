@@ -30,7 +30,7 @@ const PLATFORM_CHIPS: Array<{ key: ReportPlatform; label: string }> = [
 
 const STATUS_OPTIONS: Array<{ value: CourierStatus | "all"; label: string }> = [
   { value: "all", label: "Toate statusurile" },
-  ...(["active", "in_activation", "paused", "stopped", "draft"] as CourierStatus[]).map((s) => ({
+  ...(["pending", "active", "rejected", "in_activation", "paused", "stopped", "draft"] as CourierStatus[]).map((s) => ({
     value: s,
     label: COURIER_STATUS_LABEL[s],
   })),

@@ -77,7 +77,7 @@ function matchesQuickFilter(row: CourierRow, key: QuickFilterKey, now: number): 
   switch (key) {
     case "all": return true;
     case "status_active": return row.status === "active";
-    case "status_in_activation": return row.status === "in_activation";
+    case "status_in_activation": return row.status === "in_activation" || row.status === "pending";
     case "waiting": return isWaiting(row);
     case "docs_missing": return row.documentsMissingCount > 0 || row.documentsExpiredCount > 0;
     case "open_issues": return row.hasOpenIssue;
@@ -198,7 +198,7 @@ export function computeStats(rows: CourierRow[], activeFleetId: string, now: num
     if (row.status === "stopped") stopped++;
     if (isWaiting(row)) waiting++;
     if (row.status === "active") active++;
-    if (row.status === "in_activation") inActivation++;
+    if (row.status === "in_activation" || row.status === "pending") inActivation++;
     if (row.documentsMissingCount > 0 || row.documentsExpiredCount > 0) documentsMissing++;
     if (row.hasOpenIssue) openIssues++;
     if (row.hasBlockedActivation) activationBlocked++;

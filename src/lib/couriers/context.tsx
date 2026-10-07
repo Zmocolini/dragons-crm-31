@@ -4,7 +4,7 @@ import {
   createContext, useCallback, useContext, useEffect, useMemo, useRef, useState,
   type ReactNode,
 } from "react";
-import type { Courier, CourierDuplicateMatch } from "./types";
+import type { Courier, CourierDuplicateMatch, CourierStatus } from "./types";
 import { SEED_COURIERS, type CourierRow } from "./mock-seed";
 import { useAuth } from "@/lib/auth/context";
 import { useOwnerScope } from "@/lib/owner-scope/context";
@@ -81,13 +81,21 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration from localStorage; codebase-wide pattern in all providers.
       if (raw) {
         const parsed = JSON.parse(raw) as Courier[];
-        // Migrare curieri: Haani San (și oricare curier Husein cu comision legacy) se corectează la 0% și 0 taxă
+        const MIGRATION_PENDING_KEY = "crm31-migrated-pending-subcontractors-v2";
+        const alreadyMigrated = localStorage.getItem(MIGRATION_PENDING_KEY);
         const migrated = parsed.map((c) => {
-          if (c.fullName?.toLowerCase().trim() === "haani san" && (c.commissionPct === 9 || c.commissionPct === undefined)) {
-            return { ...c, commissionPct: 0, weeklyContractFeeRon: 0 };
+          let updated = { ...c };
+          if (updated.fullName?.toLowerCase().trim() === "haani san" && (updated.commissionPct === 9 || updated.commissionPct === undefined)) {
+            updated = { ...updated, commissionPct: 0, weeklyContractFeeRon: 0 };
           }
-          return c;
+          if (!alreadyMigrated && (updated.fullName?.toLowerCase().includes("anton") || updated.createdBy?.toLowerCase().includes("anton"))) {
+            updated = { ...updated, status: "pending" as CourierStatus };
+          }
+          return updated;
         });
+        if (!alreadyMigrated) {
+          try { localStorage.setItem(MIGRATION_PENDING_KEY, "1"); } catch {}
+        }
         setCouriers(migrated);
       }
       const rawDel = localStorage.getItem(DELETED_KEY);
@@ -104,13 +112,26 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
     } catch {}
   }, [couriers, deletedIds, hydrated]);
 
+  const { current } = useAuth();
+  const { scope } = useOwnerScope();
+  const currentUserEmailRef = useRef<string>("");
+  const currentUserRoleRef = useRef<string>("");
+  useEffect(() => {
+    currentUserEmailRef.current = current?.email ?? "";
+    currentUserRoleRef.current = current?.role ?? "";
+  }, [current]);
+
   const addCourier = useCallback((c: Omit<Courier, "id" | "createdAtIso">) => {
     // ATENȚIE: forțez createdBy = emailul user-ului logat ca să funcționeze filtrarea
     // per rol (subcontractor vede doar ce a creat el). Ignoră ce trimite caller-ul.
     const ownerEmail = currentUserEmailRef.current || c.createdBy || "";
     const nowIso = new Date().toISOString();
+    const isSubcontractor = currentUserRoleRef.current === "subcontractor_owner";
+    // Subcontractorii creează ÎNTOTDEAUNA curieri în status "pending" (în așteptare aprobare de la flotă)
+    const courierStatus: CourierStatus = isSubcontractor ? "pending" : (c.status || "active");
     const created: Courier = {
       ...c,
+      status: courierStatus,
       createdBy: ownerEmail,
       id: `courier_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
       createdAtIso: nowIso,
@@ -127,10 +148,18 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateCourier = useCallback((id: string, input: Partial<Omit<Courier, "id" | "createdAtIso" | "tenantId">>) => {
+    const isSubcontractor = currentUserRoleRef.current === "subcontractor_owner";
+    const safeInput = { ...input };
+    // Subcontractorul NU poate modifica statusul curierului (statusul e confirmat și modificat doar de flotă)
+    if (isSubcontractor && safeInput.status !== undefined) {
+      delete safeInput.status;
+    }
     setCouriers((prev) => {
       // Ceasul pending (pragul de 5 zile) pornește doar la o schimbare reală de status.
       const before = prev.find((c) => c.id === id) ?? SEED_COURIERS.find((c) => c.id === id);
-      const patch = input.status && before && input.status !== before.status ? { ...input, statusSinceIso: new Date().toISOString() } : input;
+      const patch = safeInput.status && before && safeInput.status !== before.status
+        ? { ...safeInput, statusSinceIso: new Date().toISOString() }
+        : safeInput;
       const idx = prev.findIndex((c) => c.id === id);
       if (idx !== -1) {
         const target = prev[idx];
@@ -160,11 +189,6 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
     setCouriers((prev) => prev.filter((c) => c.id !== id));
     setDeletedIds((prev) => (prev.includes(id) ? prev : [id, ...prev]));
   }, []);
-
-  const { current } = useAuth();
-  const { scope } = useOwnerScope();
-  const currentUserEmailRef = useRef<string>("");
-  useEffect(() => { currentUserEmailRef.current = current?.email ?? ""; }, [current]);
 
   const allRows = useMemo<CourierRow[]>(() => {
     const all = [...couriers.map(wrapUserCourier), ...SEED_COURIERS].filter((c) => !deletedIds.includes(c.id));
