@@ -21,9 +21,9 @@ const PLATFORMS = [
 ] as const;
 
 const RANGES = [
-  { value: 7, label: "Ultimele 7 zile", tickInterval: 0 },
-  { value: 30, label: "Ultimele 30 zile", tickInterval: 3 },
-  { value: 90, label: "Ultimele 90 zile", tickInterval: 11 },
+  { value: 4, label: "Ultimele 4 rapoarte" },
+  { value: 8, label: "Ultimele 8 rapoarte" },
+  { value: 12, label: "Ultimele 12 rapoarte" },
 ] as const;
 
 type RangeValue = (typeof RANGES)[number]["value"];
@@ -45,7 +45,7 @@ function niceMax(value: number): number {
 }
 
 export function CourierActivityChart({ data }: Props) {
-  const [range, setRange] = useState<RangeValue>(30);
+  const [range, setRange] = useState<RangeValue>(8);
   const [open, setOpen] = useState(false);
 
   const sliced = useMemo(() => data.slice(-range), [data, range]);
@@ -64,13 +64,16 @@ export function CourierActivityChart({ data }: Props) {
     };
   }, [sliced]);
 
-  const showDots = range <= 30;
-
   return (
     <Card>
       <CardHeader>
         <div className="flex flex-col gap-3">
-          <CardTitle>Activitate curieri</CardTitle>
+          <div>
+            <CardTitle>Activitate curieri</CardTitle>
+            <p className="mt-0.5 text-[11.5px] text-fg-muted">
+              Curieri activi pe platformă, de la raport la raport
+            </p>
+          </div>
           <div className="flex items-center gap-4">
             {PLATFORMS.map((p) => (
               <span
@@ -139,6 +142,11 @@ export function CourierActivityChart({ data }: Props) {
         </div>
       </CardHeader>
       <CardBody className="pl-1 pr-3 pb-3">
+        {sliced.length === 0 ? (
+          <div className="flex h-[220px] items-center justify-center text-[12.5px] text-fg-muted">
+            Niciun raport importat încă
+          </div>
+        ) : (
         <div className="h-[220px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
@@ -152,12 +160,13 @@ export function CourierActivityChart({ data }: Props) {
                 axisLine={false}
                 tick={{ fontSize: 11 }}
                 dy={6}
-                interval={activeRange.tickInterval}
+                interval={0}
               />
               <YAxis
                 tickLine={false}
                 axisLine={false}
                 tick={{ fontSize: 11 }}
+                allowDecimals={false}
                 domain={[0, domainMax]}
                 ticks={ticks}
               />
@@ -172,7 +181,7 @@ export function CourierActivityChart({ data }: Props) {
                   return (
                     <div className="rounded-lg border border-line bg-card-2 px-3 py-2 shadow-xl">
                       <div className="text-[15px] font-bold text-fg">
-                        {total} comenzi
+                        {total} curieri activi
                       </div>
                       <div className="text-[10.5px] text-fg-dim">{label}</div>
                       <div className="mt-1.5 space-y-0.5">
@@ -205,7 +214,7 @@ export function CourierActivityChart({ data }: Props) {
                   dataKey={p.key}
                   stroke={p.color}
                   strokeWidth={2}
-                  dot={showDots ? { r: 2.5, strokeWidth: 0, fill: p.color } : false}
+                  dot={{ r: 2.5, strokeWidth: 0, fill: p.color }}
                   activeDot={{
                     r: 4,
                     strokeWidth: 2,
@@ -217,6 +226,7 @@ export function CourierActivityChart({ data }: Props) {
             </LineChart>
           </ResponsiveContainer>
         </div>
+        )}
       </CardBody>
     </Card>
   );

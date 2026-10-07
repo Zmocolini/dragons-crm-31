@@ -23,11 +23,20 @@ export type Stat = {
 
 export type PlatformKey = "bolt" | "wolt" | "glovo";
 
+/** Un punct = un raport săptămânal (S40 …); valorile = curieri activi distincți pe platformă în acel raport. */
 export type CourierActivityPoint = {
   label: string;
   bolt: number;
   wolt: number;
   glovo: number;
+};
+
+/** Venitul brut al unui raport săptămânal, total + pe platforme. Ordine crescătoare în timp. */
+export type WeeklyRevenue = {
+  label: string;     // "S40"
+  startIso: string;  // luni, YYYY-MM-DD
+  total: number;     // RON
+  byPlatform: { bolt: number; wolt: number; glovo: number; other: number };
 };
 
 export type RevenuePoint = {

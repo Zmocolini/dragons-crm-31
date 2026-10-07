@@ -8,6 +8,7 @@ import { SettingsProvider } from "@/lib/settings/context";
 import { CandidatesProvider } from "@/lib/candidates/context";
 import { CandidatesStageProvider } from "@/lib/candidates/stage-context";
 import { CouriersProvider } from "@/lib/couriers/context";
+import { FleetTasksProvider } from "@/lib/tasks/context";
 import { DuplicatePairsProvider } from "@/lib/subcontractors/duplicate-pairs-context";
 import { OwnerScopeProvider } from "@/lib/owner-scope/context";
 import { PaymentsProvider } from "@/lib/payments/context";
@@ -31,6 +32,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
           <CandidatesProvider>
             <CandidatesStageProvider>
               <CouriersProvider>
+                <FleetTasksProvider>
                 <DuplicatePairsProvider>
                 <VehiclesProvider>
                 <AccommodationsProvider>
@@ -52,6 +54,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
                 </AccommodationsProvider>
                 </VehiclesProvider>
                 </DuplicatePairsProvider>
+                </FleetTasksProvider>
               </CouriersProvider>
             </CandidatesStageProvider>
           </CandidatesProvider>

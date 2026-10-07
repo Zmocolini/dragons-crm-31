@@ -42,3 +42,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# memoria buclei (locală, nu se versionează)
+.bucla/
