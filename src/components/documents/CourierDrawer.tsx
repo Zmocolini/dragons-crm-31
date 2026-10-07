@@ -49,7 +49,7 @@ export function CourierDrawer({
 }) {
   const router = useRouter();
   const docsCtx = useDocuments();
-  const { user } = useSession();
+  const { user, can } = useSession();
   const toast = useToast();
   const replaceRef = useRef<HTMLInputElement>(null);
 
@@ -187,7 +187,7 @@ export function CourierDrawer({
               <InfoRow label="Email" value={c.email ?? "—"} />
               <div className="flex items-center justify-between gap-3 py-1"><span className="text-[12px] text-fg-dim">Platforme</span><PlatformBadges platforms={c.platforms} /></div>
               <InfoRow label="Vehicul" value={VEHICLE_TYPE_LABEL[c.vehicleType]} />
-              <InfoRow label="Subcontractor" value={c.subcontractorName ?? "Flotă directă"} />
+              {can("subcontractors.view") && <InfoRow label="Subcontractor" value={c.subcontractorName ?? "Flotă directă"} />}
               <InfoRow label="ID intern" value={`#${c.id.toUpperCase()}`} />
               <InfoRow label="Data adăugării" value={ddmmyyyy(c.createdAtIso)} />
               <button type="button" onClick={() => router.push(`/curieri/${c.id}`)} className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-lg border border-line bg-card-hover py-2 text-[12.5px] font-medium text-fg hover:bg-white/[0.06]">

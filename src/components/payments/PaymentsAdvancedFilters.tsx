@@ -107,10 +107,10 @@ export function PaymentsAdvancedFilters({
             <Select value={draft.operator} onChange={(v) => set({ operator: v })}
               options={[{ value: "all", label: "Toți" }, ...operators.map((o) => ({ value: o, label: o }))]} />
           </Group>
-          <Group label="Subcontractor">
+          {subcontractors.length > 0 && <Group label="Subcontractor">
             <Select value={draft.subcontractor} onChange={(v) => set({ subcontractor: v })}
               options={[{ value: "all", label: "Toți" }, ...subcontractors.map((s) => ({ value: s, label: s }))]} />
-          </Group>
+          </Group>}
           <Group label="Procesare">
             <Select value={draft.processed} onChange={(v) => set({ processed: v as AdvancedPaymentFilters["processed"] })}
               options={[{ value: "all", label: "Toate" }, { value: "processed", label: "Procesate" }, { value: "unprocessed", label: "Neprocesate" }]} />

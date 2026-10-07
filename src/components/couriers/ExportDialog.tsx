@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useSession } from "@/lib/rbac/session";
 import { FileSpreadsheet, FileText, FileType2 } from "lucide-react";
 import { Dialog, DialogFooter } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
@@ -28,11 +29,11 @@ function csvEscape(v: string): string {
   return v;
 }
 
-function rowsToCsv(rows: CourierRow[]): string {
+function rowsToCsv(rows: CourierRow[], withSubcontractor: boolean): string {
   const header = [
     "ID", "Nume", "Telefon", "Email", "Oraș", "Platforme", "Vehicul", "Tip vehicul",
     "Documente", "Docs lipsă", "Docs expirate", "Status", "Ultima activitate",
-    "Data adăugării", "Subcontractor",
+    "Data adăugării", ...(withSubcontractor ? ["Subcontractor"] : []),
   ];
   const lines = rows.map((r) => [
     r.id,
@@ -49,7 +50,7 @@ function rowsToCsv(rows: CourierRow[]): string {
     COURIER_STATUS_LABEL[r.status],
     r.lastActivityIso,
     r.createdAtIso,
-    r.subcontractorName ?? "",
+    ...(withSubcontractor ? [r.subcontractorName ?? ""] : []),
   ].map(csvEscape).join(","));
   return [header.join(","), ...lines].join("\n");
 }
@@ -57,6 +58,7 @@ function rowsToCsv(rows: CourierRow[]): string {
 export function ExportDialog({ open, onClose, rows, fleetName }: Props) {
   const [format, setFormat] = useState<Format>("csv");
   const toast = useToast();
+  const { can } = useSession();
 
   const handleExport = () => {
     const opt = OPTIONS.find((o) => o.value === format);
@@ -64,7 +66,7 @@ export function ExportDialog({ open, onClose, rows, fleetName }: Props) {
       toast.info(`Export ${opt?.label ?? format} — în curând`, "Momentan doar CSV e disponibil client-side. Excel/PDF necesită backend.");
       return;
     }
-    const csv = rowsToCsv(rows);
+    const csv = rowsToCsv(rows, can("subcontractors.view"));
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");

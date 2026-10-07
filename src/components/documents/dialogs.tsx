@@ -45,14 +45,16 @@ export function AdvancedFiltersDialog({
         <Field label="Status documente curier">
           <Select value={filters.status} options={statusOptions} onChange={(v) => patch({ status: v })} ariaLabel="Status" />
         </Field>
-        <Field label="Subcontractor">
-          <Select
-            value={filters.subcontractor}
-            options={[{ value: "all", label: "Toți subcontractorii" }, ...subcontractorOptions.map((s) => ({ value: s, label: s }))]}
-            onChange={(v) => patch({ subcontractor: v })}
-            ariaLabel="Subcontractor"
-          />
-        </Field>
+        {subcontractorOptions.length > 0 && (
+          <Field label="Subcontractor">
+            <Select
+              value={filters.subcontractor}
+              options={[{ value: "all", label: "Toți subcontractorii" }, ...subcontractorOptions.map((s) => ({ value: s, label: s }))]}
+              onChange={(v) => patch({ subcontractor: v })}
+              ariaLabel="Subcontractor"
+            />
+          </Field>
+        )}
         <Field label="Curier">
           <button type="button" onClick={() => patch({ onlyActive: !filters.onlyActive })}
             className={cn("flex w-full items-center justify-between rounded-lg border px-3 py-2 text-[12.5px]", filters.onlyActive ? "border-accent/50 bg-accent/10 text-fg" : "border-line bg-card-hover text-fg-muted")}>

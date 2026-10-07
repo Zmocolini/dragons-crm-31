@@ -24,6 +24,7 @@ export type RegisterInput = {
   fleetCity: string;
   fleetCountry: string;
   fleetCui: string | null;
+  vatPayer: boolean;
   flagEmoji: string | null;
   brandColor: string | null;
   logoDataUrl: string | null;
@@ -82,7 +83,7 @@ export type AuthContextValue = {
   register: (input: RegisterInput) => Promise<{ ok: true } | { ok: false; error: string }>;
   logout: () => void;
   updateProfile: (patch: Partial<Pick<AccountUser, "name" | "avatarDataUrl">>) => void;
-  updateMyFleet: (patch: Partial<Pick<FleetTenant, "name" | "city" | "cui" | "logoDataUrl" | "flagEmoji" | "brandColor">>) => void;
+  updateMyFleet: (patch: Partial<Pick<FleetTenant, "name" | "city" | "country" | "vatPayer" | "cui" | "logoDataUrl" | "flagEmoji" | "brandColor">>) => void;
 
   /** Invitații emise de flota curentă. */
   invitations: Invitation[];

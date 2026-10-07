@@ -254,7 +254,7 @@ export function PaymentsTable({
                           </span>
                         ))}
 
-                        <SubcontractorBadge name={subcontractorFor(p.recipient.name)} />
+                        {can("subcontractors.view") && <SubcontractorBadge name={subcontractorFor(p.recipient.name)} />}
 
                         {isDuplicate && (
                           <DuplicateAccountBadge

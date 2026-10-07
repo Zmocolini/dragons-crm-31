@@ -72,6 +72,13 @@ type SettingsContextValue = {
 
 const SettingsContext = createContext<SettingsContextValue | null>(null);
 
+// Orașe impuse tuturor (admin + subcontractori): se adaugă în setările deja salvate local.
+const MANDATORY_CITY_IDS = ["c_chisinau"];
+function withMandatoryCities(cities: City[]): City[] {
+  const missing = DEFAULT_SETTINGS.cities.filter((d) => MANDATORY_CITY_IDS.includes(d.id) && !cities.some((c) => c.id === d.id || c.name === d.name));
+  return missing.length ? [...cities, ...missing] : cities;
+}
+
 function safeRead(): SettingsState {
   if (typeof window === "undefined") return DEFAULT_SETTINGS;
   try {
@@ -91,7 +98,7 @@ function safeRead(): SettingsState {
         },
       },
       // Auto-migrate: dacă user-ul are lista veche (<10 orașe), forțăm defaultul cu toate cele 63.
-      cities:    (parsed.cities && parsed.cities.length >= 10) ? parsed.cities : DEFAULT_SETTINGS.cities,
+      cities:    withMandatoryCities((parsed.cities && parsed.cities.length >= 10) ? parsed.cities : DEFAULT_SETTINGS.cities),
       platforms: { ...DEFAULT_SETTINGS.platforms, ...(parsed.platforms ?? {}) },
       integrations: {
         platforms: parsed.integrations?.platforms ?? DEFAULT_SETTINGS.integrations.platforms,

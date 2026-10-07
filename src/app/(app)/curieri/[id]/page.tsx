@@ -130,10 +130,12 @@ export default function CourierProfilePage() {
               <span className="rounded-md border border-line bg-white/[0.04] px-2 py-0.5 text-[11px] text-fg-muted">#{courier.id.toUpperCase()}</span>
             </div>
           </div>
-          <div className="text-right">
-            <div className="text-[11px] text-fg-dim">Subcontractor</div>
-            <div className="text-[13px] font-semibold text-fg">{courier.subcontractorName ?? "Flotă directă"}</div>
-          </div>
+          {can("subcontractors.view") && (
+            <div className="text-right">
+              <div className="text-[11px] text-fg-dim">Subcontractor</div>
+              <div className="text-[13px] font-semibold text-fg">{courier.subcontractorName ?? "Flotă directă"}</div>
+            </div>
+          )}
         </div>
       </Card>
 

@@ -1,20 +1,41 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Bot, Download, FileText, ListChecks, Loader2, Mic, Paperclip, Send } from "lucide-react";
+import { ArrowRight, Bot, Check, Download, FileText, ListChecks, Loader2, Mic, MicOff, Paperclip, Send, Volume2, VolumeX, Wrench, X } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
 import { useSession } from "@/lib/rbac/session";
-import { useCouriers } from "@/lib/couriers/context";
-import { usePayments } from "@/lib/payments/context";
-import { useDocuments } from "@/lib/documents/context";
 import { useOwnerScope } from "@/lib/owner-scope/context";
-import { UNPAID_STATUSES } from "@/lib/payments/types";
-import { formatRon } from "@/lib/reports/analytics";
+import { useCopilotExecutor, ToolError } from "@/lib/ai/executor";
+import { CONFIRM_TOOLS, TOOL_LABEL } from "@/lib/ai/tools";
 import { cn } from "@/lib/utils/cn";
 
-type Msg = { id: string; role: "ai" | "user"; text: string; actions?: boolean };
+type Msg = { id: string; role: "ai" | "user"; text: string; actions?: boolean; steps?: string[] };
+type ToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
+type ApiMsg = { role: "user" | "assistant" | "tool"; content: string | null; tool_calls?: ToolCall[]; tool_call_id?: string };
+type Confirm = { text: string; resolve: (ok: boolean) => void };
+
+// Web Speech API — nativ în Chrome/Edge/Safari; fără tipuri în lib.dom pentru recognition.
+type SpeechRec = {
+  lang: string; interimResults: boolean; continuous: boolean; start: () => void; stop: () => void;
+  onresult: ((e: { resultIndex: number; results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => void) | null;
+  onerror: ((e: { error: string }) => void) | null; onend: (() => void) | null;
+};
+const MAX_STEPS = 8;
+const YES = /^(da|confirm|ok|sigur|fă|fa|execută|executa)\b/i;
+const NO = /^(nu|anulează|anuleaza|stop|renunț|renunt)\b/i;
+
+function speak(text: string) {
+  if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+  const clean = text.replace(/\*\*|[#`_>•]/g, "").replace(/\s+/g, " ").trim().slice(0, 1200);
+  const u = new SpeechSynthesisUtterance(clean);
+  u.lang = "ro-RO";
+  const ro = window.speechSynthesis.getVoices().find((v) => v.lang.toLowerCase().startsWith("ro"));
+  if (ro) u.voice = ro;
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(u);
+}
 
 const SUGGESTIONS: Array<[string, string]> = [
   ["Curieri neplătiți", "Afișează lista curierilor neplătiți în această săptămână"],
@@ -43,139 +64,134 @@ const EXAMPLES = [
 export function AICopilotPage() {
   const toast = useToast();
   const router = useRouter();
-  const { user, activeFleetId } = useSession();
-  const { allRows } = useCouriers();
-  const { fleetPayments } = usePayments();
-  const { fleetDocuments } = useDocuments();
+  const { user } = useSession();
   const { scope } = useOwnerScope();
+  const exec = useCopilotExecutor();
   const endRef = useRef<HTMLDivElement>(null);
 
-  const fleetCouriers = useMemo(() => allRows.filter((c) => c.tenantId === activeFleetId), [allRows, activeFleetId]);
-
-  const greeting = `Salut, ${user.name.split(" ")[0]}! 👋\n\nSunt AI Copilot și te pot ajuta cu:\n• Analiza și rezumatul datelor din platformă\n• Crearea de rapoarte și liste personalizate\n• Verificarea documentelor și expirărilor\n• Informații despre plăți, activări, curieri\n• Sugestii și automatizări pentru sarcini repetitive\n\nScrie-mi mai jos ce ai nevoie sau alege o sugestie din dreapta.`;
-  const [messages, setMessages] = useState<Msg[]>([{ id: "g", role: "ai", text: greeting }]);
+  const greeting = `Salut, ${user.name.split(" ")[0]}! 👋\n\nSunt AI Copilot — agent, nu doar chat. Îmi poți scrie sau vorbi (🎤) și fac direct în CRM:\n• Înregistrez și modific curieri\n• Citesc plăți, rapoarte, documente, vehicule\n• Emit facturi (și din raport, cu TVA după regim)\n• Schimb statusuri de plăți și facturi (cu confirmarea ta)\n• Deschid pagini, creez tichete, explic orice modul\n\nSpune-mi ce ai nevoie.`;
+  const [messages, setMessages] = useState<Msg[]>([{ id: "g", role: "ai", text: "" }]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [autos, setAutos] = useState<boolean[]>([true, true, false, false]);
   const [asked, setAsked] = useState(0);
   const [tasks, setTasks] = useState(0);
+  const [confirm, setConfirm] = useState<Confirm | null>(null);
+  const [listening, setListening] = useState(false);
+  const [speakOn, setSpeakOn] = useState(false);
 
-  // Motor de răspuns pe DATE REALE (nu LLM; nu fabrică date). TODO(real-users): înlocuit
-  // cu un endpoint AI server-side (fără API key în client) + tool-calling peste CRM.
-  const answer = (qRaw: string): { text: string; actions: boolean } => {
-    const q = qRaw.toLowerCase();
-    if (/neplăt|neplat|unpaid/.test(q)) {
-      const unpaid = fleetPayments.filter((p) => UNPAID_STATUSES.includes(p.status));
-      const byPlat: Record<string, number> = { bolt: 0, wolt: 0, glovo: 0 };
-      for (const p of unpaid) (p.platforms ?? []).forEach((pl) => (byPlat[pl] += 1));
-      return { text: `În această săptămână sunt **${unpaid.length}** curieri neplătiți în flota ${user.activeTenant.name}.\n• Bolt: ${byPlat.bolt}\n• Wolt: ${byPlat.wolt}\n• Glovo: ${byPlat.glovo}\n\nVrei să îți afișez lista completă cu numele, orașul și suma?`, actions: true };
-    }
-    if (/expir|docum/.test(q)) {
-      const now = new Date("2026-09-10").getTime();
-      const soon = fleetDocuments.filter((d) => d.expiryIso && (new Date(d.expiryIso).getTime() - now) / 86400000 <= 30 && (new Date(d.expiryIso).getTime() - now) >= 0);
-      return { text: `**${soon.length}** documente expiră în următoarele 30 de zile în flota curentă. Cele mai urgente necesită reînnoire. Vrei lista detaliată sau export Excel?`, actions: true };
-    }
-    if (/bolt.*bucure|activ.*bolt|activ.*curier/.test(q)) {
-      const n = fleetCouriers.filter((c) => c.status === "active" && c.platforms.includes("bolt") && /bucure/i.test(c.city)).length;
-      return { text: `Sunt **${n}** curieri activi pe Bolt în București (flota ${user.activeTenant.name}).`, actions: true };
-    }
-    if (/top|performan|comenzi|venit/.test(q)) {
-      const top = [...fleetPayments].sort((a, b) => (b.ordersCount ?? 0) - (a.ordersCount ?? 0)).slice(0, 5);
-      const lines = top.map((p, i) => `${i + 1}. ${p.recipient.name} — ${p.ordersCount ?? 0} comenzi, ${formatRon(p.breakdown.grossRevenue)}`).join("\n");
-      return { text: `Top curieri după comenzi:\n${lines || "Fără date."}`, actions: true };
-    }
-    if (/oraș|orase|liste pe/.test(q)) {
-      const byCity = new Map<string, number>();
-      fleetCouriers.forEach((c) => byCity.set(c.city, (byCity.get(c.city) ?? 0) + 1));
-      const lines = Array.from(byCity.entries()).sort((a, b) => b[1] - a[1]).map(([c, n]) => `• ${c}: ${n} curieri`).join("\n");
-      return { text: `Distribuția curierilor pe orașe:\n${lines}`, actions: true };
-    }
-    if (/raport|rezumat|plăț|plat/.test(q)) {
-      const gross = fleetPayments.reduce((s, p) => s + p.breakdown.grossRevenue, 0);
-      return { text: `Rezumat flotă ${user.activeTenant.name}:\n• Curieri: ${fleetCouriers.length}\n• Plăți înregistrate: ${fleetPayments.length}\n• Venit brut total: ${formatRon(gross)}\n\nPot genera un raport complet — apasă „Exportă în Excel".`, actions: true };
-    }
-    return { text: `Am înțeles întrebarea, dar încă nu am o rutină dedicată pentru ea. Pot răspunde la întrebări despre curieri neplătiți, documente expirate, activări, top performeri, liste pe orașe și rapoarte de plăți — toate din datele reale ale flotei tale.`, actions: false };
+  const apiRef = useRef<ApiMsg[]>([]);           // transcriptul complet trimis la LLM (cu tool calls)
+  const execRef = useRef(exec);                  // executorul cu starea cea mai nouă (re-randat între pași)
+  const confirmRef = useRef<Confirm | null>(null);
+  const recRef = useRef<SpeechRec | null>(null);
+  // După fiecare unealtă, bucla așteaptă o randare reală: următoarea unealtă trebuie să vadă ce a scris precedenta
+  // (ex: create_courier → find_couriers). `exec` e recreat la fiecare randare, deci efectul rulează după fiecare commit.
+  const renderWaiters = useRef<Array<() => void>>([]);
+  const [, nudge] = useState(0);
+  useEffect(() => {
+    execRef.current = exec;
+    const waiting = renderWaiters.current; renderWaiters.current = [];
+    waiting.forEach((resolve) => resolve());
+  }, [exec]);
+  const afterRender = () => new Promise<void>((resolve) => { renderWaiters.current.push(resolve); nudge((x) => x + 1); });
+  useEffect(() => { confirmRef.current = confirm; }, [confirm]);
+
+  const scrollEnd = () => setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+  const askConfirm = (text: string) => new Promise<boolean>((resolve) => { setConfirm({ text, resolve }); scrollEnd(); });
+  const answerConfirm = (ok: boolean) => { confirmRef.current?.resolve(ok); setConfirm(null); };
+
+  const describe = (name: string, a: Record<string, unknown>) => {
+    const courier = typeof a.id === "string" ? execRef.current.fleetCouriers.find((c) => c.id === a.id)?.fullName : undefined;
+    const rest = Object.entries(a).filter(([k]) => k !== "id").map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join(", ");
+    return `${TOOL_LABEL[name] ?? name}${courier ? ` — ${courier}` : a.id ? ` — ${String(a.id)}` : ""}${rest ? ` (${rest})` : ""}`;
   };
 
-  const send = async (text: string) => {
-    const t = text.trim(); if (!t) return;
-    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: t }]);
-    setInput(""); setLoading(true); setAsked((n) => n + 1);
+  const send = async (text: string, spoken = false) => {
+    const t = text.trim(); if (!t || loading) return;
+    const aiId = `a${Date.now()}`;
+    setMessages((m) => [...m, { id: `u${Date.now()}`, role: "user", text: t }, { id: aiId, role: "ai", text: "", steps: [] }]);
+    setInput(""); setLoading(true); setAsked((n) => n + 1); scrollEnd();
+    const patchAi = (fn: (m: Msg) => Msg) => setMessages((ms) => ms.map((m) => (m.id === aiId ? fn(m) : m)));
+    apiRef.current.push({ role: "user", content: t });
 
-    // Construiește contextul local (curieri/plăți/documente din state) → mesaj context inline.
-    const gross = fleetPayments.reduce((s, p) => s + p.breakdown.grossRevenue, 0);
-    const unpaid = fleetPayments.filter((p) => UNPAID_STATUSES.includes(p.status)).length;
-    const soonNow = new Date().getTime();
-    const soonDocs = fleetDocuments.filter((d) => d.expiryIso && (new Date(d.expiryIso).getTime() - soonNow) / 86400000 <= 30 && (new Date(d.expiryIso).getTime() - soonNow) >= 0).length;
-
-    // Grupare pe orașe și platforme (numere agregate → puține tokens)
-    const cityCounts = new Map<string, number>();
-    for (const c of fleetCouriers) cityCounts.set(c.city, (cityCounts.get(c.city) ?? 0) + 1);
-    const cityList = Array.from(cityCounts.entries()).sort((a, b) => b[1] - a[1]).map(([c, n]) => `${c}(${n})`).join(", ");
-    const platCounts = { bolt: 0, wolt: 0, glovo: 0 } as Record<string, number>;
-    for (const c of fleetCouriers) for (const p of c.platforms) if (p in platCounts) platCounts[p]++;
-
-    // Lista scurtă — NUME SCURT (doar prenume) + oraș + platforme + status + subcontractor.
-    // Fără telefoane, IBAN, email, boltUid → date sensibile stay OUT of AI context.
-    const shortList = fleetCouriers.slice(0, 30).map((c) => {
-      const shortName = c.fullName.split(" ").slice(0, 2).join(" "); // prenume + prima parte nume
-      return `${shortName} · ${c.city} · [${c.platforms.join(",")}] · ${c.status}${c.subcontractorName ? ` · sub:${c.subcontractorName}` : ""}`;
-    }).join("\n");
-
-    // Ultimele 15 plăți — nume scurt, sume, status. FĂRĂ IBAN, referință, note.
-    const recentPayments = [...fleetPayments]
-      .sort((a, b) => b.createdAtIso.localeCompare(a.createdAtIso))
-      .slice(0, 15)
-      .map((p) => {
-        const shortName = p.recipient.name.split(" ").slice(0, 2).join(" ");
-        return `${shortName}: brut ${formatRon(p.breakdown.grossRevenue)}, net ${formatRon(p.totalCalculated)}, status ${p.status}`;
-      })
-      .join("\n");
-
-    const contextInfo = `DATE FLOTĂ (LIVE, din browser):
-Flotă activă: ${user.activeTenant.name}
-TOTAL: ${fleetCouriers.length} curieri (${fleetCouriers.filter((c) => c.status === "active").length} activi) · ${fleetPayments.length} plăți · brut ${formatRon(gross)} · ${unpaid} neplătite · ${soonDocs} documente expiră în 30 zile
-PE PLATFORME: Bolt ${platCounts.bolt}, Wolt ${platCounts.wolt}, Glovo ${platCounts.glovo}
-PE ORAȘE: ${cityList || "—"}
-
-CURIERI (max 30):
-${shortList || "—"}
-
-ULTIMELE PLĂȚI (max 15):
-${recentPayments || "—"}`;
-
-    // Prepară istoricul mesajelor pentru API (fără cel de greeting)
-    const history = messages.filter((m) => m.id !== "g").map((m) => ({
-      role: m.role === "ai" ? "assistant" : "user",
-      content: m.text,
-    }));
-
+    let reply = "";
     try {
-      const res = await fetch("/api/ai/chat", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          impersonatedEmail: scope?.email ?? null,
-          messages: [
-            ...history,
-            { role: "user", content: `${contextInfo}\n\n---\n\nÎntrebare: ${t}` },
-          ],
-        }),
-      });
-      const j = await res.json();
-      if (!res.ok) {
-        setMessages((m) => [...m, { id: `err${Date.now()}`, role: "ai", text: `⚠️ Eroare: ${j.error ?? "Eșec la AI"}. Verifică GROQ_API_KEY în Vercel Env Vars.` }]);
-      } else {
-        const a = answer(t); // fallback local pentru cazul în care e o întrebare simplă
-        const useLocal = a.actions && j.reply.length < 60; // preferă locala dacă are acțiuni + AI e scurt
-        setMessages((m) => [...m, { id: `a${Date.now()}`, role: "ai", text: useLocal ? a.text : j.reply, actions: useLocal ? a.actions : false }]);
+      for (let step = 0; step < MAX_STEPS; step++) {
+        const res = await fetch("/api/ai/chat", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ impersonatedEmail: scope?.email ?? null, messages: apiRef.current }),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) { reply = `⚠️ ${j.error ?? `Eroare ${res.status}`}`; break; }
+        const msg = j.message as ApiMsg;
+        apiRef.current.push(msg);
+        const calls = msg.tool_calls ?? [];
+        if (!calls.length) { reply = msg.content?.trim() || "Gata."; break; }
+
+        for (const call of calls) {
+          const name = call.function.name;
+          let args: Record<string, unknown> = {};
+          try { args = JSON.parse(call.function.arguments || "{}"); } catch { /* argumente invalide → {} */ }
+          let result: unknown;
+          if (CONFIRM_TOOLS.has(name) && !(await askConfirm(describe(name, args)))) {
+            result = { refused: true, note: "Utilizatorul a refuzat acțiunea." };
+            patchAi((m) => ({ ...m, steps: [...(m.steps ?? []), `✕ ${TOOL_LABEL[name] ?? name} (refuzat)`] }));
+          } else {
+            try {
+              result = await execRef.current.run(name, args);
+              patchAi((m) => ({ ...m, steps: [...(m.steps ?? []), `✓ ${TOOL_LABEL[name] ?? name}`] }));
+              if (!name.startsWith("list_") && !["overview", "find_couriers", "report_summary", "navigate"].includes(name)) setTasks((n) => n + 1);
+            } catch (e) {
+              result = { error: e instanceof ToolError ? e.message : String((e as Error).message ?? e) };
+              patchAi((m) => ({ ...m, steps: [...(m.steps ?? []), `⚠ ${TOOL_LABEL[name] ?? name}`] }));
+            }
+          }
+          apiRef.current.push({ role: "tool", tool_call_id: call.id, content: JSON.stringify(result).slice(0, 8000) });
+          await afterRender();
+        }
+        if (step === MAX_STEPS - 1) reply = "Am atins limita de pași pentru o cerere. Spune-mi dacă continui.";
       }
     } catch (e) {
-      setMessages((m) => [...m, { id: `err${Date.now()}`, role: "ai", text: `⚠️ Server AI indisponibil: ${String((e as Error).message ?? e)}` }]);
+      reply = `⚠️ Server AI indisponibil: ${String((e as Error).message ?? e)}`;
     } finally {
+      patchAi((m) => ({ ...m, text: reply }));
       setLoading(false);
-      setTimeout(() => endRef.current?.scrollIntoView({ behavior: "smooth" }), 50);
+      scrollEnd();
+      if ((spoken || speakOn) && reply) speak(reply);
     }
+  };
+
+  const toggleMic = () => {
+    if (listening) { recRef.current?.stop(); return; }
+    const w = window as unknown as { SpeechRecognition?: new () => SpeechRec; webkitSpeechRecognition?: new () => SpeechRec };
+    const SR = w.SpeechRecognition ?? w.webkitSpeechRecognition;
+    if (!SR) { toast.info("Microfon", "Browserul nu are dictare vocală. Folosește Chrome, Edge sau Safari."); return; }
+    const rec = new SR();
+    rec.lang = "ro-RO"; rec.interimResults = true; rec.continuous = false;
+    let finalText = "";
+    rec.onresult = (e) => {
+      let interim = "";
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) finalText += r[0].transcript; else interim += r[0].transcript;
+      }
+      setInput((finalText + interim).trim());
+    };
+    rec.onerror = (e) => { if (e.error !== "no-speech" && e.error !== "aborted") toast.error("Microfon", e.error === "not-allowed" ? "Permite accesul la microfon în browser." : e.error); };
+    rec.onend = () => {
+      setListening(false);
+      const said = finalText.trim();
+      if (!said) return;
+      if (confirmRef.current) {                     // „da" / „nu" cu vocea pe cardul de confirmare
+        if (YES.test(said)) { setInput(""); answerConfirm(true); return; }
+        if (NO.test(said)) { setInput(""); answerConfirm(false); return; }
+      }
+      send(said, true);
+    };
+    recRef.current = rec;
+    window.speechSynthesis?.cancel();
+    rec.start(); setListening(true);
   };
 
   return (
@@ -195,7 +211,9 @@ ${recentPayments || "—"}`;
               <div key={m.id} className={cn("flex gap-2.5", m.role === "user" && "flex-row-reverse")}>
                 {m.role === "ai" ? <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500"><Bot size={16} className="text-white" /></span> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/30 text-[11px] font-bold text-blue-200">{user.name.slice(0, 2).toUpperCase()}</span>}
                 <div className={cn("max-w-[78%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed", m.role === "user" ? "bg-blue-600 text-white" : "border border-line bg-card-2 text-fg")}>
-                  {m.text.split("\n").map((line, i) => <div key={i} className={line.startsWith("•") ? "text-fg-muted" : ""} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.+?)\*\*/g, '<b class="text-fg">$1</b>') }} />)}
+                  {m.steps && m.steps.length > 0 && <div className="mb-1.5 flex flex-wrap gap-1">{m.steps.map((st, i) => <span key={i} className="inline-flex items-center gap-1 rounded-md border border-line bg-card-hover px-1.5 py-0.5 text-[10.5px] text-fg-muted"><Wrench size={10} />{st}</span>)}</div>}
+                  {!m.text && loading && <span className="text-fg-muted"><Loader2 size={14} className="inline animate-spin" /> Lucrez...</span>}
+                  {(m.id === "g" ? greeting : m.text).split("\n").map((line, i) => <div key={i} className={line.startsWith("•") ? "text-fg-muted" : ""} dangerouslySetInnerHTML={{ __html: line.replace(/\*\*(.+?)\*\*/g, '<b class="text-fg">$1</b>') }} />)}
                   {m.actions && <div className="mt-2.5 flex flex-wrap gap-1.5">
                     <button type="button" onClick={() => { toast.info("Listă", "Deschid lista completă de curieri."); router.push("/curieri"); }} className="inline-flex items-center gap-1 rounded-lg border border-line bg-card-hover px-2.5 py-1 text-[11.5px] font-medium text-fg hover:bg-white/[0.06]"><ListChecks size={12} /> Afișează lista</button>
                     <button type="button" onClick={() => toast.success("Export", "Fișier .xlsx generat.")} className="inline-flex items-center gap-1 rounded-lg border border-line bg-card-hover px-2.5 py-1 text-[11.5px] font-medium text-fg hover:bg-white/[0.06]"><Download size={12} /> Exportă în Excel</button>
@@ -204,15 +222,24 @@ ${recentPayments || "—"}`;
                 </div>
               </div>
             ))}
-            {loading && <div className="flex gap-2.5"><span className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500"><Bot size={16} className="text-white" /></span><div className="rounded-2xl border border-line bg-card-2 px-3.5 py-2.5 text-[13px] text-fg-muted"><Loader2 size={14} className="inline animate-spin" /> Analizez datele...</div></div>}
+            {confirm && <div className="ml-10 max-w-[78%] rounded-2xl border border-amber-500/40 bg-amber-500/10 px-3.5 py-2.5 text-[13px] text-fg">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-amber-300">Confirmă acțiunea</div>
+              <div className="mt-1">{confirm.text}</div>
+              <div className="mt-2 flex gap-1.5">
+                <button type="button" onClick={() => answerConfirm(true)} className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11.5px] font-semibold text-white hover:brightness-110"><Check size={12} /> Confirm</button>
+                <button type="button" onClick={() => answerConfirm(false)} className="inline-flex items-center gap-1 rounded-lg border border-line bg-card-hover px-2.5 py-1 text-[11.5px] font-medium text-fg hover:bg-white/[0.06]"><X size={12} /> Refuz</button>
+                <span className="self-center text-[10.5px] text-fg-dim">sau spune „da” / „nu”</span>
+              </div>
+            </div>}
             <div ref={endRef} />
           </div>
           <div className="border-t border-line p-3">
             <div className="flex items-end gap-2 rounded-xl border border-line bg-card-hover p-2">
               <button type="button" onClick={() => toast.info("Atașament", "Selectează un fișier de analizat.")} aria-label="Atașament" className="text-fg-dim hover:text-fg"><Paperclip size={16} /></button>
-              <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }} rows={1} placeholder="Scrie aici întrebarea ta..." className="max-h-24 flex-1 resize-none bg-transparent text-[13px] text-fg outline-none" />
-              <button type="button" onClick={() => toast.info("Microfon", "Dictare vocală indisponibilă în acest mediu.")} aria-label="Microfon" className="text-fg-dim hover:text-fg"><Mic size={16} /></button>
-              <button type="button" onClick={() => send(input)} disabled={!input.trim()} aria-label="Trimite" className={cn("inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 text-white", !input.trim() && "opacity-50")}><Send size={15} /></button>
+              <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }} rows={1} placeholder={listening ? "Te ascult..." : "Scrie sau vorbește: „înregistrează curierul Ion Pop din Iași pe Bolt”"} className="max-h-24 flex-1 resize-none bg-transparent text-[13px] text-fg outline-none" />
+              <button type="button" onClick={() => { setSpeakOn((v) => !v); if (speakOn) window.speechSynthesis?.cancel(); }} aria-label={speakOn ? "Oprește citirea cu voce" : "Citește răspunsurile cu voce"} aria-pressed={speakOn} className={cn("hover:text-fg", speakOn ? "text-violet-300" : "text-fg-dim")}>{speakOn ? <Volume2 size={16} /> : <VolumeX size={16} />}</button>
+              <button type="button" onClick={toggleMic} aria-label={listening ? "Oprește dictarea" : "Vorbește"} aria-pressed={listening} className={cn("hover:text-fg", listening ? "animate-pulse text-rose-400" : "text-fg-dim")}>{listening ? <MicOff size={16} /> : <Mic size={16} />}</button>
+              <button type="button" onClick={() => send(input)} disabled={!input.trim() || loading} aria-label="Trimite" className={cn("inline-flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 text-white", !input.trim() && "opacity-50")}><Send size={15} /></button>
             </div>
             <p className="mt-2 text-center text-[10.5px] text-fg-dim">AI Copilot poate face greșeli. Verifică întotdeauna informațiile importante.</p>
           </div>

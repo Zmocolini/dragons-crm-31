@@ -50,8 +50,9 @@ type SourceFilterKey = PaymentSourceDetail | "all" | "sub_husein" | "double";
 
 /** Chip-uri pentru filtrare pe sursă (TTG / Gusty Bolt / Wolt / Glovo / Manual / HUSEIN / 2×). */
 function SourceFilterChips({
-  active, counts, onChange,
+  active, counts, onChange, showSubs,
 }: {
+  showSubs: boolean;
   active: SourceFilterKey;
   counts: Record<SourceFilterKey, number>;
   onChange: (s: SourceFilterKey) => void;
@@ -64,7 +65,7 @@ function SourceFilterChips({
     { key: "gusty_glovo", label: "Gusty Glovo", tone: "border-amber-500/40 bg-amber-500/10 text-amber-200" },
     { key: "manual",      label: "Manual",      tone: "border-white/[0.08] bg-white/[0.04] text-fg-muted" },
     { key: "sub_husein",  label: "HUSEIN",      tone: "border-amber-500/40 bg-amber-500/15 text-amber-200" },
-  ];
+  ].filter((it) => showSubs || it.key !== "sub_husein") as Array<{ key: SourceFilterKey; label: string; tone: string }>;
   return (
     <div className="flex flex-wrap items-center gap-1.5">
       <span className="text-[10.5px] font-bold uppercase tracking-widest text-fg-dim">Sursă:</span>
@@ -975,7 +976,7 @@ export default function PlatiPage() {
 
       {/* Filtru sursă — separare vizuală TTG / Gusty Bolt / Wolt / Glovo / Manual + Cont dublu */}
       <div className="flex flex-wrap items-center gap-2">
-        <SourceFilterChips active={sourceFilter} counts={sourceCounts} onChange={(s) => { setSourceFilter(s); setPage(1); }} />
+        <SourceFilterChips showSubs={can("subcontractors.view")} active={sourceFilter} counts={sourceCounts} onChange={(s) => { setSourceFilter(s); setPage(1); }} />
         <DuplicatePairsMenu />
       </div>
 

@@ -1,56 +1,15 @@
 "use client";
 
-import Link from "next/link";
-import { Activity, ChevronRight, Database, FileClock, HardDrive, Headphones, Server, Shield, Undo2, UserCog } from "lucide-react";
+import { Activity, HardDrive, Headphones, Server, Shield } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { useToast } from "@/components/ui/Toast";
-import { useProfile } from "@/lib/profile/context";
 import { formatRoDateLong } from "@/components/profile/utils";
 
 export function RightRail() {
   const toast = useToast();
-  const { logActivity } = useProfile();
 
   return (
     <div className="space-y-4">
-      {/* ACȚIUNI RAPIDE */}
-      <section className="rounded-2xl border border-line bg-card">
-        <header className="border-b border-line/70 px-5 py-3.5">
-          <h3 className="text-[13.5px] font-semibold text-fg">Acțiuni rapide</h3>
-        </header>
-        <ul className="divide-y divide-line/40">
-          <QuickRow
-            icon={UserCog}
-            title="Gestionează utilizatori"
-            subtitle="Adaugă sau editează conturi"
-            href="/utilizatori"
-          />
-          <QuickRow
-            icon={FileClock}
-            title="Vezi loguri sistem"
-            subtitle="Monitorizează activitatea"
-            href="/profil?tab=activity"
-          />
-          <QuickRow
-            icon={Database}
-            title="Backup date"
-            subtitle="Descarcă o copie de siguranță"
-            onClick={() => {
-              logActivity("preferences.update", "Cerere backup date", "Setări");
-              toast.info("Cerere backup înregistrată", "Se activează după integrarea backend.");
-            }}
-          />
-          <QuickRow
-            icon={Undo2}
-            title="Restabilește date"
-            subtitle="Revenire la o versiune anterioară"
-            onClick={() => {
-              toast.info("Restabilire", "Contactează administratorul pentru restore.");
-            }}
-          />
-        </ul>
-      </section>
-
       {/* INFORMAȚII SISTEM */}
       <section className="rounded-2xl border border-line bg-card">
         <header className="border-b border-line/70 px-5 py-3.5">
@@ -99,43 +58,6 @@ export function RightRail() {
         </button>
       </section>
     </div>
-  );
-}
-
-function QuickRow({
-  icon: Icon,
-  title,
-  subtitle,
-  href,
-  onClick,
-}: {
-  icon: LucideIcon;
-  title: string;
-  subtitle: string;
-  href?: string;
-  onClick?: () => void;
-}) {
-  const content = (
-    <>
-      <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-line bg-card-2 text-fg-muted">
-        <Icon size={14} />
-      </span>
-      <span className="min-w-0 flex-1 leading-tight">
-        <span className="block text-[13px] font-semibold text-fg">{title}</span>
-        <span className="mt-0.5 block text-[11px] text-fg-dim">{subtitle}</span>
-      </span>
-      <ChevronRight size={13} className="text-fg-dim" />
-    </>
-  );
-  const cls = "flex w-full items-center gap-3 px-5 py-3 text-left transition-colors hover:bg-white/[0.03]";
-  return (
-    <li>
-      {href ? (
-        <Link href={href} className={cls}>{content}</Link>
-      ) : (
-        <button type="button" onClick={onClick} className={cls}>{content}</button>
-      )}
-    </li>
   );
 }
 

@@ -12,6 +12,7 @@ import { CourierAvatar } from "@/components/reports/bits";
 import { useToast } from "@/components/ui/Toast";
 import { useSession } from "@/lib/rbac/session";
 import { useCouriers } from "@/lib/couriers/context";
+import { useOwnerScope } from "@/lib/owner-scope/context";
 import { formatInt, formatRon } from "@/lib/reports/analytics";
 import { buildXlsx, downloadBlob } from "@/lib/reports/xlsx";
 import {
@@ -20,17 +21,19 @@ import {
 } from "@/lib/subcontractors/data";
 import { cn } from "@/lib/utils/cn";
 import { AccountsPanel } from "./AccountsPanel";
+import { EcontracteePage } from "@/components/econtracts/EcontracteePage";
 import { usePersistentList } from "@/lib/utils/use-persistent-list";
 
 const PAGE = 10;
 function fmt(iso: string): string { if (!iso) return "—"; const [y, m, d] = iso.split("-"); return `${d}.${m}.${y}`; }
 const TABS: Array<[SubStatus | "all", string]> = [["all", "Toți"], ["active", "Activi"], ["evaluation", "În evaluare"], ["inactive", "Inactivi"]];
 
-export function SubcontractorsPage() {
+export function SubcontractorsPage({ initialView = "list" }: { initialView?: "list" | "accounts" | "contracts" }) {
   const toast = useToast();
   const { user, activeFleetId, can } = useSession();
   const { allRows } = useCouriers();
   const canManage = can("subcontractors.view") && user.role === "global_owner";
+  const canContracts = can("payments.view");
 
   const fleetCouriers = useMemo(() => allRows.filter((c) => c.tenantId === activeFleetId), [allRows, activeFleetId]);
   const seed = useMemo(() => buildSubcontractors(fleetCouriers, activeFleetId), [fleetCouriers, activeFleetId]);
@@ -71,10 +74,16 @@ export function SubcontractorsPage() {
     }).catch(() => {});
   }, [fleetCouriers, activeFleetId]);
 
-  const list = useMemo(() => [...userSubs, ...added, ...seed], [userSubs, added, seed]);
+  // Scope pe un subcontractor (FleetCard): vezi doar înregistrarea lui, nu pe a celorlalți.
+  const { scope } = useOwnerScope();
+  const list = useMemo(() => {
+    const all = [...userSubs, ...added, ...seed];
+    if (!scope) return all;
+    return all.filter((s) => s.contactEmail.toLowerCase() === scope.email.toLowerCase());
+  }, [userSubs, added, seed, scope]);
 
   const [q, setQ] = useState(""); const [tab, setTab] = useState<SubStatus | "all">("all"); const [city, setCity] = useState("all"); const [platform, setPlatform] = useState("all"); const [type, setType] = useState("all");
-  const [view, setView] = useState<"list" | "accounts">("list");
+  const [view, setView] = useState<"list" | "accounts" | "contracts">(initialView);
   const [page, setPage] = useState(1); const [selected, setSelected] = useState<Subcontractor | null>(null); const [addOpen, setAddOpen] = useState(false);
 
   const cities = useMemo(() => Array.from(new Set(list.flatMap((s) => s.cities))).sort(), [list]);
@@ -113,20 +122,20 @@ export function SubcontractorsPage() {
 
   return (
     <div className="flex min-h-full flex-col gap-4 overflow-x-hidden p-4 lg:p-6">
-      <header className="flex flex-wrap items-start justify-between gap-3">
+      {view !== "contracts" && <header className="flex flex-wrap items-start justify-between gap-3">
         <div><h1 className="text-[26px] font-bold tracking-tight text-fg">Subcontractori</h1><p className="mt-1 max-w-2xl text-[13px] text-fg-muted">Gestionează partenerii și subcontractorii. Monitorizează performanța, contractele și curierii alocați.</p></div>
         <div className="flex items-center gap-2"><button type="button" onClick={exportXlsx} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card-hover px-3 py-2 text-[12.5px] font-medium text-fg hover:bg-white/[0.06]"><Download size={14} className="text-fg-dim" /> Exportă</button><button type="button" onClick={() => setAddOpen(true)} disabled={!canManage} className={cn("inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-violet-600 via-indigo-600 to-blue-600 px-4 py-2 text-[13px] font-semibold text-white", !canManage && "opacity-50")}><Plus size={15} /> Adaugă subcontractor</button></div>
-      </header>
+      </header>}
 
-      {canManage && (
+      {(canManage || canContracts) && (
         <div role="tablist" className="inline-flex w-fit rounded-lg border border-line bg-card-2 p-0.5 text-[12.5px] font-medium">
-          {([["list", "Subcontractori"], ["accounts", "Conturi și invitații"]] as const).map(([k, l]) => (
+          {([["list", "Subcontractori"], ["contracts", "Contracte"], ["accounts", "Conturi și invitații"]] as const).filter(([k]) => k === "list" || (k === "contracts" ? canContracts : canManage)).map(([k, l]) => (
             <button key={k} type="button" role="tab" aria-selected={view === k} onClick={() => setView(k)} className={cn("rounded-md px-3 py-1.5", view === k ? "bg-white/[0.08] text-fg" : "text-fg-muted hover:text-fg")}>{l}</button>
           ))}
         </div>
       )}
 
-      {view === "accounts" && canManage ? <AccountsPanel /> : (<>
+      {view === "contracts" && canContracts ? <EcontracteePage /> : view === "accounts" && canManage ? <AccountsPanel /> : (<>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         <Kpi icon={Briefcase} tint="bg-info/12" color="text-[color:var(--color-info)]" label="Total subcontractori" value={kpi.total} />

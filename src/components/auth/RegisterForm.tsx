@@ -30,6 +30,7 @@ export function RegisterForm() {
   const [fleetCity, setFleetCity] = useState("");
   const [fleetCountry, setFleetCountry] = useState("România");
   const [fleetCui, setFleetCui] = useState("");
+  const [vatPayer, setVatPayer] = useState(false);
   const [flagEmoji, setFlagEmoji] = useState<string>("🐉");
   const [brandColor, setBrandColor] = useState<string>("#f97316");
   const [logoDataUrl, setLogoDataUrl] = useState<string | null>(null);
@@ -61,6 +62,7 @@ export function RegisterForm() {
       name, email, password,
       fleetName, fleetCity, fleetCountry,
       fleetCui: fleetCui.trim() || null,
+      vatPayer,
       flagEmoji, brandColor, logoDataUrl,
     });
     setBusy(false);
@@ -109,7 +111,16 @@ export function RegisterForm() {
                 <input type="text" value={fleetCity} onChange={(e) => setFleetCity(e.target.value)} className="w-full rounded-lg border border-line bg-card-2 px-3 py-2 text-[13px] text-fg placeholder:text-fg-dim focus:border-violet-500/60 focus:outline-none" placeholder="București" />
               </Field>
               <Field label="Țară">
-                <input type="text" value={fleetCountry} onChange={(e) => setFleetCountry(e.target.value)} className="w-full rounded-lg border border-line bg-card-2 px-3 py-2 text-[13px] text-fg placeholder:text-fg-dim focus:border-violet-500/60 focus:outline-none" placeholder="România" />
+                <select value={fleetCountry} onChange={(e) => setFleetCountry(e.target.value)} className="w-full rounded-lg border border-line bg-card-2 px-3 py-2 text-[13px] text-fg focus:border-violet-500/60 focus:outline-none">
+                  <option value="România">România</option>
+                  <option value="Moldova">Moldova</option>
+                </select>
+              </Field>
+              <Field label="Regim TVA (decide cota pe facturi)">
+                <select value={vatPayer ? "yes" : "no"} onChange={(e) => setVatPayer(e.target.value === "yes")} className="w-full rounded-lg border border-line bg-card-2 px-3 py-2 text-[13px] text-fg focus:border-violet-500/60 focus:outline-none">
+                  <option value="no">Neplătitor de TVA (0%)</option>
+                  <option value="yes">Plătitor de TVA ({/mold/i.test(fleetCountry) ? "20% Moldova" : "21% România"})</option>
+                </select>
               </Field>
               <Field label="CUI (opțional)">
                 <input type="text" value={fleetCui} onChange={(e) => setFleetCui(e.target.value)} className="w-full rounded-lg border border-line bg-card-2 px-3 py-2 text-[13px] text-fg placeholder:text-fg-dim focus:border-violet-500/60 focus:outline-none" placeholder="RO12345678" />

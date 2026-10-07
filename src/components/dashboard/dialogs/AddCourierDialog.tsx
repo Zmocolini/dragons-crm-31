@@ -54,6 +54,13 @@ const COUNTRY_CODES: { code: string; flag: string; label: string }[] = [
   { code: "+39",  flag: "🇮🇹", label: "Italia" },
   { code: "+34",  flag: "🇪🇸", label: "Spania" },
   { code: "+33",  flag: "🇫🇷", label: "Franța" },
+  { code: "+880", flag: "🇧🇩", label: "Bangladesh" },
+  { code: "+977", flag: "🇳🇵", label: "Nepal" },
+  { code: "+94",  flag: "🇱🇰", label: "Sri Lanka" },
+  { code: "+91",  flag: "🇮🇳", label: "India" },
+  { code: "+92",  flag: "🇵🇰", label: "Pakistan" },
+  { code: "+63",  flag: "🇵🇭", label: "Filipine" },
+  { code: "+84",  flag: "🇻🇳", label: "Vietnam" },
 ];
 
 type FormState = {
@@ -444,7 +451,7 @@ export function AddCourierDialog({
               <Field label="Oraș activare" required incomplete={isIncomplete("city")}>
                 <select
                   value={form.city}
-                  onChange={(e) => setForm({ ...form, city: e.target.value })}
+                  onChange={(e) => setForm({ ...form, city: e.target.value, ...(e.target.value === "Chișinău" ? { phoneCode: "+373" } : {}) })}
                   className="dd-input"
                 >
                   {activeCities.length === 0 && <option value="">Niciun oraș activ</option>}

@@ -1,5 +1,5 @@
-import { EcontracteePage } from "@/components/econtracts/EcontracteePage";
+import { redirect } from "next/navigation";
 
 export default function EcontracteRoutePage() {
-  return <EcontracteePage />;
+  redirect("/subcontractori?view=contracte");
 }

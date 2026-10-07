@@ -237,6 +237,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       city:          input.fleetCity.trim() || "—",
       country:       input.fleetCountry.trim() || "România",
       cui:           input.fleetCui?.trim() || "",
+      vatPayer:      input.vatPayer,
       planLabel:     "Trial 14 zile",
       planTier:      "trial",
       planUsage:     { used: 0, total: 50 },
@@ -432,7 +433,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     persistUsers(users.map((u) => u.id === current.id ? { ...u, ...patch } : u));
   }, [current, users, persistUsers]);
 
-  const updateMyFleet = useCallback((patch: Partial<Pick<FleetTenant, "name" | "city" | "cui" | "logoDataUrl" | "flagEmoji" | "brandColor">>) => {
+  const updateMyFleet = useCallback((patch: Partial<Pick<FleetTenant, "name" | "city" | "country" | "vatPayer" | "cui" | "logoDataUrl" | "flagEmoji" | "brandColor">>) => {
     if (!current) return;
     persistFleets(fleets.map((f) => f.id === current.fleetId ? { ...f, ...patch } : f));
   }, [current, fleets, persistFleets]);

@@ -610,6 +610,8 @@ export const DEFAULT_CITIES: City[] = [
   { id: "c_valea_prahovei", name: "Valea Prahovei", status: "active" },
   { id: "c_vaslui", name: "Vaslui", status: "active" },
   { id: "c_zalau", name: "Zalău", status: "active" },
+  // Republica Moldova
+  { id: "c_chisinau", name: "Chișinău", status: "active" },
 ];
 
 export const DEFAULT_PLATFORMS: PlatformActive = {

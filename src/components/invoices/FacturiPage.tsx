@@ -7,6 +7,10 @@ import { Card, CardBody } from "@/components/ui/Card";
 import { Dialog, DialogFooter } from "@/components/ui/Dialog";
 import { useToast } from "@/components/ui/Toast";
 import { useSession } from "@/lib/rbac/session";
+import { useAuth } from "@/lib/auth/context";
+import type { Payment } from "@/lib/payments/types";
+import { usePayments } from "@/lib/payments/context";
+import { reportBase, vatRateFor, vatRegimeLabel } from "@/lib/invoices/vat";
 import { useInvoices, computeInvoicesKpi } from "@/lib/invoices/context";
 import {
   INVOICE_DIRECTION_LABEL, INVOICE_STATUS_LABEL, INVOICE_STATUS_STYLE,
@@ -22,7 +26,10 @@ function formatRon(n: number): string {
 }
 
 export function FacturiPage() {
-  const { user, activeFleetId } = useSession();
+  const { user, activeFleetId, fleets } = useSession();
+  const fleet = fleets.find((f) => f.id === activeFleetId);
+  const { updateMyFleet } = useAuth();
+  const { fleetPayments } = usePayments();
   const toast = useToast();
   const { hydrated, fleetInvoices, addInvoice, markPaid, cancelInvoice, deleteInvoice } = useInvoices();
 
@@ -63,6 +70,21 @@ export function FacturiPage() {
             Emite facturi către clienți / subcontractori și înregistrează facturile primite de la platforme și furnizori.
           </p>
         </div>
+        <div className="flex items-center gap-2 self-start">
+        <select
+          aria-label="Regim TVA"
+          value={`${/mold/i.test(fleet?.country ?? "") ? "MD" : "RO"}-${fleet?.vatPayer ? "yes" : "no"}`}
+          onChange={(e) => {
+            const [c, v] = e.target.value.split("-");
+            updateMyFleet({ country: c === "MD" ? "Moldova" : "România", vatPayer: v === "yes" });
+          }}
+          className="rounded-lg border border-line bg-card-2 px-2.5 py-2 text-[12.5px] text-fg focus:border-violet-500/60 focus:outline-none"
+        >
+          <option value="RO-no">România · neplătitor TVA</option>
+          <option value="RO-yes">România · plătitor TVA 21%</option>
+          <option value="MD-no">Moldova · neplătitor TVA</option>
+          <option value="MD-yes">Moldova · plătitor TVA 20%</option>
+        </select>
         <button
           type="button"
           onClick={() => setShowAdd(true)}
@@ -70,6 +92,7 @@ export function FacturiPage() {
         >
           <Plus size={15} /> Adaugă factură
         </button>
+        </div>
       </div>
 
       {/* KPI cards */}
@@ -223,6 +246,11 @@ export function FacturiPage() {
 
       <Dialog open={showAdd} onClose={() => setShowAdd(false)} title="Adaugă factură" size="lg">
         <AddInvoiceForm
+          defaultVatPct={vatRateFor(fleet?.country ?? "", fleet?.vatPayer)}
+          fleetName={fleet?.name ?? ""}
+          fleetCui={fleet?.cui ?? ""}
+          payments={fleetPayments}
+          regimeLabel={vatRegimeLabel(fleet?.country ?? "", fleet?.vatPayer)}
           onCancel={() => setShowAdd(false)}
           onCreate={(input) => {
             const created = addInvoice({ ...input, tenantId: activeFleetId }, user.name);
@@ -331,7 +359,12 @@ type NewInvoicePayload = {
   tenantId: string;
 };
 
-function AddInvoiceForm({ onCancel, onCreate }: {
+function AddInvoiceForm({ onCancel, onCreate, defaultVatPct, regimeLabel, fleetName, fleetCui, payments }: {
+  fleetName: string;
+  fleetCui: string;
+  payments: Payment[];
+  defaultVatPct: number;
+  regimeLabel: string;
   onCancel: () => void;
   onCreate: (input: Omit<NewInvoicePayload, "tenantId">) => void;
 }) {
@@ -342,8 +375,20 @@ function AddInvoiceForm({ onCancel, onCreate }: {
   const [counterpartyName, setName] = useState("");
   const [cui, setCui] = useState("");
   const [baseRon, setBase] = useState<string>("");
-  const [vatPct, setVatPct] = useState<number>(19);
+  const [vatPct, setVatPct] = useState<number>(defaultVatPct);
   const [notes, setNotes] = useState("");
+  const [repFrom, setRepFrom] = useState("");
+  const [repTo, setRepTo] = useState("");
+
+  /** Factura = consecința raportului: suma plăților achitate ale curierilor flotei în perioadă. */
+  function fillFromReport() {
+    const { base: sum, count } = reportBase(payments, repFrom, repTo);
+    setDirection("issued");
+    setBase(String(sum));
+    setName(fleetName);
+    setCui(fleetCui);
+    setNotes(`Raport ${repFrom} – ${repTo}: ${count} plăți`);
+  }
 
   const base = Number(baseRon) || 0;
   const { vatRon, totalRon } = computeInvoiceTotals(base, vatPct);
@@ -365,6 +410,18 @@ function AddInvoiceForm({ onCancel, onCreate }: {
             {d === "issued" ? "Emisă (către client)" : "Primită (de la furnizor)"}
           </button>
         ))}
+      </div>
+
+      <div className="flex flex-wrap items-end gap-2 rounded-md border border-line bg-card-2 p-2.5">
+        <Field label="Din raport: de la">
+          <input type="date" value={repFrom} onChange={(e) => setRepFrom(e.target.value)} className="rounded-md border border-line bg-card-2 px-2 py-1 text-[12.5px] text-fg" />
+        </Field>
+        <Field label="până la">
+          <input type="date" value={repTo} onChange={(e) => setRepTo(e.target.value)} className="rounded-md border border-line bg-card-2 px-2 py-1 text-[12.5px] text-fg" />
+        </Field>
+        <button type="button" disabled={!repFrom || !repTo} onClick={fillFromReport} className="rounded-md bg-violet-600 px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-40">
+          Preia din plăți
+        </button>
       </div>
 
       <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
@@ -422,7 +479,7 @@ function AddInvoiceForm({ onCancel, onCreate }: {
             className="w-full rounded-md border border-line bg-card-2 px-2.5 py-1.5 text-[12.5px] text-fg placeholder:text-fg-dim focus:border-violet-500/60 focus:outline-none"
           />
         </Field>
-        <Field label="TVA %">
+        <Field label={`TVA % — ${regimeLabel}`}>
           <select
             value={vatPct}
             onChange={(e) => setVatPct(Number(e.target.value))}
@@ -432,6 +489,8 @@ function AddInvoiceForm({ onCancel, onCreate }: {
             <option value={5}>5%</option>
             <option value={9}>9%</option>
             <option value={19}>19%</option>
+            <option value={20}>20%</option>
+            <option value={21}>21%</option>
           </select>
         </Field>
         <div className="flex flex-col justify-end rounded-md border border-line bg-card-2 px-2.5 py-2">

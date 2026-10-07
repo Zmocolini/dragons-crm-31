@@ -92,13 +92,13 @@ export function AdvancedFiltersDialog({ open, onClose, current, cities, subcontr
             <option value="completed">Activare finalizată</option>
           </select>
         </Field>
-        <Field label="Subcontractor">
+        {subcontractors.length > 0 && <Field label="Subcontractor">
           <select className={inputCls} value={draft.subcontractor} onChange={(e) => update("subcontractor", e.target.value)}>
             <option value="any">Oricare</option>
             <option value="__none__">Fără subcontractor</option>
             {subcontractors.map((s) => <option key={s} value={s}>{s}</option>)}
           </select>
-        </Field>
+        </Field>}
         <Field label="Perioadă adăugare">
           <select className={inputCls} value={draft.addedRange} onChange={(e) => update("addedRange", e.target.value as AdvancedFilters["addedRange"])}>
             <option value="any">Oricare</option>

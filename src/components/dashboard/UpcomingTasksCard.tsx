@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import { Check } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
@@ -47,12 +46,6 @@ export function UpcomingTasksCard({ tasks }: { tasks: UpcomingTask[] }) {
     <Card>
       <CardHeader>
         <CardTitle>Următoarele task-uri</CardTitle>
-        <Link
-          href="/calendar"
-          className="text-[11.5px] font-medium text-violet-300 transition-colors hover:text-violet-200"
-        >
-          Vezi toate
-        </Link>
       </CardHeader>
       <CardBody className="space-y-2">
         {items.length === 0 && (

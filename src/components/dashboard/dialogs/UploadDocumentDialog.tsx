@@ -87,7 +87,8 @@ type Props = {
 };
 
 export function UploadDocumentDialog({ open, onClose, prefillSubjectId }: Props) {
-  const { user, activeFleetId, fleets } = useSession();
+  const { user, activeFleetId, fleets, can } = useSession();
+  const canSeeSubs = can("subcontractors.view");
   const { couriers } = useCouriers();
   const { candidates } = useCandidates();
   const { addDocument } = useDocuments();
@@ -110,8 +111,8 @@ export function UploadDocumentDialog({ open, onClose, prefillSubjectId }: Props)
     const subs: Subject[] = SEED_SUBCONTRACTORS.map((s) => ({
       id: s.id, name: s.name, kind: s.kind, city: s.city, platform: s.platform,
     }));
-    return [...liveCouriers, ...liveCandidates, ...seedC, ...subs];
-  }, [couriers, candidates]);
+    return [...liveCouriers, ...liveCandidates, ...seedC, ...(canSeeSubs ? subs : [])];
+  }, [couriers, candidates, canSeeSubs]);
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [subjectId, setSubjectId] = useState<string>(prefillSubjectId ?? "");

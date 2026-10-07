@@ -14,6 +14,8 @@ export type FleetTenant = {
   city: string;
   country: string;
   cui: string;
+  /** Plătitor de TVA? Decide cota pe facturi (MD 20%, RO 21%, neplătitor 0%). Setat la înregistrare. */
+  vatPayer?: boolean;
   planLabel: string;
   planTier: PlanTier;
   planUsage: {
