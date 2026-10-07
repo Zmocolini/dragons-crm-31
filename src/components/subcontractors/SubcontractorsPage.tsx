@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Briefcase, Building2, CheckCircle2, Download, FileText, Mail, MapPin, MoreHorizontal, Paperclip, Phone, Plus, Search, Trash2, Upload, Users, Wallet, X } from "lucide-react";
 import { useRef } from "react";
+import Link from "next/link";
 import { Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, XAxis } from "recharts";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Dialog, DialogFooter } from "@/components/ui/Dialog";
@@ -12,6 +13,7 @@ import { CourierAvatar } from "@/components/reports/bits";
 import { useToast } from "@/components/ui/Toast";
 import { useSession } from "@/lib/rbac/session";
 import { useCouriers } from "@/lib/couriers/context";
+import { isWaiting } from "@/lib/couriers/filters";
 import { useOwnerScope } from "@/lib/owner-scope/context";
 import { formatInt, formatRon } from "@/lib/reports/analytics";
 import { buildXlsx, downloadBlob } from "@/lib/reports/xlsx";
@@ -59,6 +61,7 @@ export function SubcontractorsPage({ initialView = "list" }: { initialView?: "li
           cities: Array.from(new Set(couriersOfSub.map((c) => c.city).filter(Boolean))),
           platforms: Array.from(new Set(couriersOfSub.flatMap((c) => c.platforms))),
           couriersCount: couriersOfSub.length,
+          waitingCount: couriersOfSub.filter(isWaiting).length,
           commissionPct: 10,
           status: "active",
           type: "srl",
@@ -157,7 +160,7 @@ export function SubcontractorsPage({ initialView = "list" }: { initialView?: "li
 
       <div className={cn(selected && "lg:pr-[340px]")}>
         <Card className="overflow-hidden"><div className="overflow-x-auto"><table className="w-full min-w-[1040px] text-[12px]">
-          <thead><tr className="border-b border-line text-left text-[10.5px] uppercase tracking-wide text-fg-dim"><th className="px-4 py-2.5">#</th><th className="py-2.5 pr-2 font-medium">Nume / Firmă</th><th className="py-2.5 pr-2 font-medium">CUI</th><th className="py-2.5 pr-2 font-medium">Contact</th><th className="py-2.5 pr-2 font-medium">Orașe</th><th className="py-2.5 pr-2 font-medium">Platforme</th><th className="py-2.5 pr-2 text-center font-medium">Curieri</th><th className="py-2.5 pr-2 font-medium">Comision</th><th className="py-2.5 pr-2 font-medium">Contract</th><th className="py-2.5 pr-2 font-medium">Status</th><th className="px-4 py-2.5 text-right font-medium">Acțiuni</th></tr></thead>
+          <thead><tr className="border-b border-line text-left text-[10.5px] uppercase tracking-wide text-fg-dim"><th className="px-4 py-2.5">#</th><th className="py-2.5 pr-2 font-medium">Nume / Firmă</th><th className="py-2.5 pr-2 font-medium">CUI</th><th className="py-2.5 pr-2 font-medium">Contact</th><th className="py-2.5 pr-2 font-medium">Orașe</th><th className="py-2.5 pr-2 font-medium">Platforme</th><th className="py-2.5 pr-2 text-center font-medium">Curieri</th><th className="py-2.5 pr-2 text-center font-medium">În așteptare</th><th className="py-2.5 pr-2 font-medium">Comision</th><th className="py-2.5 pr-2 font-medium">Contract</th><th className="py-2.5 pr-2 font-medium">Status</th><th className="px-4 py-2.5 text-right font-medium">Acțiuni</th></tr></thead>
           <tbody>{rows.map((s, i) => (
             <tr key={s.id} className={cn("border-b border-line/50 hover:bg-white/[0.02]", selected?.id === s.id && "bg-accent/[0.06]")}>
               <td className="px-4 py-2.5 text-fg-dim tabular-nums">{(safePage - 1) * PAGE + i + 1}</td>
@@ -167,6 +170,7 @@ export function SubcontractorsPage({ initialView = "list" }: { initialView?: "li
               <td className="py-2.5 pr-2 max-w-[120px] truncate text-fg-muted">{s.cities.join(", ")}</td>
               <td className="py-2.5 pr-2"><span className="flex gap-1">{s.platforms.map((p) => <Badge key={p} tone={p as "bolt"}>{p}</Badge>)}</span></td>
               <td className="py-2.5 pr-2 text-center tabular-nums text-fg">{s.couriersCount}</td>
+              <td className="py-2.5 pr-2 text-center tabular-nums">{s.waitingCount ? <Link href={`/curieri?segment=asteptare&sub=${encodeURIComponent(s.contactEmail)}`} className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/20">{s.waitingCount}</Link> : <span className="text-fg-dim">—</span>}</td>
               <td className="py-2.5 pr-2"><span className="rounded-md border border-amber-500/25 bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-300 tabular-nums">{s.commissionPct}%</span></td>
               <td className="py-2.5 pr-2 tabular-nums text-fg-muted">{fmt(s.contractEndIso)}</td>
               <td className="py-2.5 pr-2"><span className={cn("inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium", SUB_STATUS_STYLE[s.status])}>{SUB_STATUS_LABEL[s.status]}</span></td>

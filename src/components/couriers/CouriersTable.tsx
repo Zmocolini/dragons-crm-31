@@ -1,16 +1,18 @@
 "use client";
 
-import { Bike, Car, Pencil, Trash2, Zap } from "lucide-react";
+import { Bike, Car, Pencil, Plus, Trash2, X, Zap } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { Avatar } from "@/components/dashboard/Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { PlatformLogo } from "@/components/ui/PlatformLogo";
 import type { CourierRow } from "@/lib/couriers/mock-seed";
 import type { CourierStatus, VehicleType } from "@/lib/couriers/types";
-import { COURIER_STATUS_LABEL } from "@/lib/couriers/types";
+import { COURIER_STATUS_LABEL, COURIER_STATUS_TONE } from "@/lib/couriers/types";
 import { useDocuments } from "@/lib/documents/context";
 import type { CourierRowAction } from "./CourierRowMenu";
 import { CourierWaitlistButton } from "./CourierWaitlistButton";
+import { PLATFORM_NAME } from "./CouriersWaitingPanel";
+import type { PlatformKey } from "@/lib/dashboard/types";
 
 type Props = {
   rows: CourierRow[];
@@ -20,6 +22,12 @@ type Props = {
   onRowDelete?: (row: CourierRow) => void;
   onRowEdit?: (row: CourierRow) => void;
   onRowToggleStatus?: (row: CourierRow) => void;
+  /** Segmentul „În așteptare": platformele în așteptare devin chip-uri cu Activat / Scoate. */
+  waitingMode?: boolean;
+  onActivateWaiting?: (row: CourierRow, platform: PlatformKey) => void;
+  onRemoveWaiting?: (row: CourierRow, platform: PlatformKey) => void;
+  /** Dacă e dat, apare coloana Subcontractor (vederea Global Owner pe toate flotele). */
+  ownerLabel?: (row: CourierRow) => string;
   loading?: boolean;
 };
 
@@ -30,15 +38,9 @@ const VEHICLE_ICON: Record<VehicleType, LucideIcon> = {
   car:     Car,
 };
 
-const STATUS_TONE: Record<CourierStatus, "success" | "warn" | "danger" | "neutral" | "info"> = {
-  active:        "success",
-  in_activation: "warn",
-  paused:        "neutral",
-  stopped:       "danger",
-  draft:         "neutral",
-};
+const STATUS_TONE = COURIER_STATUS_TONE;
 
-export function CouriersTable({ rows, totalMatching, onRowClick, onRowAction, onRowDelete, onRowEdit, onRowToggleStatus, loading }: Props) {
+export function CouriersTable({ rows, totalMatching, onRowClick, onRowAction, onRowDelete, onRowEdit, onRowToggleStatus, waitingMode, onActivateWaiting, onRemoveWaiting, ownerLabel, loading }: Props) {
   const { documentsForSubject } = useDocuments();
   if (loading) {
     return (
@@ -54,7 +56,9 @@ export function CouriersTable({ rows, totalMatching, onRowClick, onRowAction, on
         <div className="text-[14px] font-semibold text-fg">Niciun curier găsit</div>
         <div className="max-w-md text-[12.5px] text-fg-muted">
           {totalMatching === 0
-            ? "Ajustează filtrele sau căutarea pentru a vedea rezultate."
+            ? waitingMode
+              ? "Nimeni nu așteaptă loc. Adaugă platforme în așteptare la un curier (butonul din stânga rândului) sau din „Curier nou”."
+              : "Ajustează filtrele sau căutarea pentru a vedea rezultate."
             : "Această pagină nu conține curieri. Încearcă altă pagină."}
         </div>
       </div>
@@ -68,7 +72,8 @@ export function CouriersTable({ rows, totalMatching, onRowClick, onRowAction, on
           <tr className="border-b border-line text-left text-[11px] font-semibold uppercase tracking-wide text-fg-dim">
             <th className="w-[52px] px-2 py-2.5" aria-label="Așteaptă" />
             <th className="px-3 py-2.5">Curier</th>
-            <th className="w-[110px] px-2 py-2.5">Platforme</th>
+            {ownerLabel && <th className="w-[130px] px-2 py-2.5">Subcontractor</th>}
+            <th className={waitingMode ? "w-[300px] px-2 py-2.5" : "w-[110px] px-2 py-2.5"}>Platforme</th>
             <th className="w-[110px] px-2 py-2.5">Documente</th>
             <th className="w-[110px] px-2 py-2.5">Status</th>
             <th className="w-[100px] px-2 py-2.5 text-right">Acțiuni</th>
@@ -99,11 +104,53 @@ export function CouriersTable({ rows, totalMatching, onRowClick, onRowAction, on
                     </div>
                   </div>
                 </td>
-                <td className="px-2 py-3">
+                {ownerLabel && (
+                  <td className="truncate px-2 py-3 text-fg-muted">{ownerLabel(row)}</td>
+                )}
+                <td className="px-2 py-3" onClick={waitingMode ? (e) => e.stopPropagation() : undefined}>
                   <div className="flex flex-wrap items-center gap-1">
                     {row.platforms.map((p) => (
-                      <PlatformLogo key={p} platform={p} size={20} rounded="md" />
+                      <span key={p} title={`${PLATFORM_NAME[p]}: activ`}>
+                        <PlatformLogo platform={p} size={20} rounded="md" />
+                      </span>
                     ))}
+                    {(row.waitlistedPlatforms ?? []).map((p) =>
+                      waitingMode ? (
+                        <span
+                          key={`w-${p}`}
+                          className="inline-flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 py-0.5 pl-1.5 pr-1 text-[11px] font-semibold text-amber-100"
+                        >
+                          <PlatformLogo platform={p} size={14} rounded="md" />
+                          {PLATFORM_NAME[p]}
+                          <button
+                            type="button"
+                            onClick={() => onActivateWaiting?.(row, p)}
+                            title={`Marchează activat pe ${PLATFORM_NAME[p]}`}
+                            className="ml-0.5 inline-flex h-5 items-center gap-0.5 rounded bg-emerald-500/25 px-1.5 text-[10px] font-bold text-emerald-100 hover:bg-emerald-500/40"
+                          >
+                            <Plus size={9} />
+                            Activat
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onRemoveWaiting?.(row, p)}
+                            aria-label={`Scoate din așteptarea pentru ${PLATFORM_NAME[p]}`}
+                            title="Scoate din așteptare"
+                            className="inline-flex h-5 w-5 items-center justify-center rounded text-amber-200 hover:bg-amber-500/25 hover:text-amber-50"
+                          >
+                            <X size={10} />
+                          </button>
+                        </span>
+                      ) : (
+                        <span
+                          key={`w-${p}`}
+                          title={`${PLATFORM_NAME[p]}: în așteptare`}
+                          className="rounded-md opacity-60 ring-2 ring-amber-400/70 ring-offset-1 ring-offset-transparent"
+                        >
+                          <PlatformLogo platform={p} size={20} rounded="md" />
+                        </span>
+                      ),
+                    )}
                   </div>
                 </td>
                 <td className="px-2 py-3">

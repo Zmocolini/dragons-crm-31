@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
+import { X } from "lucide-react";
 import { AICopilotBanner } from "@/components/dashboard/AICopilotBanner";
 import { DragonsCommunityBanner } from "@/components/dashboard/DragonsCommunityBanner";
 import { AddCourierDialog } from "@/components/dashboard/dialogs/AddCourierDialog";
@@ -11,19 +12,23 @@ import { RecordPaymentDialog } from "@/components/dashboard/dialogs/RecordPaymen
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
 import { useCouriers } from "@/lib/couriers/context";
+import { courierOwner, useAccountDirectory } from "@/lib/couriers/use-account-directory";
+import { useOwnerScope } from "@/lib/owner-scope/context";
 import type { CourierRow } from "@/lib/couriers/mock-seed";
 import type { CourierStatus, VehicleType } from "@/lib/couriers/types";
 import type { PlatformKey } from "@/lib/dashboard/types";
 import { useSession } from "@/lib/rbac/session";
 import {
   applyFilters, computeStats, countActiveAdvancedFilters,
-  DEFAULT_ADVANCED_FILTERS, uniqueCities, uniqueSubcontractors,
+  DEFAULT_ADVANCED_FILTERS, uniqueCities, uniqueSubcontractors, waitingByPlatform,
   type AdvancedFilters, type QuickFilterKey,
 } from "@/lib/couriers/filters";
 import { CouriersHeader } from "@/components/couriers/CouriersHeader";
 import { CouriersStatsRow } from "@/components/couriers/CouriersStatsRow";
 import { CouriersToolbar } from "@/components/couriers/CouriersToolbar";
 import { CouriersTable } from "@/components/couriers/CouriersTable";
+import { CouriersSegments, type CourierSegment } from "@/components/couriers/CouriersSegments";
+import { CouriersWaitingPanel, PLATFORM_NAME } from "@/components/couriers/CouriersWaitingPanel";
 import { CouriersPagination } from "@/components/couriers/CouriersPagination";
 import { AdvancedFiltersDialog } from "@/components/couriers/AdvancedFiltersDialog";
 import { ExportDialog } from "@/components/couriers/ExportDialog";
@@ -32,16 +37,26 @@ import type { CourierRowAction } from "@/components/couriers/CourierRowMenu";
 
 const PAGE_SIZE = 10;
 
-export function CouriersPage() {
+export function CouriersPage({ initialSegment = "all", initialSub = null }: { initialSegment?: CourierSegment; initialSub?: string | null }) {
   const { user, activeFleetId } = useSession();
-  const { allRows, hydrated, deleteCourier, updateCourier } = useCouriers();
+  const { allRows: allCourierRows, hydrated, deleteCourier, updateCourier } = useCouriers();
+  const { scope } = useOwnerScope();
+  const accounts = useAccountDirectory();
+  // Venit din pagina Subcontractori: doar curierii creați de contul acelui subcontractor.
+  const [subEmail, setSubEmail] = useState<string | null>(initialSub?.toLowerCase() ?? null);
+  const allRows = useMemo(
+    () => (subEmail ? allCourierRows.filter((c) => (c.createdBy ?? "").toLowerCase() === subEmail) : allCourierRows),
+    [allCourierRows, subEmail],
+  );
   const toast = useToast();
   const router = useRouter();
 
   // Filter state
   const [search, setSearch] = useState("");
-  const [quickFilter, setQuickFilter] = useState<QuickFilterKey>("all");
-  const [statusFilter, setStatusFilter] = useState<CourierStatus | "any">("any");
+  const [quickFilter, setQuickFilter] = useState<QuickFilterKey>(initialSegment === "waiting" ? "waiting" : "all");
+  const [statusFilter, setStatusFilter] = useState<CourierStatus | "any">(
+    initialSegment === "active" || initialSegment === "paused" || initialSegment === "stopped" ? initialSegment : "any",
+  );
   const [cityFilter, setCityFilter] = useState<string | "any">("any");
   const [platformFilter, setPlatformFilter] = useState<PlatformKey | "any">("any");
   const [vehicleFilter, setVehicleFilter] = useState<VehicleType | "any">("any");
@@ -60,6 +75,7 @@ export function CouriersPage() {
   const [now] = useState(() => Date.now());
 
   const stats = useMemo(() => computeStats(allRows, activeFleetId, now), [allRows, activeFleetId, now]);
+  const waitingCounts = useMemo(() => waitingByPlatform(allRows, activeFleetId), [allRows, activeFleetId]);
   const cities = useMemo(() => uniqueCities(allRows, activeFleetId), [allRows, activeFleetId]);
   const subcontractors = useMemo(() => uniqueSubcontractors(allRows, activeFleetId), [allRows, activeFleetId]);
 
@@ -124,10 +140,66 @@ export function CouriersPage() {
     setQuickFilter(key);
   };
 
+  // Segmentul e o vedere peste aceleași filtre (statusFilter / quickFilter), nu o stare separată.
+  const segment: CourierSegment =
+    quickFilter === "waiting" ? "waiting"
+    : quickFilter === "status_active" || statusFilter === "active" ? "active"
+    : statusFilter === "paused" ? "paused"
+    : statusFilter === "stopped" ? "stopped"
+    : "all";
+
+  const handleSegment = (next: CourierSegment) => {
+    setPlatformFilter("any"); // „platformă" înseamnă altceva pe În așteptare (unde așteaptă, nu unde e activ)
+    if (next === "waiting") {
+      setQuickFilter("waiting");
+      setStatusFilter("any");
+      return;
+    }
+    setQuickFilter("all");
+    setStatusFilter(next === "all" ? "any" : next);
+  };
+
+  const activateOn = (row: CourierRow, platform: PlatformKey) => {
+    const nextWaitlist = (row.waitlistedPlatforms ?? []).filter((p) => p !== platform);
+    const nextPlatforms = row.platforms.includes(platform) ? row.platforms : [...row.platforms, platform];
+    updateCourier(row.id, { platforms: nextPlatforms, waitlistedPlatforms: nextWaitlist });
+    toast.success(`Activat pe ${PLATFORM_NAME[platform]}`, `${row.fullName} este acum activ și pe ${PLATFORM_NAME[platform]}.`);
+  };
+
+  const removeFromWaitlist = (row: CourierRow, platform: PlatformKey) => {
+    const nextWaitlist = (row.waitlistedPlatforms ?? []).filter((p) => p !== platform);
+    updateCourier(row.id, { waitlistedPlatforms: nextWaitlist });
+    toast.info("Scos din așteptare", `${row.fullName} nu mai așteaptă ${PLATFORM_NAME[platform]}.`);
+  };
+
+  // Coloana Subcontractor doar în vederea Global Owner pe toate flotele; harta de conturi vine async.
+  const showOwner = user.role === "global_owner" && !scope && accounts.size > 0;
+  const segmentCounts: Record<CourierSegment, number> = {
+    all: stats.total, active: stats.active, waiting: stats.waiting, paused: stats.paused, stopped: stats.stopped,
+  };
+
   return (
     <div className="mx-auto w-full max-w-[1520px] px-5 pt-5 pb-4 md:px-6 md:pt-6">
       <div className="space-y-5">
           <CouriersHeader onAddCourier={() => setShowAdd(true)} />
+
+          <CouriersSegments value={segment} counts={segmentCounts} onChange={handleSegment} />
+
+          {subEmail && (
+            <button
+              type="button"
+              onClick={() => setSubEmail(null)}
+              className="inline-flex items-center gap-1.5 self-start rounded-lg border border-violet-500/40 bg-violet-500/10 px-3 py-1.5 text-[12px] font-semibold text-violet-100 hover:bg-violet-500/20"
+            >
+              Subcontractor: {accounts.get(subEmail)?.name ?? subEmail}
+              <X size={12} aria-hidden />
+              <span className="sr-only">Scoate filtrul de subcontractor</span>
+            </button>
+          )}
+
+          {segment === "waiting" && (
+            <CouriersWaitingPanel counts={waitingCounts} selected={platformFilter} onSelect={setPlatformFilter} />
+          )}
 
           <CouriersStatsRow
             active={stats.active}
@@ -141,7 +213,7 @@ export function CouriersPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Lista curierilor</CardTitle>
+              <CardTitle>{segment === "waiting" ? "Lista de așteptare" : "Lista curierilor"}</CardTitle>
             </CardHeader>
             <CardBody className="space-y-4">
               <CouriersToolbar
@@ -176,6 +248,10 @@ export function CouriersPage() {
                   deleteCourier(row.id);
                   toast.success("Curier șters", row.fullName);
                 }}
+                waitingMode={segment === "waiting"}
+                onActivateWaiting={activateOn}
+                onRemoveWaiting={removeFromWaitlist}
+                ownerLabel={showOwner ? (row) => courierOwner(row, accounts).label : undefined}
                 loading={!hydrated}
               />
               {filtered.length > 0 && (

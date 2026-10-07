@@ -3,7 +3,6 @@ import {
   BarChart3,
   Bike,
   Car,
-  Clock,
   Hotel,
   LayoutDashboard,
   Receipt,
@@ -27,7 +26,6 @@ export type NavItem = {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, permission: "dashboard.view" },
   { href: "/curieri", label: "Curieri", icon: Bike, permission: "couriers.view" },
-  { href: "/curieri-in-asteptare", label: "Curieri în așteptare", icon: Clock, permission: "couriers.view" },
   { href: "/plati", label: "Plăți", icon: Wallet, permission: "payments.view" },
   { href: "/facturi", label: "Facturi", icon: Receipt, permission: "payments.view" },
   { href: "/vehicule", label: "Vehicule", icon: Car, permission: "vehicles.view" },

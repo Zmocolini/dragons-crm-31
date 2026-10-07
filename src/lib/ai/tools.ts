@@ -36,7 +36,7 @@ export const COPILOT_TOOLS: ToolDef[] = [
   tool("list_expiring_documents", "Documente care expiră în următoarele N zile (și cele deja expirate).", obj({ days: num("implicit 30") })),
   tool("list_vehicles", "Listează vehiculele flotei cu status."),
   tool("navigate", "Deschide o pagină din CRM pentru utilizator.", obj({
-    path: str("ruta", { enum: ["/", "/curieri", "/curieri-in-asteptare", "/plati", "/facturi", "/vehicule", "/cazari", "/subcontractori", "/rapoarte", "/econtracte", "/setari", "/ai?tab=issues", "/clubul-antreprenorilor"] }),
+    path: str("ruta", { enum: ["/", "/curieri", "/curieri?segment=asteptare", "/plati", "/facturi", "/vehicule", "/cazari", "/subcontractori", "/rapoarte", "/econtracte", "/setari", "/ai?tab=issues", "/clubul-antreprenorilor"] }),
   }, ["path"])),
 
   // ── Scriere ──

@@ -28,6 +28,8 @@ export type Subcontractor = {
   status: SubStatus; type: SubType; startIso: string; contractEndIso: string; tenantId: string;
   revenue3m: number; commissionGenerated: number; payRate: number;
   contractFile?: SubcontractorContractFile | null;
+  /** Curieri ai subcontractorului care așteaptă loc pe o platformă (vezi /curieri?segment=asteptare). */
+  waitingCount?: number;
 };
 
 const TODAY = "2026-09-10"; const DAY = 86400000;

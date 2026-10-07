@@ -7,6 +7,7 @@ export type QuickFilterKey =
   | "all"
   | "status_active"
   | "status_in_activation"
+  | "waiting"
   | "docs_missing"
   | "open_issues"
   | "activation_blocked"
@@ -20,6 +21,7 @@ export const QUICK_FILTER_LABEL: Record<QuickFilterKey, string> = {
   all:                  "Toți curierii",
   status_active:        "Activi",
   status_in_activation: "În activare",
+  waiting:              "În așteptare",
   docs_missing:         "Documente lipsă",
   open_issues:          "Probleme deschise",
   activation_blocked:   "Activări blocate",
@@ -66,11 +68,17 @@ export function countActiveAdvancedFilters(f: AdvancedFilters): number {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
+/** Curier care așteaptă loc pe cel puțin o platformă (poate fi activ pe alta). */
+export function isWaiting(row: Pick<CourierRow, "waitlistedPlatforms">): boolean {
+  return (row.waitlistedPlatforms?.length ?? 0) > 0;
+}
+
 function matchesQuickFilter(row: CourierRow, key: QuickFilterKey, now: number): boolean {
   switch (key) {
     case "all": return true;
     case "status_active": return row.status === "active";
     case "status_in_activation": return row.status === "in_activation";
+    case "waiting": return isWaiting(row);
     case "docs_missing": return row.documentsMissingCount > 0 || row.documentsExpiredCount > 0;
     case "open_issues": return row.hasOpenIssue;
     case "activation_blocked": return row.hasBlockedActivation;
@@ -148,7 +156,11 @@ export function applyFilters(input: CouriersFilterInput): CourierRow[] {
     if (row.tenantId !== input.activeFleetId) return false;
     if (input.statusFilter !== "any" && row.status !== input.statusFilter) return false;
     if (input.cityFilter !== "any" && row.city !== input.cityFilter) return false;
-    if (input.platformFilter !== "any" && !row.platforms.includes(input.platformFilter)) return false;
+    if (input.platformFilter !== "any") {
+      // Pe segmentul „În așteptare", platforma înseamnă platforma pe care așteaptă.
+      const onPlatform = input.quickFilter === "waiting" ? row.waitlistedPlatforms ?? [] : row.platforms;
+      if (!onPlatform.includes(input.platformFilter)) return false;
+    }
     if (input.vehicleFilter !== "any" && row.vehicleType !== input.vehicleFilter) return false;
     if (!matchesQuickFilter(row, input.quickFilter, input.now)) return false;
     if (!matchesAdvanced(row, input.advanced, input.now)) return false;
@@ -158,7 +170,11 @@ export function applyFilters(input: CouriersFilterInput): CourierRow[] {
 }
 
 export type CouriersStats = {
+  total: number;
   active: number;
+  paused: number;
+  stopped: number;
+  waiting: number;
   inActivation: number;
   documentsMissing: number;
   openIssues: number;
@@ -171,11 +187,16 @@ export type CouriersStats = {
 };
 
 export function computeStats(rows: CourierRow[], activeFleetId: string, now: number): CouriersStats {
+  let total = 0, paused = 0, stopped = 0, waiting = 0;
   let active = 0, inActivation = 0, documentsMissing = 0, openIssues = 0;
   let activationBlocked = 0, noActivity7d = 0, pendingPayment = 0;
   let bolt = 0, wolt = 0, glovo = 0;
   for (const row of rows) {
     if (row.tenantId !== activeFleetId) continue;
+    total++;
+    if (row.status === "paused") paused++;
+    if (row.status === "stopped") stopped++;
+    if (isWaiting(row)) waiting++;
     if (row.status === "active") active++;
     if (row.status === "in_activation") inActivation++;
     if (row.documentsMissingCount > 0 || row.documentsExpiredCount > 0) documentsMissing++;
@@ -187,7 +208,7 @@ export function computeStats(rows: CourierRow[], activeFleetId: string, now: num
     if (row.platforms.includes("wolt"))  wolt++;
     if (row.platforms.includes("glovo")) glovo++;
   }
-  return { active, inActivation, documentsMissing, openIssues, activationBlocked, noActivity7d, pendingPayment, bolt, wolt, glovo };
+  return { total, active, paused, stopped, waiting, inActivation, documentsMissing, openIssues, activationBlocked, noActivity7d, pendingPayment, bolt, wolt, glovo };
 }
 
 export function uniqueCities(rows: CourierRow[], activeFleetId: string): string[] {
@@ -204,4 +225,14 @@ export function uniqueSubcontractors(rows: CourierRow[], activeFleetId: string):
     if (r.tenantId === activeFleetId && r.subcontractorName) set.add(r.subcontractorName);
   }
   return Array.from(set).sort((a, b) => a.localeCompare(b, "ro"));
+}
+
+/** Câți curieri așteaptă pe fiecare platformă (un curier poate conta pe mai multe). */
+export function waitingByPlatform(rows: CourierRow[], activeFleetId: string): Record<PlatformKey, number> {
+  const counts: Record<PlatformKey, number> = { bolt: 0, wolt: 0, glovo: 0 };
+  for (const r of rows) {
+    if (r.tenantId !== activeFleetId) continue;
+    for (const p of r.waitlistedPlatforms ?? []) counts[p]++;
+  }
+  return counts;
 }
