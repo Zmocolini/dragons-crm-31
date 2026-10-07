@@ -8,6 +8,8 @@ import { useProfile } from "@/lib/profile/context";
 import { useToast } from "@/components/ui/Toast";
 
 const CONFIRM_TEXT = "STERGE CONTUL";
+// Textul de confirmare e tradus în EN de translator ("DELETE ACCOUNT"), deci îl acceptăm și pe el.
+const CONFIRM_TEXT_EN = "DELETE ACCOUNT";
 
 export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { user } = useSession();
@@ -20,7 +22,7 @@ export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose:
 
   function del() {
     if (isSoleGlobalOwner) return;
-    if (text !== CONFIRM_TEXT) return;
+    if (text !== CONFIRM_TEXT && text !== CONFIRM_TEXT_EN) return;
     // TODO(real-users): apelează server action deleteMyAccount() + revoke sessions + audit + redirect /login.
     logActivity("account.delete_requested", "Cerere ștergere cont");
     toast.error("Cont trimis spre ștergere", "Se activează după integrarea backend.");
@@ -84,7 +86,7 @@ export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose:
           <button
             type="button"
             onClick={del}
-            disabled={text !== CONFIRM_TEXT}
+            disabled={text !== CONFIRM_TEXT && text !== CONFIRM_TEXT_EN}
             className="rounded-lg bg-rose-600 px-4 py-2 text-[12.5px] font-semibold text-white hover:bg-rose-500 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Șterge definitiv
