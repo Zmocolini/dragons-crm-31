@@ -24,7 +24,7 @@ type Props = {
   onRowToggleStatus?: (row: CourierRow) => void;
   onConfirmStatus?: (row: CourierRow, status: "active" | "rejected") => void;
   canManageStatus?: boolean;
-  /** Segmentul „În așteptare": platformele în așteptare devin chip-uri cu Activat / Scoate. */
+  /** Segmentul „Așteaptă loc": platformele pe care așteaptă devin chip-uri cu Activat / Scoate. */
   waitingMode?: boolean;
   onActivateWaiting?: (row: CourierRow, platform: PlatformKey) => void;
   onRemoveWaiting?: (row: CourierRow, platform: PlatformKey) => void;
@@ -82,7 +82,7 @@ export function CouriersTable({
         <div className="max-w-md text-[12.5px] text-fg-muted">
           {totalMatching === 0
             ? waitingMode
-              ? "Nimeni nu așteaptă loc. Adaugă platforme în așteptare la un curier (butonul din stânga rândului) sau din „Curier nou”."
+              ? "Nimeni nu așteaptă loc. Adaugă o platformă pe care așteaptă loc la un curier (butonul din stânga rândului) sau din „Curier nou”."
               : "Ajustează filtrele sau căutarea pentru a vedea rezultate."
             : "Această pagină nu conține curieri. Încearcă altă pagină."}
         </div>
@@ -159,8 +159,8 @@ export function CouriersTable({
                           <button
                             type="button"
                             onClick={() => onRemoveWaiting?.(row, p)}
-                            aria-label={`Scoate din așteptarea pentru ${PLATFORM_NAME[p]}`}
-                            title="Scoate din așteptare"
+                            aria-label={`Nu mai așteaptă loc pe ${PLATFORM_NAME[p]}`}
+                            title="Nu mai așteaptă loc"
                             className="inline-flex h-5 w-5 items-center justify-center rounded text-amber-200 hover:bg-amber-500/25 hover:text-amber-50"
                           >
                             <X size={10} />
@@ -169,7 +169,7 @@ export function CouriersTable({
                       ) : (
                         <span
                           key={`w-${p}`}
-                          title={`${PLATFORM_NAME[p]}: în așteptare`}
+                          title={`${PLATFORM_NAME[p]}: așteaptă loc`}
                           className="rounded-md opacity-60 ring-2 ring-amber-400/70 ring-offset-1 ring-offset-transparent"
                         >
                           <PlatformLogo platform={p} size={20} rounded="md" />

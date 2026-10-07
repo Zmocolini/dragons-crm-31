@@ -49,9 +49,9 @@ export function CourierWaitlistButton({ row }: { row: CourierRow }) {
       : [...waitlist, platform];
     updateCourier(row.id, { waitlistedPlatforms: next });
     if (isWaiting) {
-      toast.info("Scos din așteptare", `${row.fullName} nu mai așteaptă ${PLATFORM_NAME[platform]}.`);
+      toast.info("Nu mai așteaptă loc", `${row.fullName} nu mai așteaptă ${PLATFORM_NAME[platform]}.`);
     } else {
-      toast.success("Adăugat în așteptare", `${row.fullName} așteaptă ${PLATFORM_NAME[platform]}.`);
+      toast.success("Așteaptă loc", `${row.fullName} așteaptă ${PLATFORM_NAME[platform]}.`);
     }
   }
 

@@ -60,7 +60,7 @@ export function CouriersPage({ initialSegment = "all", initialSub = null, initia
   const [search, setSearch] = useState("");
   const [quickFilter, setQuickFilter] = useState<QuickFilterKey>(initialSegment === "waiting" ? "waiting" : "all");
   const [statusFilter, setStatusFilter] = useState<CourierStatus | "any">(
-    initialSegment === "active" || initialSegment === "paused" || initialSegment === "stopped" ? initialSegment : "any",
+    initialSegment === "pending" || initialSegment === "active" || initialSegment === "paused" || initialSegment === "stopped" ? initialSegment : "any",
   );
   const [cityFilter, setCityFilter] = useState<string | "any">("any");
   const [platformFilter, setPlatformFilter] = useState<PlatformKey | "any">("any");
@@ -152,13 +152,14 @@ export function CouriersPage({ initialSegment = "all", initialSub = null, initia
   // Segmentul e o vedere peste aceleași filtre (statusFilter / quickFilter), nu o stare separată.
   const segment: CourierSegment =
     quickFilter === "waiting" ? "waiting"
+    : statusFilter === "pending" ? "pending"
     : quickFilter === "status_active" || statusFilter === "active" ? "active"
     : statusFilter === "paused" ? "paused"
     : statusFilter === "stopped" ? "stopped"
     : "all";
 
   const handleSegment = (next: CourierSegment) => {
-    setPlatformFilter("any"); // „platformă" înseamnă altceva pe În așteptare (unde așteaptă, nu unde e activ)
+    setPlatformFilter("any"); // „platformă" înseamnă altceva pe Așteaptă loc (unde așteaptă, nu unde e activ)
     if (next === "waiting") {
       setQuickFilter("waiting");
       setStatusFilter("any");
@@ -178,13 +179,13 @@ export function CouriersPage({ initialSegment = "all", initialSub = null, initia
   const removeFromWaitlist = (row: CourierRow, platform: PlatformKey) => {
     const nextWaitlist = (row.waitlistedPlatforms ?? []).filter((p) => p !== platform);
     updateCourier(row.id, { waitlistedPlatforms: nextWaitlist });
-    toast.info("Scos din așteptare", `${row.fullName} nu mai așteaptă ${PLATFORM_NAME[platform]}.`);
+    toast.info("Nu mai așteaptă loc", `${row.fullName} nu mai așteaptă ${PLATFORM_NAME[platform]}.`);
   };
 
   // Coloana Subcontractor doar în vederea Global Owner pe toate flotele; harta de conturi vine async.
   const showOwner = user.role === "global_owner" && !scope && accounts.size > 0;
   const segmentCounts: Record<CourierSegment, number> = {
-    all: stats.total, active: stats.active, waiting: stats.waiting, paused: stats.paused, stopped: stats.stopped,
+    all: stats.total, pending: stats.pendingConfirm, active: stats.active, waiting: stats.waiting, paused: stats.paused, stopped: stats.stopped,
   };
 
   return (
@@ -252,7 +253,7 @@ export function CouriersPage({ initialSegment = "all", initialSub = null, initia
           {view === "list" && (
           <Card>
             <CardHeader>
-              <CardTitle>{segment === "waiting" ? "Lista de așteptare" : "Lista curierilor"}</CardTitle>
+              <CardTitle>{segment === "waiting" ? "Așteaptă loc pe platformă" : "Lista curierilor"}</CardTitle>
             </CardHeader>
             <CardBody className="space-y-4">
               <CouriersToolbar

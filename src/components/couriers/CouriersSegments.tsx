@@ -2,12 +2,15 @@
 
 import { cn } from "@/lib/utils/cn";
 
-export type CourierSegment = "all" | "active" | "waiting" | "paused" | "stopped";
+export type CourierSegment = "all" | "pending" | "active" | "waiting" | "paused" | "stopped";
 
 const SEGMENTS: Array<{ key: CourierSegment; label: string }> = [
   { key: "all", label: "Toți" },
+  // Status `pending`: înregistrat de subcontractor, flota trebuie să-l activeze sau să-l respingă.
+  { key: "pending", label: "De confirmat" },
   { key: "active", label: "Activi" },
-  { key: "waiting", label: "În așteptare" },
+  // Nu e un status: curierul așteaptă loc pe o platformă (poate fi activ pe alta).
+  { key: "waiting", label: "Așteaptă loc" },
   { key: "paused", label: "Pauză" },
   { key: "stopped", label: "Opriți" },
 ];
@@ -30,8 +33,8 @@ export function CouriersSegments({ value, counts, onChange }: Props) {
             role="tab"
             aria-selected={selected}
             onClick={() => onChange(key)}
-            // Un curier activ pe o platformă și în așteptare pe alta e numărat și la Activi, și la În așteptare.
-            title={key === "waiting" ? "Curieri care așteaptă loc pe cel puțin o platformă (pot fi activi pe alta)" : undefined}
+            // Un curier activ pe o platformă care așteaptă loc pe alta e numărat și la Activi, și la Așteaptă loc.
+            title={key === "waiting" ? "Curieri care așteaptă loc pe cel puțin o platformă (pot fi activi pe alta)" : key === "pending" ? "Înregistrați de subcontractori: activează sau respinge" : undefined}
             className={cn(
               "inline-flex items-center gap-2 rounded-lg border px-3 py-1.5 text-[12.5px] font-semibold transition-colors",
               selected

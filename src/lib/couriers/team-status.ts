@@ -6,7 +6,7 @@ import { INCOMPLETE_FIELD_LABEL } from "./types";
 
 /**
  * Vederea „Pe echipe": fiecare curier cade în EXACT o găleată (suma găleților = total echipă).
- * Prioritate: eroare > de activat > pending > ok; pauză/oprit sunt separat, nu sunt probleme.
+ * Prioritate: eroare > de activat > pending > ok; pauză/oprit/respins sunt separat, nu sunt probleme.
  * Motivele (reasons) se afișează toate, chiar dacă găleata e decisă de primul.
  */
 export type TeamBucket = "error" | "to_activate" | "pending" | "ok" | "inactive";
@@ -16,9 +16,10 @@ export const TEAM_BUCKETS: TeamBucket[] = ["error", "to_activate", "pending", "o
 export const TEAM_BUCKET_LABEL: Record<TeamBucket, string> = {
   error: "Eroare",
   to_activate: "De activat",
-  pending: "Pending",
+  // Nu e statusul `pending` (acela e „De activat"): aici curierul așteaptă loc pe o platformă sau verificarea actelor.
+  pending: "Așteaptă loc / acte",
   ok: "În regulă",
-  inactive: "Pauză / oprit",
+  inactive: "Inactiv / respins",
 };
 
 // Aceleași nume ca în CouriersWaitingPanel; duplicat aici ca modulul să rămână pur (fără React) și testabil.
@@ -38,7 +39,7 @@ function latestPerType(docs: CrmDocument[]): CrmDocument[] {
 }
 
 export function classifyCourier(row: CourierRow, { docs, payments, todayMs }: ClassifyInput): Classified {
-  if (row.status === "paused" || row.status === "stopped") return { bucket: "inactive", reasons: [] };
+  if (row.status === "paused" || row.status === "stopped" || row.status === "rejected") return { bucket: "inactive", reasons: [] };
 
   const errors: string[] = [];
   const pending: string[] = [];
@@ -59,8 +60,12 @@ export function classifyCourier(row: CourierRow, { docs, payments, todayMs }: Cl
   if (latest.some((d) => d.status === "in_review")) pending.push("Documente în verificare");
   for (const p of row.waitlistedPlatforms ?? []) pending.push(`Așteaptă ${PLATFORM_LABEL[p]}`);
 
-  const toActivate = row.status === "in_activation" || row.status === "draft";
-  const extra = toActivate && docs.length === 0 ? ["Fără documente încărcate"] : [];
+  // pending = înregistrat de subcontractor, așteaptă ca flota să-l confirme (activează / respinge).
+  const toActivate = row.status === "in_activation" || row.status === "draft" || row.status === "pending";
+  const extra = [
+    ...(row.status === "pending" ? ["Așteaptă confirmarea flotei"] : []),
+    ...(toActivate && row.status !== "pending" && docs.length === 0 ? ["Fără documente încărcate"] : []),
+  ];
   const reasons = [...errors, ...extra, ...pending];
 
   const bucket: TeamBucket = errors.length ? "error" : toActivate ? "to_activate" : pending.length ? "pending" : "ok";

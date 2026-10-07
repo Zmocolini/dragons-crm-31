@@ -42,6 +42,13 @@ const both = classifyCourier(row({ waitlistedPlatforms: ["glovo"] }), input({ pa
 assert.equal(both.bucket, "error");
 assert.deepEqual(both.reasons, ["Plată blocată", "Așteaptă Glovo"]);
 
+// înregistrat de subcontractor, așteaptă confirmarea flotei = de activat (nu „în regulă")
+const conf = classifyCourier(row({ status: "pending" }), input());
+assert.equal(conf.bucket, "to_activate");
+assert.deepEqual(conf.reasons, ["Așteaptă confirmarea flotei"]);
+// respins nu e problemă activă și nici „în regulă"
+assert.equal(classifyCourier(row({ status: "rejected" }), input()).bucket, "inactive");
+
 // echipe: suma găleților = total, sortare cu erori întâi, echipă goală rămâne
 const rows = [
   row({ id: "1", createdBy: "a" }),

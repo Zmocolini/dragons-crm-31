@@ -17,7 +17,7 @@ type Props = {
   onSelect: (next: PlatformKey | "any") => void;
 };
 
-/** Afișat doar pe segmentul „În așteptare": explicația + câți așteaptă pe fiecare platformă. */
+/** Afișat doar pe segmentul „Așteaptă loc": explicația + câți așteaptă pe fiecare platformă. */
 export function CouriersWaitingPanel({ counts, selected, onSelect }: Props) {
   const { settings } = useSettings();
   const platforms = (Object.keys(PLATFORM_NAME) as PlatformKey[]).filter((p) => settings.platforms[p] === "active");

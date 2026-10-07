@@ -21,7 +21,7 @@ export const QUICK_FILTER_LABEL: Record<QuickFilterKey, string> = {
   all:                  "Toți curierii",
   status_active:        "Activi",
   status_in_activation: "În activare",
-  waiting:              "În așteptare",
+  waiting:              "Așteaptă loc",
   docs_missing:         "Documente lipsă",
   open_issues:          "Probleme deschise",
   activation_blocked:   "Activări blocate",
@@ -157,7 +157,7 @@ export function applyFilters(input: CouriersFilterInput): CourierRow[] {
     if (input.statusFilter !== "any" && row.status !== input.statusFilter) return false;
     if (input.cityFilter !== "any" && row.city !== input.cityFilter) return false;
     if (input.platformFilter !== "any") {
-      // Pe segmentul „În așteptare", platforma înseamnă platforma pe care așteaptă.
+      // Pe segmentul „Așteaptă loc", platforma înseamnă platforma pe care așteaptă.
       const onPlatform = input.quickFilter === "waiting" ? row.waitlistedPlatforms ?? [] : row.platforms;
       if (!onPlatform.includes(input.platformFilter)) return false;
     }
@@ -171,6 +171,7 @@ export function applyFilters(input: CouriersFilterInput): CourierRow[] {
 
 export type CouriersStats = {
   total: number;
+  pendingConfirm: number;
   active: number;
   paused: number;
   stopped: number;
@@ -187,13 +188,14 @@ export type CouriersStats = {
 };
 
 export function computeStats(rows: CourierRow[], activeFleetId: string, now: number): CouriersStats {
-  let total = 0, paused = 0, stopped = 0, waiting = 0;
+  let total = 0, paused = 0, stopped = 0, waiting = 0, pendingConfirm = 0;
   let active = 0, inActivation = 0, documentsMissing = 0, openIssues = 0;
   let activationBlocked = 0, noActivity7d = 0, pendingPayment = 0;
   let bolt = 0, wolt = 0, glovo = 0;
   for (const row of rows) {
     if (row.tenantId !== activeFleetId) continue;
     total++;
+    if (row.status === "pending") pendingConfirm++;
     if (row.status === "paused") paused++;
     if (row.status === "stopped") stopped++;
     if (isWaiting(row)) waiting++;
@@ -208,7 +210,7 @@ export function computeStats(rows: CourierRow[], activeFleetId: string, now: num
     if (row.platforms.includes("wolt"))  wolt++;
     if (row.platforms.includes("glovo")) glovo++;
   }
-  return { total, active, paused, stopped, waiting, inActivation, documentsMissing, openIssues, activationBlocked, noActivity7d, pendingPayment, bolt, wolt, glovo };
+  return { total, pendingConfirm, active, paused, stopped, waiting, inActivation, documentsMissing, openIssues, activationBlocked, noActivity7d, pendingPayment, bolt, wolt, glovo };
 }
 
 export function uniqueCities(rows: CourierRow[], activeFleetId: string): string[] {
