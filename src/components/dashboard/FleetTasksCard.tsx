@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { AlertTriangle, ArrowRightLeft, Check, CircleDot, KeyRound, Pencil, Play, Plus, Ticket } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, Car, Check, CircleDot, KeyRound, Pencil, Phone, Play, Plus, Ticket } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
 import { cn } from "@/lib/utils/cn";
@@ -11,7 +11,14 @@ import {
   type FleetTask, type FleetTaskKind, type FleetTaskPriority, type UrgentItem,
 } from "@/lib/tasks/types";
 
-const KIND_ICON: Record<FleetTaskKind, typeof Ticket> = { activation: KeyRound, transfer: ArrowRightLeft, ticket: Ticket, other: CircleDot };
+const KIND_ICON: Record<FleetTaskKind, typeof Ticket> = {
+  activation: KeyRound,
+  phone_change: Phone,
+  vehicle_change: Car,
+  transfer: ArrowRightLeft,
+  ticket: Ticket,
+  other: CircleDot,
+};
 const PRIORITY_TONE: Record<FleetTaskPriority, "danger" | "warn" | "neutral"> = { urgent: "danger", high: "warn", normal: "neutral" };
 const inp = "w-full rounded-md border border-line bg-card-2 px-2.5 py-1.5 text-[12.5px] text-fg";
 
@@ -70,12 +77,44 @@ export function FleetTasksCard({ items, couriers, isOwner, raisedByLabel, canCre
                 {(Object.keys(TASK_PRIORITY_LABEL) as FleetTaskPriority[]).map((p) => <option key={p} value={p}>{TASK_PRIORITY_LABEL[p]}</option>)}
               </select>
             </div>
-            <input aria-label="Titlu" autoFocus value={draft.title} onChange={(e) => setDraft({ ...draft, title: e.target.value })} placeholder="ex. Activare cont Glovo pentru Ion" className={inp} maxLength={140} />
+            <input
+              aria-label="Titlu"
+              autoFocus
+              value={draft.title}
+              onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+              placeholder={
+                draft.kind === "phone_change"
+                  ? "ex. Schimbare număr telefon pentru Ion Popescu"
+                  : draft.kind === "vehicle_change"
+                  ? "ex. Schimbare vehicul (Scuter → Mașină)"
+                  : draft.kind === "transfer"
+                  ? "ex. Mutare curier pe altă platformă / oraș"
+                  : "ex. Activare cont curier pentru Ion"
+              }
+              className={inp}
+              maxLength={140}
+            />
             <select aria-label="Curier" value={draft.courierId} onChange={(e) => setDraft({ ...draft, courierId: e.target.value })} className={inp}>
               <option value="">Fără curier anume</option>
               {couriers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
-            <textarea aria-label="Detalii" value={draft.details} onChange={(e) => setDraft({ ...draft, details: e.target.value })} rows={2} placeholder={draft.kind === "transfer" ? "De unde → unde (oraș, platformă, cazare)" : "Detalii pentru owner"} className={inp} maxLength={1000} />
+            <textarea
+              aria-label="Detalii"
+              value={draft.details}
+              onChange={(e) => setDraft({ ...draft, details: e.target.value })}
+              rows={2}
+              placeholder={
+                draft.kind === "phone_change"
+                  ? "Noul număr de telefon (ex. 0722 123 456) și detalii suplimentare"
+                  : draft.kind === "vehicle_change"
+                  ? "Noul vehicul (ex. Autoturism Dacia Logan B 123 ABC)"
+                  : draft.kind === "transfer"
+                  ? "De unde → unde (oraș, platformă, cazare)"
+                  : "Detalii pentru owner / flotă"
+              }
+              className={inp}
+              maxLength={1000}
+            />
             {error && <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-2.5 py-1.5 text-[12px] text-rose-200">{error}</div>}
             <div className="flex gap-2">
               <button type="button" onClick={save} disabled={!draft.title.trim()} className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-50"><Check size={13} /> {editing === "new" ? "Trimite" : "Salvează"}</button>

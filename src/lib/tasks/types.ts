@@ -1,14 +1,16 @@
 /** Task-uri de flotă: subcontractorul ridică (activare cont, mutare, tichet), owner-ul rezolvă.
  *  Sincronizate prin `crm31-fleet-tasks` cu owner = `createdBy` → subcontractorul își vede doar task-urile lui, Global Owner le vede pe toate. */
 
-export type FleetTaskKind = "activation" | "transfer" | "ticket" | "other";
+export type FleetTaskKind = "activation" | "phone_change" | "vehicle_change" | "transfer" | "ticket" | "other";
 export type FleetTaskPriority = "normal" | "high" | "urgent";
 export type FleetTaskStatus = "open" | "in_progress" | "resolved";
 
 export const TASK_KIND_LABEL: Record<FleetTaskKind, string> = {
-  activation: "Activare cont",
+  activation: "Activare cont / curier",
+  phone_change: "Schimbare număr",
+  vehicle_change: "Schimbare vehicul",
   transfer: "Mutare",
-  ticket: "Tichet",
+  ticket: "Tichet / Problemă",
   other: "Altceva",
 };
 export const TASK_PRIORITY_LABEL: Record<FleetTaskPriority, string> = { normal: "Normală", high: "Ridicată", urgent: "Urgentă" };

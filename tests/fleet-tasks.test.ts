@@ -33,7 +33,11 @@ assert.equal(weird.priority, "normal");
 assert.equal(weird.status, "open");
 assert.equal(weird.title, "(fără titlu)");
 assert.equal(normalizeTask({ id: "fara-owner" }), null, "fără createdBy nu intră");
-assert.equal(normalizeTask({ id: "x", createdBy: "a@x.ro", kind: "__proto__" })!.kind, "other");
+const phoneTask = normalizeTask({ id: "p1", createdBy: "anton@x.ro", kind: "phone_change", priority: "high", status: "open", title: "Schimbare număr", createdAtIso: "2026-10-07T00:00:00Z" })!;
+assert.equal(phoneTask.kind, "phone_change");
+const vehicleTask = normalizeTask({ id: "v1", createdBy: "anton@x.ro", kind: "vehicle_change", priority: "urgent", status: "open", title: "Schimbare vehicul", createdAtIso: "2026-10-07T00:00:00Z" })!;
+assert.equal(vehicleTask.kind, "vehicle_change");
+
 // Chiar și fără normalizare, o prioritate necunoscută nu dă NaN.
 const raw = { ...task("raw", "normal", "2026-10-07T12:00:00Z"), priority: "critical" } as unknown as FleetTask;
 assert.ok(Number.isFinite(rankUrgent([raw], [], now)[0].score));

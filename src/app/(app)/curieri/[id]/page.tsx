@@ -23,6 +23,7 @@ import { VEHICLE_TYPE_LABEL, VEHICLE_OWNERSHIP_LABEL, collaborationLabel, type V
 import { EditCourierDialog } from "@/components/couriers/EditCourierDialog";
 import { UploadDocumentDialog } from "@/components/dashboard/dialogs/UploadDocumentDialog";
 import { CourierDocumentsSection } from "@/components/couriers/CourierDocumentsSection";
+import { RequestChangeDialog } from "@/components/couriers/RequestChangeDialog";
 
 // Hub central curier (Etapa 8): agregă din TOATE modulele prin courierId — o singură
 // identitate. Deep-link-urile „Deschide profil" din orice modul ajung aici.
@@ -39,6 +40,7 @@ export default function CourierProfilePage() {
   const canUpload = can("documents.upload");
   const [editOpen, setEditOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [requestChangeOpen, setRequestChangeOpen] = useState(false);
   const { documentsForSubject } = useDocuments();
 
   const fleetCouriers = useMemo(() => allRows.filter((c) => c.tenantId === activeFleetId), [allRows, activeFleetId]);
@@ -75,6 +77,15 @@ export default function CourierProfilePage() {
               className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card-2 px-3 py-1.5 text-[12.5px] font-semibold text-fg-muted hover:bg-card-hover hover:text-fg"
             >
               <Upload size={13} /> Adaugă document
+            </button>
+          )}
+          {isSubcontractor && (
+            <button
+              type="button"
+              onClick={() => setRequestChangeOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-[12.5px] font-semibold text-amber-200 hover:bg-amber-500/25 transition-colors"
+            >
+              <FileText size={13} /> Solicită modificare flotă
             </button>
           )}
           {canEdit && (
@@ -152,6 +163,7 @@ export default function CourierProfilePage() {
 
       {editOpen && <EditCourierDialog row={courier} onClose={() => setEditOpen(false)} />}
       {uploadOpen && <UploadDocumentDialog open onClose={() => setUploadOpen(false)} prefillSubjectId={courier.id} />}
+      {requestChangeOpen && <RequestChangeDialog courier={courier} open={requestChangeOpen} onClose={() => setRequestChangeOpen(false)} />}
 
       {/* Header profil */}
       <Card className="p-5">

@@ -156,6 +156,10 @@ function useFleetUrgent() {
   return useMemo(() => {
     const fleet = allRows.filter((c) => c.tenantId === activeFleetId);
     const stuck = fleet.flatMap((c) => {
+      if (c.status === "pending") {
+        const days = pendingDays(c) ?? 0;
+        return [{ courierId: c.id, courierName: c.fullName, statusLabel: "În așteptare activare", days }];
+      }
       const days = pendingDays(c);
       return days !== null && days >= PENDING_ALERT_DAYS ? [{ courierId: c.id, courierName: c.fullName, statusLabel: COURIER_STATUS_LABEL[c.status], days }] : [];
     });

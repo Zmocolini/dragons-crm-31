@@ -12,6 +12,8 @@ type TaskPatch = Partial<Pick<FleetTask, "kind" | "title" | "details" | "priorit
 type FleetTasksValue = {
   /** Task-urile vizibile: toate pentru Global Owner, doar ale subcontractorului ales dacă e activ un scope. */
   tasks: FleetTask[];
+  /** Toate task-urile nescurtate de scope, utile pentru sumarul per subcontractor. */
+  allTasks: FleetTask[];
   /** false = sesiunea nu e încă încărcată (fără email nu putem atribui task-ul). */
   canCreate: boolean;
   addTask: (t: NewTask) => boolean;
@@ -63,7 +65,7 @@ export function FleetTasksProvider({ children }: { children: ReactNode }) {
     return stored.filter((t) => t.createdBy.toLowerCase() === scopeEmail);
   }, [stored, scope]);
 
-  const value = useMemo(() => ({ tasks, canCreate: !!email, addTask, updateTask }), [tasks, email, addTask, updateTask]);
+  const value = useMemo(() => ({ tasks, allTasks: stored, canCreate: !!email, addTask, updateTask }), [tasks, stored, email, addTask, updateTask]);
   return <FleetTasksContext.Provider value={value}>{children}</FleetTasksContext.Provider>;
 }
 
