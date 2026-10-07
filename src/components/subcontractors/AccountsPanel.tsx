@@ -75,7 +75,8 @@ export function AccountsPanel() {
   const resend = async (i: InviteRow) => {
     const res = await fetch("/api/admin/invitations", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: i.email, name: i.name }) });
     const j = await res.json();
-    if (res.ok) setResult({ email: i.email, link: j.link, emailSent: j.emailSent, emailError: j.emailError });
+    if (res.ok) { setError(null); setResult({ email: i.email, link: j.link, emailSent: j.emailSent, emailError: j.emailError }); }
+    else setError(j.error ?? "Retrimiterea a eșuat");
     await refresh();
   };
   const toggleActive = async (u: UserRow) => {
@@ -91,7 +92,7 @@ export function AccountsPanel() {
   if (user.role !== "global_owner") {
     return <div className="rounded-lg border border-rose-500/40 bg-rose-500/10 p-4 text-[13px] text-rose-100">Doar Global Owner poate gestiona conturile.</div>;
   }
-  const pending = invites.filter((i) => i.status === "pending");
+  const pending = invites.filter((i) => i.status === "pending" || i.status === "expired");
 
   return (
     <div className="flex flex-col gap-4">
@@ -100,6 +101,8 @@ export function AccountsPanel() {
         <button type="button" onClick={() => open("direct")} className="inline-flex items-center gap-1.5 rounded-lg border border-line bg-card-hover px-3 py-2 text-[12.5px] font-semibold text-fg hover:bg-white/[0.06]"><UserPlus size={13} /> Înregistrează direct</button>
         {!mailOn && <span className="text-[11.5px] text-amber-300">Trimiterea automată pe email nu e configurată — vei primi linkul de copiat.</span>}
       </div>
+
+      {!mode && error && <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-3 py-2 text-[12px] text-rose-100">{error}</div>}
 
       {result && (
         <div className={cn("rounded-xl border p-4 text-[12.5px]", result.emailSent ? "border-emerald-500/40 bg-emerald-500/[0.06]" : "border-amber-500/40 bg-amber-500/[0.06]")}>
@@ -139,7 +142,7 @@ export function AccountsPanel() {
       {pending.length > 0 && (
         <div className="rounded-xl border border-line bg-card">
           <div className="border-b border-line/60 px-3 py-2 text-[12px] font-semibold text-fg">Invitații în așteptare ({pending.length})</div>
-          <ul className="divide-y divide-line/40">{invites.filter((i) => i.status !== "accepted").map((i) => (
+          <ul className="divide-y divide-line/40">{invites.filter((i) => i.status === "pending" || i.status === "expired").map((i) => (
             <li key={i.id} className="flex flex-wrap items-center gap-2 px-3 py-2 text-[12.5px]">
               <div className="min-w-0 flex-1"><div className="truncate font-semibold text-fg">{i.name || i.email}</div><div className="truncate text-[11px] text-fg-dim">{i.email} · expiră {new Date(i.expiresAtIso).toLocaleDateString("ro-RO")}{i.emailSentAtIso ? " · trimis pe email" : ""}</div></div>
               <span className={cn("rounded-md border px-1.5 py-0.5 text-[10.5px] font-semibold", INV_STYLE[i.status])}>{INV_LABEL[i.status]}</span>

@@ -1,12 +1,25 @@
 import "server-only";
+import nodemailer from "nodemailer";
 
-/** Trimite email prin Resend (REST). Fără RESEND_API_KEY + MAIL_FROM nu trimite — apelantul afișează linkul de copiat. */
+/** Gmail SMTP (GMAIL_USER + GMAIL_APP_PASSWORD = parolă de aplicație) are prioritate; Resend (RESEND_API_KEY + MAIL_FROM) e rezerva.
+ *  Fără niciuna nu trimite — apelantul afișează linkul de copiat. */
+const gmailConfigured = () => !!(process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD);
 export function mailConfigured(): boolean {
-  return !!(process.env.RESEND_API_KEY && process.env.MAIL_FROM);
+  return gmailConfigured() || !!(process.env.RESEND_API_KEY && process.env.MAIL_FROM);
 }
 
 export async function sendMail(p: { to: string; subject: string; html: string; text: string }): Promise<{ ok: true } | { ok: false; error: string }> {
-  if (!mailConfigured()) return { ok: false, error: "Email neconfigurat (lipsesc RESEND_API_KEY / MAIL_FROM)." };
+  if (!mailConfigured()) return { ok: false, error: "Email neconfigurat (lipsesc GMAIL_USER / GMAIL_APP_PASSWORD)." };
+  if (gmailConfigured()) {
+    try {
+      const user = process.env.GMAIL_USER!;
+      const t = nodemailer.createTransport({ service: "gmail", auth: { user, pass: process.env.GMAIL_APP_PASSWORD!.replace(/\s/g, "") } });
+      await t.sendMail({ from: `Dragon Delivery CRM <${user}>`, to: p.to, subject: p.subject, html: p.html, text: p.text });
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: `Gmail a refuzat trimiterea (${(e as { responseCode?: number }).responseCode ?? "conexiune"}). Verifică parola de aplicație.` };
+    }
+  }
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
