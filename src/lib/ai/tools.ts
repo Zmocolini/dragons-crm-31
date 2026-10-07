@@ -8,7 +8,10 @@ const str = (description: string, extra: JsonSchema = {}) => ({ type: "string", 
 const num = (description: string) => ({ type: "number", description });
 const obj = (properties: Record<string, JsonSchema>, required: string[] = []) => ({ type: "object", properties, required });
 const PLATFORMS = { type: "array", items: { type: "string", enum: ["bolt", "wolt", "glovo"] } };
-const COURIER_STATUS = ["draft", "in_activation", "active", "paused", "stopped"];
+// pending = înregistrat de subcontractor, așteaptă confirmarea flotei; rejected = respins de flotă.
+const COURIER_STATUS = ["pending", "draft", "in_activation", "active", "paused", "stopped", "rejected"];
+const PLATFORM = { type: "string", enum: ["bolt", "wolt", "glovo"] };
+const IDS = { type: "array", items: { type: "string" }, description: "id-uri curieri (din find_couriers / team_overview)" };
 const PAYMENT_STATUS = ["unpaid", "partial", "paid", "in_review", "blocked", "issue"];
 const DATE = "dată ISO YYYY-MM-DD";
 
@@ -35,6 +38,10 @@ export const COPILOT_TOOLS: ToolDef[] = [
   })),
   tool("list_expiring_documents", "Documente care expiră în următoarele N zile (și cele deja expirate).", obj({ days: num("implicit 30") })),
   tool("list_vehicles", "Listează vehiculele flotei cu status."),
+  tool("team_overview", "Pe echipe (subcontractori + intern): câți curieri au eroare, de activat, așteaptă loc/acte, în regulă. Cu `team` sau `bucket` întoarce și curierii, cu motive și id-uri.", obj({
+    team: str("nume subcontractor sau „Intern” (opțional)"),
+    bucket: str("găleata (opțional)", { enum: ["error", "to_activate", "pending", "ok", "inactive"] }),
+  })),
   tool("navigate", "Deschide o pagină din CRM pentru utilizator.", obj({
     path: str("ruta", { enum: ["/", "/curieri", "/curieri?segment=asteptare", "/plati", "/facturi", "/vehicule", "/cazari", "/subcontractori", "/rapoarte", "/econtracte", "/setari", "/ai?tab=issues", "/clubul-antreprenorilor"] }),
   }, ["path"])),
@@ -59,6 +66,15 @@ export const COPILOT_TOOLS: ToolDef[] = [
     }),
   }, ["id", "patch"])),
   tool("delete_courier", "Șterge un curier. Cere confirmarea utilizatorului.", obj({ id: str("id curier") }, ["id"])),
+  tool("activate_couriers", "Activează curieri. Fără `platform`: status → activ (confirmă înregistrările pending, activările în curs). Cu `platform`: îi activează pe platforma pe care așteaptă loc. Cere confirmare.", obj({
+    ids: IDS, platform: { ...PLATFORM, description: "platforma pe care așteaptă loc (opțional)" },
+  }, ["ids"])),
+  tool("reject_couriers", "Respinge înregistrări (pending / în activare / draft) → status respins. Cere confirmare.", obj({
+    ids: IDS, reason: str("motiv (opțional)"),
+  }, ["ids"])),
+  tool("remove_from_waitlist", "Scoate un curier din așteptarea de loc pe o platformă. Cere confirmare.", obj({
+    id: str("id curier"), platform: PLATFORM,
+  }, ["id", "platform"])),
   tool("set_payment_status", "Schimbă statusul unei plăți (ex: plătită, blocată). Cere confirmare.", obj({
     id: str("id plată"), status: str("status nou", { enum: PAYMENT_STATUS }), reason: str("motiv (opțional)"),
   }, ["id", "status"])),
@@ -84,8 +100,11 @@ export const COPILOT_TOOLS: ToolDef[] = [
   }, ["subject"])),
 ];
 
-/** Unelte care nu rulează fără click „Confirm" de la utilizator: bani, ștergeri, regim fiscal. */
-export const CONFIRM_TOOLS = new Set(["delete_courier", "set_payment_status", "set_invoice_status", "set_vat_regime"]);
+/** Unelte care nu rulează fără click „Confirm" de la utilizator: bani, ștergeri, regim fiscal, activări. */
+export const CONFIRM_TOOLS = new Set([
+  "delete_courier", "set_payment_status", "set_invoice_status", "set_vat_regime",
+  "activate_couriers", "reject_couriers", "remove_from_waitlist",
+]);
 
 export const TOOL_LABEL: Record<string, string> = {
   overview: "Rezumat flotă", find_couriers: "Caut curieri", list_payments: "Citesc plăți", report_summary: "Raport",
@@ -94,4 +113,6 @@ export const TOOL_LABEL: Record<string, string> = {
   delete_courier: "Șterg curier", set_payment_status: "Status plată", add_payment_note: "Notă plată",
   create_invoice: "Creez factură", create_invoice_from_report: "Factură din raport", set_invoice_status: "Status factură",
   set_vat_regime: "Regim TVA", create_ticket: "Tichet suport",
+  team_overview: "Echipe: ce e de activat", activate_couriers: "Activez curieri", reject_couriers: "Resping curieri",
+  remove_from_waitlist: "Scot din așteptare",
 };

@@ -1,20 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { Avatar } from "@/components/dashboard/Avatar";
 import { Card, CardBody } from "@/components/ui/Card";
 import { PlatformLogo } from "@/components/ui/PlatformLogo";
 import type { CourierRow } from "@/lib/couriers/mock-seed";
-import {
-  buildTeams, TEAM_BUCKET_LABEL, TEAM_BUCKETS,
-  type ClassifyInput, type Team, type TeamBucket, type TeamId,
-} from "@/lib/couriers/team-status";
-import { courierOwner, type AccountInfo } from "@/lib/couriers/use-account-directory";
-import { useDocuments } from "@/lib/documents/context";
-import type { CrmDocument } from "@/lib/documents/types";
-import { usePayments } from "@/lib/payments/context";
-import type { Payment } from "@/lib/payments/types";
+import { TEAM_BUCKET_LABEL, TEAM_BUCKETS, type Team, type TeamBucket } from "@/lib/couriers/team-status";
+import type { AccountInfo } from "@/lib/couriers/use-account-directory";
+import { useTeams } from "@/lib/couriers/use-teams";
 import { cn } from "@/lib/utils/cn";
 
 const TONE: Record<TeamBucket, { chip: string; bar: string; text: string }> = {
@@ -37,44 +31,12 @@ type Props = {
   meName: string;
 };
 
-function indexBy<T>(items: T[], keyOf: (t: T) => string): Map<string, T[]> {
-  const m = new Map<string, T[]>();
-  for (const it of items) {
-    const k = keyOf(it);
-    const list = m.get(k);
-    if (list) list.push(it); else m.set(k, [it]);
-  }
-  return m;
-}
-
 export function CouriersTeamsView({ rows, accounts, isGlobalOwner, showEmptyTeams, meName }: Props) {
-  const { documents } = useDocuments();
-  const { fleetPayments } = usePayments();
   const [focus, setFocus] = useState<Focus>("all");
   const [open, setOpen] = useState<{ team: string; bucket: TeamBucket } | null>(null);
-  const [todayMs] = useState(() => Date.now());
+  const teams = useTeams(rows, { accounts, isGlobalOwner, showEmptyTeams, meName });
 
-  const teams = useMemo<Team[]>(() => {
-    const docsBy = indexBy<CrmDocument>(documents, (d) => d.subject.id);
-    const paysBy = indexBy<Payment>(fleetPayments.filter((p) => p.recipient.kind === "courier"), (p) => p.recipient.id);
-    const inputOf = (r: CourierRow): ClassifyInput => ({ docs: docsBy.get(r.id) ?? [], payments: paysBy.get(r.id) ?? [], todayMs });
-
-    // Doar Global Owner primește harta de conturi; subcontractorul își vede o singură echipă.
-    const grouped = isGlobalOwner;
-    const teamOf = (r: CourierRow): TeamId => {
-      if (!grouped) return { key: "me", label: meName, kind: "subcontractor" };
-      const o = courierOwner(r, accounts);
-      return { key: o.kind === "internal" ? "intern" : `sub:${o.label}`, label: o.label, kind: o.kind };
-    };
-    const extra: TeamId[] = grouped && showEmptyTeams
-      ? [...accounts.values()]
-          .filter((a) => a.role === "subcontractor_owner" && a.active !== false)
-          .map((a) => ({ key: `sub:${a.name}`, label: a.name, kind: "subcontractor" as const }))
-      : [];
-    return buildTeams(rows, teamOf, inputOf, extra);
-  }, [rows, documents, fleetPayments, accounts, isGlobalOwner, showEmptyTeams, meName, todayMs]);
-
-  if (isGlobalOwner && accounts.size === 0) {
+  if (teams === null) {
     return <div className="rounded-lg border border-dashed border-line/40 p-8 text-center text-[13px] text-fg-dim">Se încarcă echipele...</div>;
   }
 

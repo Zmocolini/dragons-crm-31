@@ -7,6 +7,11 @@ import { useRouter } from "next/navigation";
 import { useSession } from "@/lib/rbac/session";
 import { useAuth } from "@/lib/auth/context";
 import { useCouriers } from "@/lib/couriers/context";
+import { courierOwner, useAccountDirectory } from "@/lib/couriers/use-account-directory";
+import { useTeams } from "@/lib/couriers/use-teams";
+import { TEAM_BUCKET_LABEL, type TeamBucket } from "@/lib/couriers/team-status";
+import { useOwnerScope } from "@/lib/owner-scope/context";
+import { planActivation } from "@/lib/couriers/activation";
 import { usePayments } from "@/lib/payments/context";
 import { useInvoices } from "@/lib/invoices/context";
 import { useDocuments } from "@/lib/documents/context";
@@ -40,6 +45,11 @@ export function useCopilotExecutor() {
 
   const fleet = fleets.find((f) => f.id === activeFleetId);
   const fleetCouriers = allRows.filter((c) => c.tenantId === activeFleetId);
+  const isGlobalOwner = user.role === "global_owner";
+  const accounts = useAccountDirectory();
+  const { scope } = useOwnerScope();
+  const teams = useTeams(fleetCouriers, { accounts, isGlobalOwner, showEmptyTeams: !scope, meName: user.name });
+  const teamOf = (c: (typeof fleetCouriers)[number]) => (accounts.size > 0 ? courierOwner(c, accounts).label : null);
   const need = (perm: Parameters<typeof can>[0]) => { if (!can(perm)) throw new ToolError(`Rolul tău nu are dreptul ${perm}.`); };
 
   const nextInvoiceNumber = () => {
@@ -52,8 +62,8 @@ export function useCopilotExecutor() {
 
   const courierOut = (c: (typeof fleetCouriers)[number]) => ({
     id: c.id, name: c.fullName, phone: maskPhone(c.phone), city: c.city, platforms: c.platforms,
-    status: c.status, vehicle: c.vehicleType, contract: c.collaboration, subcontractor: c.subcontractorName,
-    incomplete: c.incompleteFields,
+    status: c.status, vehicle: c.vehicleType, contract: c.collaboration, team: teamOf(c),
+    incomplete: c.incompleteFields, waitingFor: c.waitlistedPlatforms ?? [],
   });
 
   // Recreat la fiecare randare → vede mereu starea curentă (pagina îl ține într-un ref).
@@ -161,6 +171,8 @@ export function useCopilotExecutor() {
         if (!fleetCouriers.some((c) => c.id === id)) throw new ToolError("Curier inexistent în flota ta.");
         if (!couriers.some((c) => c.id === id)) throw new ToolError("Curierul vine din date demo (seed) și nu poate fi editat; editează doar curierii înregistrați.");
         const p = (a.patch ?? {}) as Args;
+        // Contextul ignoră tăcut statusul trimis de un subcontractor — nu raportăm „modificat" fals.
+        if (s(p.status) && !isGlobalOwner) throw new ToolError("Statusul curierului îl schimbă doar flota (Global Owner).");
         const patch: Partial<Courier> = {};
         for (const k of ["fullName", "phone", "email", "city", "status", "vehicleType", "collaboration"] as const) if (s(p[k])) (patch as Args)[k] = s(p[k]);
         for (const k of ["commissionPct", "weeklyContractFeeRon"] as const) if (typeof p[k] === "number") patch[k] = p[k] as number;
@@ -232,6 +244,52 @@ export function useCopilotExecutor() {
         const j = await res.json().catch(() => ({}));
         if (!res.ok) throw new ToolError(j.error ?? `Eroare ${res.status}`);
         return { created: true, id: j.ticket?.id ?? j.id ?? null };
+      }
+      case "team_overview": {
+        if (!teams) throw new ToolError("Echipele încă se încarcă — reîncearcă într-o secundă.");
+        const wantTeam = s(a.team).toLowerCase();
+        const bucket = s(a.bucket) as TeamBucket | "";
+        const picked = wantTeam ? teams.filter((t) => t.label.toLowerCase().includes(wantTeam)) : teams;
+        if (wantTeam && picked.length === 0) throw new ToolError(`Nicio echipă „${s(a.team)}”. Echipe: ${teams.map((t) => t.label).join(", ")}.`);
+        const detail = Boolean(wantTeam || bucket);
+        return {
+          legend: TEAM_BUCKET_LABEL,
+          teams: picked.map((t) => ({
+            team: t.label, kind: t.kind, total: t.total, counts: t.counts,
+            ...(detail ? {
+              couriers: (bucket ? [bucket] : (["error", "to_activate", "pending"] as TeamBucket[]))
+                .flatMap((b) => t.members[b].map((m) => ({ id: m.row.id, name: m.row.fullName, city: m.row.city, status: m.row.status, bucket: b, reasons: m.reasons, waitingFor: m.row.waitlistedPlatforms ?? [] })))
+                .slice(0, 60),
+            } : {}),
+          })),
+        };
+      }
+      case "activate_couriers":
+      case "reject_couriers": {
+        need("couriers.edit");
+        const ids = Array.isArray(a.ids) ? a.ids.map(s).filter(Boolean) : [];
+        if (ids.length === 0) throw new ToolError("Lipsesc id-urile curierilor.");
+        const platform = s(a.platform) as PlatformKey | "";
+        if (platform && !PLATFORM_KEYS.includes(platform)) throw new ToolError(`Platformă necunoscută: ${platform}.`);
+        const reject = name === "reject_couriers";
+        let plan;
+        try {
+          plan = planActivation(fleetCouriers, ids, {
+            action: reject ? "reject" : "activate", platform: platform || undefined, isGlobalOwner,
+            editable: (id) => couriers.some((x) => x.id === id),
+          });
+        } catch (e) { throw new ToolError((e as Error).message); }
+        for (const { id, patch } of plan.patches) updateCourier(id, patch);
+        return { [reject ? "rejected" : "activated"]: plan.done, skipped: plan.skipped, ...(reject && s(a.reason) ? { reason: s(a.reason) } : {}), ...(platform ? { platform } : {}) };
+      }
+      case "remove_from_waitlist": {
+        need("couriers.edit");
+        const id = s(a.id); const platform = s(a.platform) as PlatformKey;
+        const c = fleetCouriers.find((x) => x.id === id);
+        if (!c) throw new ToolError("Curier inexistent în flota ta.");
+        if (!(c.waitlistedPlatforms ?? []).includes(platform)) throw new ToolError(`${c.fullName} nu așteaptă loc pe ${platform}.`);
+        updateCourier(id, { waitlistedPlatforms: (c.waitlistedPlatforms ?? []).filter((p) => p !== platform) });
+        return { removed: true, id, name: c.fullName, platform };
       }
       default:
         throw new ToolError(`Unealtă necunoscută: ${name}`);

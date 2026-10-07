@@ -101,9 +101,12 @@ export function AICopilotPage() {
   const answerConfirm = (ok: boolean) => { confirmRef.current?.resolve(ok); setConfirm(null); };
 
   const describe = (name: string, a: Record<string, unknown>) => {
-    const courier = typeof a.id === "string" ? execRef.current.fleetCouriers.find((c) => c.id === a.id)?.fullName : undefined;
-    const rest = Object.entries(a).filter(([k]) => k !== "id").map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join(", ");
-    return `${TOOL_LABEL[name] ?? name}${courier ? ` — ${courier}` : a.id ? ` — ${String(a.id)}` : ""}${rest ? ` (${rest})` : ""}`;
+    const nameOf = (id: unknown) => execRef.current.fleetCouriers.find((c) => c.id === id)?.fullName ?? String(id);
+    const courier = typeof a.id === "string" ? nameOf(a.id) : undefined;
+    // Activări în bloc: omul confirmă pe NUME, nu pe id-uri.
+    const many = Array.isArray(a.ids) ? `${a.ids.length} curieri: ${a.ids.map(nameOf).join(", ")}` : undefined;
+    const rest = Object.entries(a).filter(([k]) => k !== "id" && k !== "ids").map(([k, v]) => `${k}: ${typeof v === "object" ? JSON.stringify(v) : String(v)}`).join(", ");
+    return `${TOOL_LABEL[name] ?? name}${courier ? ` — ${courier}` : many ? ` — ${many}` : ""}${rest ? ` (${rest})` : ""}`;
   };
 
   const send = async (text: string, spoken = false) => {
