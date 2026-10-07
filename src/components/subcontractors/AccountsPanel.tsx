@@ -79,6 +79,20 @@ export function AccountsPanel() {
     else setError(j.error ?? "Retrimiterea a eșuat");
     await refresh();
   };
+  const [testBusy, setTestBusy] = useState(false);
+  const [testMsg, setTestMsg] = useState<{ text: string; created: { name: string; email: string; password: string }[] } | null>(null);
+  const testData = async (method: "POST" | "DELETE") => {
+    if (method === "DELETE" && !confirm("Ștergi subcontractorii de test (Ahsal, Hossein) și cei 8 curieri de test?")) return;
+    setTestBusy(true);
+    try {
+      const res = await fetch("/api/admin/test-data", { method });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) setTestMsg({ text: j.error ?? "Eroare", created: [] });
+      else if (method === "POST") setTestMsg({ text: `Date de test încărcate: ${j.couriers} curieri${j.rejected ? `, ${j.rejected} respinși` : ""}. Reîncarcă pagina ca să-i vezi.`, created: j.created ?? [] });
+      else setTestMsg({ text: `Șterse: ${j.removedCouriers} curieri de test, ${j.removedAccounts} conturi.`, created: [] });
+      await refresh();
+    } finally { setTestBusy(false); }
+  };
   const toggleActive = async (u: UserRow) => {
     await fetch(`/api/admin/users/${u.id}`, { method: "PATCH", headers: { "content-type": "application/json" }, body: JSON.stringify({ active: !u.active }) });
     await refresh();
@@ -164,6 +178,31 @@ export function AccountsPanel() {
                 <button type="button" onClick={() => remove(u)} title="Șterge" className="inline-flex h-6 w-6 items-center justify-center rounded border border-rose-500/40 bg-rose-500/10 text-rose-300 hover:bg-rose-500/20"><Trash2 size={11} /></button>
               </>)}
             </li>))}</ul>
+        )}
+      </div>
+
+      <div className="rounded-xl border border-dashed border-line bg-card p-3 text-[12.5px]">
+        <div className="font-semibold text-fg">Date de test</div>
+        <div className="mt-0.5 text-fg-muted">Subcontractorii Ahsal (5 curieri) și Hossein (3 curieri), marcați „(test)”. Se pot șterge exact, fără să atingă datele reale.</div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <button type="button" disabled={testBusy} onClick={() => testData("POST")} className="inline-flex items-center gap-1.5 rounded-lg border border-line px-3 py-1.5 text-[12px] font-semibold text-fg hover:bg-white/[0.06] disabled:opacity-50">{testBusy ? <Loader2 size={13} className="animate-spin" /> : <UserPlus size={13} />} Adaugă datele de test</button>
+          <button type="button" disabled={testBusy} onClick={() => testData("DELETE")} className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/10 px-3 py-1.5 text-[12px] text-rose-300 disabled:opacity-50"><Trash2 size={13} /> Șterge datele de test</button>
+        </div>
+        {testMsg && (
+          <div className="mt-2 text-fg-muted">
+            {testMsg.text}
+            {testMsg.created.length > 0 && (
+              <div className="mt-1.5 space-y-1">
+                <div className="text-amber-300">Parole pentru conturile noi — se afișează doar acum:</div>
+                {testMsg.created.map((c) => (
+                  <div key={c.email} className="flex items-center gap-2 font-mono text-[11.5px]">
+                    <span className="text-fg">{c.name}</span> {c.email} · <span className="select-all text-fg">{c.password}</span>
+                    <button type="button" onClick={() => copy(c.password)} className="rounded border border-line px-1.5 py-0.5 text-fg-muted hover:text-fg"><Copy size={11} /></button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>
