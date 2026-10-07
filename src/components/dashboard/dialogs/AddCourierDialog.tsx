@@ -30,7 +30,7 @@ import { useSession } from "@/lib/rbac/session";
 import { useSettings } from "@/lib/settings/context";
 import { cn } from "@/lib/utils/cn";
 import { isValidCnp, type IdCardFields } from "@/lib/couriers/id-card";
-import { costDefaults, weeklyVehicleCost, type VehicleCost } from "@/lib/couriers/vehicle-cost";
+import { costDefaults, rentProfit, weeklyVehicleCost, type VehicleCost } from "@/lib/couriers/vehicle-cost";
 
 const PLATFORM_NAME: Record<PlatformKey, string> = {
   bolt:  "Bolt Food",
@@ -194,7 +194,7 @@ export function AddCourierDialog({
       const next = { ...prev, ...patch };
       // Valorile de pornire ale calculatorului se schimbă cu tipul (mașină vs scuter); chiria rămâne.
       const typeChanged = patch.vehicleType && patch.vehicleType !== prev.vehicleType;
-      return typeChanged ? { ...next, vehicleCost: { ...costDefaults(next.vehicleType), rentWeeklyRon: prev.vehicleCost.rentWeeklyRon } } : next;
+      return typeChanged ? { ...next, vehicleCost: { ...costDefaults(next.vehicleType), rentWeeklyRon: prev.vehicleCost.rentWeeklyRon, rentCostRon: prev.vehicleCost.rentCostRon } } : next;
     });
   }
 
@@ -289,7 +289,9 @@ export function AddCourierDialog({
       weeklyContractFeeRon: form.weeklyContractFeeRon === "" ? undefined : Math.max(0, Number(form.weeklyContractFeeRon) || 0),
       iban: form.iban.trim() || undefined,
       cnp: form.cnp || undefined,
-      vehicleCost: { ...form.vehicleCost, weeklyRon: weeklyVehicleCost(form.vehicleOwnership, form.vehicleType, form.vehicleCost) },
+      vehicleCost: form.vehicleOwnership === "rented"
+        ? { ...form.vehicleCost, weeklyRon: weeklyVehicleCost("rented", form.vehicleType, form.vehicleCost), profitWeeklyRon: rentProfit(form.vehicleCost.rentWeeklyRon, form.vehicleCost.rentCostRon) }
+        : undefined,
       status: courierStatus,
       incompleteFields: incomplete,
       createdBy: user.id,
@@ -648,8 +650,8 @@ export function AddCourierDialog({
             </FormCard>
           </div>
 
-          {/* Evidență vehicul */}
-          <FormCard title={`Evidență vehicul · ${VEHICLE_TYPE_LABEL[form.vehicleType]} (${VEHICLE_OWNERSHIP_LABEL[form.vehicleOwnership].toLowerCase()})`} icon={Car}>
+          {/* Evidență vehicul — doar la închiriat; la „propriu" nu se ține nimic. */}
+          {form.vehicleOwnership === "rented" && <FormCard title={`Evidență vehicul · ${VEHICLE_TYPE_LABEL[form.vehicleType]} (${VEHICLE_OWNERSHIP_LABEL[form.vehicleOwnership].toLowerCase()})`} icon={Car}>
             <VehicleCostCalculator
               ownership={form.vehicleOwnership}
               type={form.vehicleType}
@@ -658,7 +660,7 @@ export function AddCourierDialog({
               commissionPct={form.commissionPct}
               contractFeeRon={Number(form.weeklyContractFeeRon) || 0}
             />
-          </FormCard>
+          </FormCard>}
 
           {/* Documente (opțional) */}
           <FormCard title="Documente" icon={FileText}>

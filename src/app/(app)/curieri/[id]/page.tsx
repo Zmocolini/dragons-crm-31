@@ -230,7 +230,13 @@ export default function CourierProfilePage() {
             <dl className="grid grid-cols-1 gap-2 text-[12.5px]">
               <InfoRow label="Tip colaborare" value={collaborationLabel(courier.collaboration)} copyable />
               <InfoRow label="Comision flotă" value={`${courier.commissionPct ?? 10}%`} copyable />
-              {courier.vehicleCost && <InfoRow label="Cost vehicul / săpt." value={`${courier.vehicleCost.weeklyRon.toLocaleString("ro-RO")} RON`} />}
+              {courier.vehicleOwnership === "rented" && courier.vehicleCost && (
+                <>
+                  <InfoRow label="Plătește antreprenorul / săpt." value={`${(courier.vehicleCost.rentCostRon ?? 0).toLocaleString("ro-RO")} RON`} />
+                  <InfoRow label="Dat curierului / săpt." value={`${courier.vehicleCost.weeklyRon.toLocaleString("ro-RO")} RON`} />
+                  <InfoRow label="Micro-profit / săpt." value={`${(courier.vehicleCost.profitWeeklyRon ?? 0).toLocaleString("ro-RO")} RON`} />
+                </>
+              )}
               <InfoRow label="Platforme" copyValue={courier.platforms.join(", ") || undefined} valueNode={
                 <div className="flex flex-wrap gap-1">
                   {courier.platforms.length > 0

@@ -3,7 +3,7 @@
 import { Calculator } from "lucide-react";
 import { useState } from "react";
 import type { VehicleOwnership, VehicleType } from "@/lib/couriers/types";
-import { MOTOR_TYPES, weeklyNet, weeklyVehicleCost, type VehicleCost } from "@/lib/couriers/vehicle-cost";
+import { MOTOR_TYPES, rentProfit, weeklyNet, weeklyVehicleCost, type VehicleCost } from "@/lib/couriers/vehicle-cost";
 
 type Inputs = Omit<VehicleCost, "weeklyRon">;
 const ron = (v: number) => `${v.toLocaleString("ro-RO", { maximumFractionDigits: 2 })} RON`;
@@ -23,6 +23,7 @@ export function VehicleCostCalculator({
   const cost = weeklyVehicleCost(ownership, type, value);
   const { commission, net } = weeklyNet(Number(gross), commissionPct, contractFeeRon, cost);
   const motor = MOTOR_TYPES.includes(type);
+  const profit = rentProfit(value.rentWeeklyRon, value.rentCostRon);
 
   const num = (key: keyof Inputs, label: string, unit: string, step = 1) => (
     <label className="flex flex-col gap-1">
@@ -48,7 +49,16 @@ export function VehicleCostCalculator({
           : motor ? "Vehicul propriu — estimăm combustibilul pe săptămână." : "Bicicletă proprie — fără cost de combustibil."}
       </div>
 
-      {ownership === "rented" && <div className="grid gap-3 sm:grid-cols-2">{num("rentWeeklyRon", "Chirie / săptămână", "RON", 10)}</div>}
+      {ownership === "rented" && (
+        <div className="grid gap-3 sm:grid-cols-3">
+          {num("rentCostRon", "Plătește antreprenorul / săpt.", "RON", 10)}
+          {num("rentWeeklyRon", "Dat curierului / săpt.", "RON", 10)}
+          <div className="flex flex-col gap-1">
+            <span className="text-[10px] font-semibold uppercase tracking-wider text-fg-dim">Micro-profit / săpt.</span>
+            <div className={`dd-input flex items-center justify-end font-bold tabular-nums ${profit < 0 ? "text-rose-300" : "text-emerald-300"}`}>{profit > 0 ? "+" : ""}{ron(profit)}</div>
+          </div>
+        </div>
+      )}
       {ownership === "own" && motor && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {num("kmPerDay", "Km / zi", "km", 5)}

@@ -3,8 +3,12 @@
 import type { VehicleOwnership, VehicleType } from "@/lib/couriers/types";
 
 export type VehicleCost = {
-  /** Doar la închiriat. */
+  /** Doar la închiriat: cât dă curierul (se scade din plata lui). */
   rentWeeklyRon?: number;
+  /** Doar la închiriat: cât plătește antreprenorul pentru vehicul. */
+  rentCostRon?: number;
+  /** Doar la închiriat: micro-profitul / săpt. = dat curierului − plătit de antreprenor. */
+  profitWeeklyRon?: number;
   /** Doar la propriu cu motor (scuter/mașină). */
   kmPerDay?: number;
   daysPerWeek?: number;
@@ -35,4 +39,9 @@ export function weeklyVehicleCost(ownership: VehicleOwnership, type: VehicleType
 export function weeklyNet(gross: number, commissionPct: number, contractFeeRon: number, vehicleRon: number) {
   const commission = r2((n(gross) * n(commissionPct)) / 100);
   return { commission, net: r2(n(gross) - commission - n(contractFeeRon) - n(vehicleRon)) };
+}
+
+/** Micro-profit din chirie: ce ia de la curier minus ce plătește antreprenorul (poate fi negativ). */
+export function rentProfit(chargedToCourier: number | undefined, paidByEntrepreneur: number | undefined): number {
+  return r2(n(chargedToCourier) - n(paidByEntrepreneur));
 }
