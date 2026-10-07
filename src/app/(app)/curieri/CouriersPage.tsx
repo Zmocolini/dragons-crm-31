@@ -28,6 +28,7 @@ import { CouriersStatsRow } from "@/components/couriers/CouriersStatsRow";
 import { CouriersToolbar } from "@/components/couriers/CouriersToolbar";
 import { CouriersTable } from "@/components/couriers/CouriersTable";
 import { CouriersSegments, type CourierSegment } from "@/components/couriers/CouriersSegments";
+import { CouriersTeamsView } from "@/components/couriers/CouriersTeamsView";
 import { CouriersWaitingPanel, PLATFORM_NAME } from "@/components/couriers/CouriersWaitingPanel";
 import { CouriersPagination } from "@/components/couriers/CouriersPagination";
 import { AdvancedFiltersDialog } from "@/components/couriers/AdvancedFiltersDialog";
@@ -37,7 +38,7 @@ import type { CourierRowAction } from "@/components/couriers/CourierRowMenu";
 
 const PAGE_SIZE = 10;
 
-export function CouriersPage({ initialSegment = "all", initialSub = null }: { initialSegment?: CourierSegment; initialSub?: string | null }) {
+export function CouriersPage({ initialSegment = "all", initialSub = null, initialView = "list" }: { initialSegment?: CourierSegment; initialSub?: string | null; initialView?: "list" | "teams" }) {
   const { user, activeFleetId } = useSession();
   const { allRows: allCourierRows, hydrated, deleteCourier, updateCourier } = useCouriers();
   const { scope } = useOwnerScope();
@@ -62,6 +63,7 @@ export function CouriersPage({ initialSegment = "all", initialSub = null }: { in
   const [vehicleFilter, setVehicleFilter] = useState<VehicleType | "any">("any");
   const [advanced, setAdvanced] = useState<AdvancedFilters>(DEFAULT_ADVANCED_FILTERS);
   const [page, setPage] = useState(1);
+  const [view, setView] = useState<"list" | "teams">(initialView);
 
   // Dialog state
   const [showAdd, setShowAdd] = useState(false);
@@ -183,7 +185,24 @@ export function CouriersPage({ initialSegment = "all", initialSub = null }: { in
       <div className="space-y-5">
           <CouriersHeader onAddCourier={() => setShowAdd(true)} />
 
-          <CouriersSegments value={segment} counts={segmentCounts} onChange={handleSegment} />
+          <div role="tablist" aria-label="Vedere curieri" className="inline-flex self-start rounded-lg border border-line bg-card p-0.5">
+            {([["list", "Listă"], ["teams", "Pe echipe"]] as const).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={view === key}
+                onClick={() => setView(key)}
+                className={view === key
+                  ? "rounded-md bg-violet-500/20 px-3 py-1.5 text-[12.5px] font-semibold text-fg"
+                  : "rounded-md px-3 py-1.5 text-[12.5px] font-semibold text-fg-muted hover:text-fg"}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {view === "list" && <CouriersSegments value={segment} counts={segmentCounts} onChange={handleSegment} />}
 
           {subEmail && (
             <button
@@ -197,10 +216,21 @@ export function CouriersPage({ initialSegment = "all", initialSub = null }: { in
             </button>
           )}
 
-          {segment === "waiting" && (
+          {view === "teams" && (
+            <CouriersTeamsView
+              rows={allRows.filter((c) => c.tenantId === activeFleetId)}
+              accounts={accounts}
+              isGlobalOwner={user.role === "global_owner"}
+              showEmptyTeams={!scope && !subEmail}
+              meName={user.name}
+            />
+          )}
+
+          {view === "list" && segment === "waiting" && (
             <CouriersWaitingPanel counts={waitingCounts} selected={platformFilter} onSelect={setPlatformFilter} />
           )}
 
+          {view === "list" && (
           <CouriersStatsRow
             active={stats.active}
             bolt={stats.bolt}
@@ -210,7 +240,9 @@ export function CouriersPage({ initialSegment = "all", initialSub = null }: { in
             activeFilter={quickFilter}
             onSelect={handleQuickSelect}
           />
+          )}
 
+          {view === "list" && (
           <Card>
             <CardHeader>
               <CardTitle>{segment === "waiting" ? "Lista de așteptare" : "Lista curierilor"}</CardTitle>
@@ -265,6 +297,7 @@ export function CouriersPage({ initialSegment = "all", initialSub = null }: { in
               )}
             </CardBody>
           </Card>
+          )}
 
           <div className="grid gap-4 lg:grid-cols-2">
             <AICopilotBanner />

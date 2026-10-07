@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useSession } from "@/lib/rbac/session";
 
-export type AccountInfo = { name: string; role: string };
+export type AccountInfo = { name: string; role: string; active?: boolean };
 export type CourierOwner = { kind: "internal" | "subcontractor"; label: string };
 
 /** email cont → {nume, rol}. Doar Global Owner poate lista conturile; pentru ceilalți harta rămâne goală. */
@@ -16,8 +16,8 @@ export function useAccountDirectory(): Map<string, AccountInfo> {
     let alive = true;
     fetch("/api/admin/users")
       .then((r) => (r.ok ? r.json() : { users: [] }))
-      .then((j: { users?: Array<{ email: string; name: string; role: string }> }) => {
-        if (alive) setMap(new Map((j.users ?? []).map((u) => [u.email.toLowerCase(), { name: u.name, role: u.role }])));
+      .then((j: { users?: Array<{ email: string; name: string; role: string; active?: boolean }> }) => {
+        if (alive) setMap(new Map((j.users ?? []).map((u) => [u.email.toLowerCase(), { name: u.name, role: u.role, active: u.active }])));
       })
       .catch(() => {});
     return () => { alive = false; };
