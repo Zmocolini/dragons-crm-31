@@ -219,5 +219,187 @@
  "Subcontractor": {
   "en": "Subcontractor",
   "ru": "Субподрядчик"
+ },
+ "Încarcă buletinul / permisul": {
+  "ru": "Загрузите удостоверение / вид на жительство",
+  "hi": "पहचान पत्र / परमिट अपलोड करें"
+ },
+ "Completăm automat numele și CNP-ul, în orice poziție. Poza rămâne în browser.": {
+  "en": "We fill in the name and CNP automatically, in any position. The photo stays in your browser.",
+  "ru": "Имя и CNP заполняются автоматически, в любом положении. Фото остаётся в браузере.",
+  "hi": "हम नाम और CNP अपने-आप भरते हैं, किसी भी स्थिति में। फ़ोटो आपके ब्राउज़र में ही रहती है।"
+ },
+ "Scanează": {
+  "ru": "Сканировать",
+  "hi": "स्कैन करें"
+ },
+ "Citesc actul… {n}%": {
+  "en": "Reading the document… {n}%",
+  "ru": "Читаю документ… {n}%",
+  "hi": "दस्तावेज़ पढ़ रहे हैं… {n}%"
+ },
+ "Caut orientarea actului…": {
+  "en": "Finding the document's orientation…",
+  "ru": "Определяю положение документа…",
+  "hi": "दस्तावेज़ की दिशा खोज रहे हैं…"
+ },
+ "Completat:": {
+  "en": "Filled in:",
+  "ru": "Заполнено:",
+  "hi": "भरा गया:"
+ },
+ "nume": {
+  "en": "name",
+  "ru": "имя",
+  "hi": "नाम"
+ },
+ "expirare act": {
+  "en": "document expiry",
+  "ru": "срок действия документа",
+  "hi": "दस्तावेज़ की समाप्ति"
+ },
+ "— verifică datele înainte de trimitere.": {
+  "en": "— check the data before submitting.",
+  "ru": "— проверьте данные перед отправкой.",
+  "hi": "— भेजने से पहले डेटा जाँच लें।"
+ },
+ "Încarcă o poză (JPG/PNG) a actului, nu PDF.": {
+  "ru": "Загрузите фото (JPG/PNG) документа, не PDF.",
+  "hi": "दस्तावेज़ की फ़ोटो (JPG/PNG) अपलोड करें, PDF नहीं।"
+ },
+ "Actul a fost atașat, dar textul nu s-a putut citi. Fă o poză clară, fără reflexii, cu tot actul în cadru și banda de jos (<<<) vizibilă — sau completează manual.": {
+  "en": "The document was attached, but the text couldn't be read. Take a clear photo without glare, with the whole document in frame and the bottom strip (<<<) visible — or fill in manually.",
+  "ru": "Документ прикреплён, но текст не удалось прочитать. Сделайте чёткое фото без бликов, чтобы весь документ был в кадре и нижняя полоса (<<<) была видна — или заполните вручную.",
+  "hi": "दस्तावेज़ संलग्न हो गया, लेकिन पाठ पढ़ा नहीं जा सका। बिना चमक के साफ़ फ़ोटो लें, पूरा दस्तावेज़ फ़्रेम में हो और नीचे की पट्टी (<<<) दिखे — या मैन्युअल रूप से भरें।"
+ },
+ "Scanarea a eșuat (conexiune sau imagine). Completează manual sau încearcă din nou.": {
+  "ru": "Сканирование не удалось (соединение или изображение). Заполните вручную или попробуйте снова.",
+  "hi": "स्कैन विफल रहा (कनेक्शन या छवि)। मैन्युअल रूप से भरें या फिर से प्रयास करें।"
+ },
+ "Act identitate · {n}": {
+  "en": "ID document · {n}",
+  "ru": "Удостоверение личности · {n}",
+  "hi": "पहचान पत्र · {n}"
+ },
+ "Din buletin sau manual": {
+  "ru": "Из удостоверения или вручную",
+  "hi": "पहचान पत्र से या मैन्युअल रूप से"
+ },
+ "13 cifre": {
+  "en": "13 digits",
+  "ru": "13 цифр",
+  "hi": "13 अंक"
+ },
+ "CNP invalid (13 cifre, cifra de control nu se potrivește).": {
+  "ru": "Неверный CNP (13 цифр, контрольная цифра не совпадает).",
+  "hi": "अमान्य CNP (13 अंक, चेक अंक मेल नहीं खाता)।"
+ },
+ "Curierul va fi adăugat cu statusul": {
+  "ru": "Курьер будет добавлен со статусом",
+  "hi": "कूरियर इस स्थिति के साथ जोड़ा जाएगा:"
+ },
+ "În așteptare (Pending)": {
+  "ru": "В ожидании (Pending)",
+  "hi": "प्रतीक्षारत (Pending)"
+ },
+ "până la confirmarea și activarea de către flotă.": {
+  "ru": "до подтверждения и активации автопарком.",
+  "hi": "जब तक फ़्लीट पुष्टि और सक्रिय नहीं करता।"
+ },
+ "Trimite spre aprobare flotă": {
+  "ru": "Отправить на одобрение автопарка",
+  "hi": "फ़्लीट अनुमोदन के लिए भेजें"
+ },
+ "Suma dorită": {
+  "ru": "Желаемая сумма",
+  "hi": "वांछित राशि"
+ },
+ "Ex.: Contract colaborare, PFA, CIM 8h": {
+  "ru": "Напр.: договор о сотрудничестве, PFA, CIM 8ч",
+  "hi": "उदा.: सहयोग अनुबंध, PFA, CIM 8 घंटे"
+ },
+ "Taxă contract / săptămână": {
+  "ru": "Плата по договору / неделя",
+  "hi": "अनुबंध शुल्क / सप्ताह"
+ },
+ "Evidență vehicul · {n} ({n})": {
+  "ru": "Учёт транспорта · {n} ({n})",
+  "hi": "वाहन रिकॉर्ड · {n} ({n})"
+ },
+ "propriu": {
+  "en": "own",
+  "ru": "собственный",
+  "hi": "अपना"
+ },
+ "închiriat": {
+  "en": "rented",
+  "ru": "арендованный",
+  "hi": "किराए का"
+ },
+ "Vehicul închiriat — chiria se ține în evidență săptămânal.": {
+  "ru": "Арендованный транспорт — аренда учитывается еженедельно.",
+  "hi": "किराए का वाहन — किराया साप्ताहिक रूप से दर्ज होता है।"
+ },
+ "Vehicul propriu — estimăm combustibilul pe săptămână.": {
+  "ru": "Собственный транспорт — оцениваем топливо за неделю.",
+  "hi": "अपना वाहन — हम प्रति सप्ताह ईंधन का अनुमान लगाते हैं।"
+ },
+ "Bicicletă proprie — fără cost de combustibil.": {
+  "ru": "Собственный велосипед — без расходов на топливо.",
+  "hi": "अपनी साइकिल — ईंधन का कोई खर्च नहीं।"
+ },
+ "Km / zi": {
+  "ru": "Км / день",
+  "hi": "किमी / दिन"
+ },
+ "Zile / săpt.": {
+  "ru": "Дней / нед.",
+  "hi": "दिन / सप्ताह"
+ },
+ "Consum": {
+  "en": "Consumption",
+  "ru": "Расход",
+  "hi": "खपत"
+ },
+ "Preț carburant": {
+  "ru": "Цена топлива",
+  "hi": "ईंधन की कीमत"
+ },
+ "Încasări brute estimate / săpt.": {
+  "ru": "Ожидаемый валовой доход / нед.",
+  "hi": "अनुमानित सकल आय / सप्ताह"
+ },
+ "ex. 2000": {
+  "en": "e.g. 2000",
+  "ru": "напр. 2000",
+  "hi": "उदा. 2000"
+ },
+ "Rămâne curierului": {
+  "ru": "Остаётся курьеру",
+  "hi": "कूरियर के पास बचता है"
+ },
+ "Se scade din plata săptămânală.": {
+  "ru": "Вычитается из еженедельной выплаты.",
+  "hi": "साप्ताहिक भुगतान से काटा जाता है।"
+ },
+ "Fața actului se citește altfel:": {
+  "ru": "Лицевая сторона читается иначе:",
+  "hi": "दस्तावेज़ का सामने वाला हिस्सा अलग पढ़ा गया:"
+ },
+ "— apasă dacă e corect.": {
+  "ru": "— нажмите, если верно.",
+  "hi": "— सही हो तो क्लिक करें।"
+ },
+ "Plătește antreprenorul / săpt.": {
+  "ru": "Платит подрядчик / нед.",
+  "hi": "ठेकेदार भुगतान करता है / सप्ताह"
+ },
+ "Dat curierului / săpt.": {
+  "ru": "Выплачено курьеру / нед.",
+  "hi": "कूरियर को दिया गया / सप्ताह"
+ },
+ "Micro-profit / săpt.": {
+  "ru": "Микроприбыль / нед.",
+  "hi": "सूक्ष्म लाभ / सप्ताह"
  }
 }

@@ -1,38 +1,30 @@
-// OCR de act de identitate, LOCAL în browser (tesseract.js, model românesc).
-// Măsurat pe 24 de poze degradate (rotite, blurate, mici, zgomot): nume corect 23/24 față de 5/24
-// cu varianta veche (model englezesc, imagine color). Câștigul vine din: model `ron` (diacritice,
-// etichetele „Nume/Prenume"), tonuri de gri cu contrast întins, a doua trecere cu filtru median.
-import type { Worker } from "tesseract.js";
-import { readIdCard, type IdCardFields } from "@/lib/couriers/id-card";
+// OCR de act de identitate, LOCAL în browser (tesseract.js, model românesc), cu actul în orice poziție.
+// Model `ron` (diacritice, etichetele „Nume/Prenume"): măsurat pe 24 de poze degradate, nume corect
+// 23/24 față de 5/24 cu `eng`. Orientarea, banda MRZ și trecerea cu median sunt în id-scan.ts (pur, testat).
+// tesseract.js se încarcă doar prin import dinamic: modulul ăsta poate fi importat static.
+import type { PSM, Worker } from "tesseract.js";
+import { encodeBmp, type Gray } from "./id-scan-image";
+import { scanIdImage, type Ocr, type OcrLine, type ScanResult } from "./id-scan";
 
-/** Luminanță + întindere de contrast între percentilele 1 și 99 (ca `sharp.normalize()`). */
-export function grayStretch(rgba: Uint8ClampedArray): Uint8ClampedArray {
-  const n = rgba.length / 4;
-  const g = new Uint8ClampedArray(n);
-  const hist = new Uint32Array(256);
-  for (let i = 0; i < n; i++) {
-    const v = (rgba[i * 4] * 299 + rgba[i * 4 + 1] * 587 + rgba[i * 4 + 2] * 114) / 1000;
-    g[i] = v; hist[g[i]]++;
-  }
-  const pct = (p: number) => { let acc = 0; for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= n * p) return v; } return 255; };
-  const lo = pct(0.01), hi = pct(0.99), span = Math.max(1, hi - lo);
-  for (let i = 0; i < n; i++) g[i] = ((g[i] - lo) * 255) / span;
-  return g;
-}
+const MRZ_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789<";
 
-/** Median 3×3 — scoate zgomotul „sare și piper" fără să înmoaie marginile literelor. */
-export function median3(g: Uint8ClampedArray, w: number, h: number): Uint8ClampedArray {
-  const out = new Uint8ClampedArray(g);
-  const win = new Uint8Array(9);
-  for (let y = 1; y < h - 1; y++) {
-    for (let x = 1; x < w - 1; x++) {
-      let k = 0;
-      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) win[k++] = g[(y + dy) * w + x + dx];
-      win.sort();
-      out[y * w + x] = win[4];
+/** Adaptorul tesseract → `Ocr` (folosit și în Node, pentru măsurători). */
+export function tesseractOcr(worker: Worker): Ocr {
+  let mode: "text" | "mrz" | null = null;
+  return async (img, m) => {
+    if (m !== mode) {
+      // „6" = un singur bloc (banda MRZ), „3" = pagină cu așezare automată.
+      await worker.setParameters(m === "mrz"
+        ? { tessedit_char_whitelist: MRZ_CHARS, tessedit_pageseg_mode: "6" as PSM }
+        : { tessedit_char_whitelist: "", tessedit_pageseg_mode: "3" as PSM });
+      mode = m;
     }
-  }
-  return out;
+    // BMP în loc de canvas: aceeași cale în browser și în Node, fără recomprimare.
+    const { data } = await worker.recognize(encodeBmp(img) as unknown as Buffer, {}, { text: true, blocks: true });
+    const lines: OcrLine[] = [];
+    for (const b of data.blocks ?? []) for (const p of b.paragraphs) for (const l of p.lines) lines.push({ text: l.text, ...l.bbox });
+    return { text: data.text, lines };
+  };
 }
 
 let workerP: Promise<Worker> | null = null;
@@ -47,42 +39,12 @@ export function warmIdOcr(): Promise<Worker> {
   return workerP;
 }
 
-function loadImage(file: File): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file);
-    const img = new Image();
-    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error("Imagine invalidă.")); };
-    img.src = url;
-  });
-}
-
-function grayCanvas(g: Uint8ClampedArray, w: number, h: number): HTMLCanvasElement {
-  const c = document.createElement("canvas");
-  c.width = w; c.height = h;
-  const ctx = c.getContext("2d")!;
-  const img = ctx.createImageData(w, h);
-  for (let i = 0; i < g.length; i++) { img.data[i * 4] = img.data[i * 4 + 1] = img.data[i * 4 + 2] = g[i]; img.data[i * 4 + 3] = 255; }
-  ctx.putImageData(img, 0, 0);
-  return c;
-}
-
-/** Scanează actul: trecerea 1 normală, trecerea 2 (doar dacă prima nu e sigură) cu median. */
-export async function scanIdImage(file: File, progress: (pct: number) => void): Promise<IdCardFields> {
-  const [worker, img] = await Promise.all([warmIdOcr(), loadImage(file)]);
-  const scale = Math.min(1, 2000 / Math.max(img.width, img.height));
-  const w = Math.round(img.width * scale), h = Math.round(img.height * scale);
-  const src = document.createElement("canvas");
-  src.width = w; src.height = h;
-  const ctx = src.getContext("2d")!;
-  ctx.drawImage(img, 0, 0, w, h);
-  const gray = grayStretch(ctx.getImageData(0, 0, w, h).data);
-
-  let pass = 0;
-  onProgress = (p) => progress(Math.round(((pass - 1 + p) / 2) * 100));
-  const run = async (g: Uint8ClampedArray) => { pass++; return (await worker.recognize(grayCanvas(g, w, h))).data.text; };
+/** Scanează poza (gri, orientarea EXIF deja aplicată). `onAttempt(i)` = a câta orientare încearcă. */
+export async function scanIdPhoto(photo: Gray, progress: (p: number) => void, onAttempt: (i: number) => void): Promise<ScanResult> {
+  const worker = await warmIdOcr();
+  onProgress = progress;
   try {
-    return await readIdCard([() => run(gray), () => run(median3(gray, w, h))]);
+    return await scanIdImage(photo, tesseractOcr(worker), onAttempt);
   } finally {
     onProgress = null;
   }

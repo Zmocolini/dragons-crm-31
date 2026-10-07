@@ -72,7 +72,8 @@ function mrzName(lines: string[]): string | undefined {
   for (const l of lines) {
     let names: string | null = null;
     // CI: „IDROU…", citit și „TDROU", „IDR0U", uneori cu gunoi lipit în față.
-    const td2 = l.match(/[I1T][A-Z0<]R[O0]{1,2}U([A-Z<]{6,})/);
+    // Pe o poză strâmbă banda MRZ poate fi tăiată la margine: „DROU…" (fără „I") e tot CI.
+    const td2 = l.match(/(?:[I1T][A-Z0<]|^[A-Z0<])R[O0]{1,2}U([A-Z<]{6,})/);
     if (td2) names = td2[1];
     else if (/^P[A-Z<][A-Z]{3}[A-Z<]+$/.test(l) && l.length >= 40) names = l.slice(5); // pașaport (TD3)
     else if (/^[A-Z<]+$/.test(l) && /[A-Z]<<[A-Z]/.test(l)) names = l;                // permis (TD1, linia 3)
@@ -131,22 +132,59 @@ export function parseIdCardText(text: string): IdCardFields {
   if (out.nameAlt) out.nameAlt = out.nameAlt.replace(/Ş/g, "Ș").replace(/ş/g, "ș").replace(/Ţ/g, "Ț").replace(/ţ/g, "ț");
 
   // 3) Linia 2 CI: serie+nr, ROU, data nașterii, sex, expirare, opțional (cifra 1 + ultimele 6 din CNP).
+  // Pot fi mai multe citiri ale rândului (banda MRZ + pagina, vezi id-scan.ts): câștigă cea mai coerentă
+  // — cifrele de control (naștere, expirare, compusă), CNP-ul refăcut valid și egal cu cel de pe față,
+  // data plauzibilă. O singură cifră de control nu ajunge: o cifră inserată de OCR o nimerește 1 din 10.
   const D = "[0-9OBSIZLG]";
-  const re = new RegExp(`([A-Z]{2}${D}{6})<?${D}?R[O0]{1,2}U(${D}{6})${D}([MF<])(${D}{6})${D}(${D}{7})`);
-  for (const l of lines) {
+  const re = new RegExp(`([A-Z]{2}${D}{6})<?${D}?R[O0]{1,2}U(${D}{6})(${D})([MF<])(${D}{6})(${D})(${D}{7})`);
+  // Rândul are fix 36 de caractere; cu unul în plus (cifră inserată) încerc și variantele fără câte un caracter.
+  const candidates = lines.flatMap((l) => (l.length === 37 && /R[O0]U/.test(l) ? [l, ...[...l].map((_, i) => l.slice(0, i) + l.slice(i + 1))] : [l]));
+  const year = new Date().getFullYear();
+  const reads = candidates.flatMap((l) => {
     const m = l.match(re);
-    if (!m) continue;
-    out.docNumber = m[1].slice(0, 2) + toDigits(m[1].slice(2));
-    out.expiryIso = mrzDate(toDigits(m[4]));
-    if (!out.cnp) {
-      const opt = toDigits(m[5]);
-      const cnp = opt[0] + toDigits(m[2]) + opt.slice(1);
-      if (isValidCnp(cnp)) out.cnp = cnp;
+    if (!m) return [];
+    const [dob, exp, opt] = [toDigits(m[2]), toDigits(m[5]), toDigits(m[7])];
+    const cnp = opt[0] + dob + opt.slice(1);
+    const yyyy = 2000 + Number(exp.slice(0, 2)), mm = Number(exp.slice(2, 4)), dd = Number(exp.slice(4, 6));
+    const plausible = mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31 && Math.abs(yyyy - year) <= 20;
+    // Cifra compusă (ICAO TD2): pozițiile 1–10, 14–20, 22–35 → poziția 36 (doar pe un rând citit întreg).
+    const n = l.slice(m.index, m.index! + 36);
+    const nd = n.slice(0, 2) + toDigits(n.slice(2));
+    const composite = n.length === 36 && mrzCheck(nd.slice(0, 10) + nd.slice(13, 20) + nd.slice(21, 35)) === Number(nd[35]);
+    const score =
+      (mrzCheck(exp) === Number(toDigits(m[6])) ? 2 : 0) + (mrzCheck(dob) === Number(toDigits(m[3])) ? 1 : 0) +
+      (composite ? 2 : 0) + (isValidCnp(cnp) ? 1 : 0) + (out.cnp && out.cnp === cnp ? 2 : 0) + (plausible ? 1 : 0);
+    return [{ doc: m[1], exp, cnp, plausible, score }];
+  });
+  const pick = reads.reduce<(typeof reads)[number] | undefined>((b, r) => (!b || r.score > b.score ? r : b), undefined);
+  if (pick) {
+    out.docNumber = pick.doc.slice(0, 2) + toDigits(pick.doc.slice(2));
+    if (pick.plausible) out.expiryIso = mrzDate(pick.exp);
+    if (!out.cnp && isValidCnp(pick.cnp)) out.cnp = pick.cnp;
+  }
+
+  // 4) Expirarea de pe față („Valabilitate … 01.06.19-13.05.2029"), dacă MRZ-ul n-a dat una sigură.
+  if (!out.expiryIso) {
+    for (const l of lines) {
+      const m = toDigits(l).match(/\d{1,2}\.\d{1,2}\.\d{1,4}-(\d{2})\.(\d{2})\.(\d{4})/);
+      if (!m) continue;
+      const [dd, mm, yyyy] = [Number(m[1]), Number(m[2]), Number(m[3])];
+      if (mm >= 1 && mm <= 12 && dd >= 1 && dd <= 31 && Math.abs(yyyy - year) <= 20) { out.expiryIso = `${m[3]}-${m[2]}-${m[1]}`; break; }
     }
-    break;
   }
 
   return out;
+}
+
+/** Cifra de control MRZ (ICAO 9303, ponderi 7-3-1). */
+export function mrzCheck(s: string): number {
+  let sum = 0;
+  for (let i = 0; i < s.length; i++) {
+    const c = s[i];
+    const v = c === "<" ? 0 : c >= "0" && c <= "9" ? Number(c) : c.charCodeAt(0) - 55;
+    sum += v * [7, 3, 1][i % 3];
+  }
+  return sum % 10;
 }
 
 /** Citirea e sigură când avem CNP și numele de pe față se potrivește cu MRZ (sau există doar una din ele, fără conflict). */
