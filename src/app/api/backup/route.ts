@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { desc, eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { currentSyncUser } from "@/lib/sync/server";
+import { compactLegacy, gcBlobs, slimAndStore } from "@/lib/backup/blobs-db";
 
 const TENANT = "fleet_dragons";
 const MAX_KEEP = 50;
@@ -51,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   await db.insert(schema.backupSnapshots).values({
     tenantId: TENANT,
-    keys: JSON.stringify(keys),
+    keys: JSON.stringify(await slimAndStore(keys)),
     itemCount: incoming.items,
     sizeBytes: incoming.sizeBytes,
     isShrunk: shrunk,
@@ -74,7 +75,10 @@ export async function POST(req: NextRequest) {
     for (const id of toDelete) {
       await db.delete(schema.backupSnapshots).where(eq(schema.backupSnapshots.id, id));
     }
+    if (toDelete.length > 0) await gcBlobs();
   }
+  // Snapshot-urile vechi (cu documente inline) se subțiază treptat, câteva la fiecare backup.
+  if (await compactLegacy()) await gcBlobs();
 
   return NextResponse.json({ ok: true, shrunk, volume: incoming, previousVolume: latestVolume });
 }

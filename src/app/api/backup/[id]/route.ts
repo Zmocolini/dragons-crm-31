@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/lib/db/client";
 import { currentSyncUser } from "@/lib/sync/server";
+import { gcBlobs, loadFull } from "@/lib/backup/blobs-db";
 
 /** GET /api/backup/:id — returnează un snapshot din DB. */
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -13,7 +14,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const [row] = await db.select().from(schema.backupSnapshots).where(eq(schema.backupSnapshots.id, n)).limit(1);
   if (!row) return NextResponse.json({ error: "not found" }, { status: 404 });
   try {
-    const keys = JSON.parse(row.keys);
+    const keys = await loadFull(JSON.parse(row.keys));
     return NextResponse.json({ createdAt: row.createdAtIso, keys });
   } catch {
     return NextResponse.json({ error: "corrupt data" }, { status: 500 });
@@ -28,5 +29,6 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const n = Number(id);
   if (!Number.isFinite(n) || n <= 0) return NextResponse.json({ error: "invalid id" }, { status: 400 });
   await db.delete(schema.backupSnapshots).where(eq(schema.backupSnapshots.id, n));
+  await gcBlobs();
   return NextResponse.json({ ok: true });
 }
