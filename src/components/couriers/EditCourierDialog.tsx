@@ -6,7 +6,7 @@ import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/Toast";
 import { useCouriers } from "@/lib/couriers/context";
 import type { CourierRow } from "@/lib/couriers/mock-seed";
-import { COLLABORATION_LABEL, type CollaborationType } from "@/lib/couriers/types";
+import { COLLABORATION_LABEL } from "@/lib/couriers/types";
 import type { PlatformKey } from "@/lib/dashboard/types";
 import { useSettings } from "@/lib/settings/context";
 import { useSession } from "@/lib/rbac/session";
@@ -28,7 +28,7 @@ export function EditCourierDialog({ row, onClose }: { row: CourierRow; onClose: 
   const [email, setEmail] = useState(row.email ?? "");
   const [city, setCity] = useState(row.city);
   const [platforms, setPlatforms] = useState<PlatformKey[]>(row.platforms);
-  const [collaboration, setCollaboration] = useState<CollaborationType>(row.collaboration);
+  const [collaboration, setCollaboration] = useState<string>(COLLABORATION_LABEL[row.collaboration] ?? row.collaboration);
   const [commissionPct, setCommissionPct] = useState<number>(row.commissionPct ?? 10);
   const [weeklyContractFeeRon, setWeeklyContractFeeRon] = useState<number>(row.weeklyContractFeeRon ?? 210);
   const [iban, setIban] = useState<string>(row.iban ?? "");
@@ -53,7 +53,7 @@ export function EditCourierDialog({ row, onClose }: { row: CourierRow; onClose: 
       email: email.trim() || null,
       city,
       platforms,
-      collaboration,
+      collaboration: collaboration.trim(),
       commissionPct,
       weeklyContractFeeRon,
       iban: iban.trim() || undefined,
@@ -131,11 +131,7 @@ export function EditCourierDialog({ row, onClose }: { row: CourierRow; onClose: 
             </div>
           </F>
           <F label="Tip colaborare">
-            <select value={collaboration} onChange={(e) => setCollaboration(e.target.value as CollaborationType)} className="inp">
-              {(Object.keys(COLLABORATION_LABEL) as CollaborationType[]).map((c) => (
-                <option key={c} value={c}>{COLLABORATION_LABEL[c]}</option>
-              ))}
-            </select>
+            <input value={collaboration} onChange={(e) => setCollaboration(e.target.value)} placeholder="Ex.: Contract colaborare, PFA, CIM 8h" className="inp" />
           </F>
           <div className="grid gap-3 md:grid-cols-2">
             <F label="Comision flotă (%)">

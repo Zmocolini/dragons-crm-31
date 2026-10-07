@@ -19,7 +19,7 @@ import { buildCourierRow, COURIER_DOC_STATUS_LABEL } from "@/lib/documents/rules
 import { DOCUMENT_TYPE_LABEL } from "@/lib/documents/types";
 import { cn } from "@/lib/utils/cn";
 import { NATIONALITY_LABEL } from "@/lib/candidates/types";
-import { VEHICLE_TYPE_LABEL, VEHICLE_OWNERSHIP_LABEL, COLLABORATION_LABEL, type VehicleType } from "@/lib/couriers/types";
+import { VEHICLE_TYPE_LABEL, VEHICLE_OWNERSHIP_LABEL, collaborationLabel, type VehicleType } from "@/lib/couriers/types";
 import { EditCourierDialog } from "@/components/couriers/EditCourierDialog";
 import { UploadDocumentDialog } from "@/components/dashboard/dialogs/UploadDocumentDialog";
 import { CourierDocumentsSection } from "@/components/couriers/CourierDocumentsSection";
@@ -176,7 +176,7 @@ export default function CourierProfilePage() {
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               {courier.platforms.map((p) => <Badge key={p} tone={p as "bolt"}>{p}</Badge>)}
               <span className="rounded-md border border-line bg-white/[0.04] px-2 py-0.5 text-[11px] text-fg-muted">{NATIONALITY_LABEL[courier.nationality]}</span>
-              <span className="rounded-md border border-line bg-white/[0.04] px-2 py-0.5 text-[11px] text-fg-muted">{COLLABORATION_LABEL[courier.collaboration]}</span>
+              <span className="rounded-md border border-line bg-white/[0.04] px-2 py-0.5 text-[11px] text-fg-muted">{collaborationLabel(courier.collaboration)}</span>
               <span className="rounded-md border border-line bg-white/[0.04] px-2 py-0.5 text-[11px] text-fg-muted">#{courier.id.toUpperCase()}</span>
             </div>
           </div>
@@ -215,7 +215,7 @@ export default function CourierProfilePage() {
           </CardHeader>
           <CardBody>
             <dl className="grid grid-cols-1 gap-2 text-[12.5px]">
-              <InfoRow label="Tip colaborare" value={COLLABORATION_LABEL[courier.collaboration]} copyable />
+              <InfoRow label="Tip colaborare" value={collaborationLabel(courier.collaboration)} copyable />
               <InfoRow label="Comision flotă" value={`${courier.commissionPct ?? 10}%`} copyable />
               <InfoRow label="Platforme" copyValue={courier.platforms.join(", ") || undefined} valueNode={
                 <div className="flex flex-wrap gap-1">

@@ -17,9 +17,9 @@ import { useDocuments } from "@/lib/documents/context";
 import { resizeImageFile } from "@/lib/utils/image";
 import { DOCUMENT_TYPE_LABEL, type DocumentType } from "@/lib/documents/types";
 import {
-  COLLABORATION_LABEL, COURIER_STATUS_LABEL, INCOMPLETE_FIELD_LABEL,
+  COURIER_STATUS_LABEL, INCOMPLETE_FIELD_LABEL,
   VEHICLE_OWNERSHIP_LABEL, VEHICLE_TYPE_LABEL,
-  type CollaborationType, type Courier, type CourierDuplicateMatch, type CourierStatus,
+  type Courier, type CourierDuplicateMatch, type CourierStatus,
   type IncompleteFieldKey, type VehicleOwnership, type VehicleType,
 } from "@/lib/couriers/types";
 import type { PlatformKey } from "@/lib/dashboard/types";
@@ -74,9 +74,10 @@ type FormState = {
   waitlistedPlatforms: PlatformKey[];
   vehicleType: VehicleType;
   vehicleOwnership: VehicleOwnership;
-  collaboration: CollaborationType;
+  collaboration: string;
   commissionPct: number;
-  weeklyContractFeeRon: number;
+  /** Gol = nesetat (la import se aplică regula implicită a flotei). */
+  weeklyContractFeeRon: string;
   iban: string;
   status: CourierStatus;
 };
@@ -92,9 +93,9 @@ const EMPTY_FORM: FormState = {
   waitlistedPlatforms: [],
   vehicleType: "bike",
   vehicleOwnership: "own",
-  collaboration: "collaboration",
+  collaboration: "",
   commissionPct: 10,
-  weeklyContractFeeRon: 210,
+  weeklyContractFeeRon: "",
   iban: "",
   status: "active",
 };
@@ -235,6 +236,7 @@ export function AddCourierDialog({
 
     if (!form.city) incomplete.push("city");
     if (form.platforms.length === 0) incomplete.push("platforms");
+    if (!form.collaboration.trim()) incomplete.push("collaboration");
 
     return { hardErrors, incomplete };
   }
@@ -255,9 +257,9 @@ export function AddCourierDialog({
       waitlistedPlatforms: form.waitlistedPlatforms,
       vehicleType: form.vehicleType,
       vehicleOwnership: form.vehicleOwnership,
-      collaboration: form.collaboration,
+      collaboration: form.collaboration.trim(),
       commissionPct: form.commissionPct,
-      weeklyContractFeeRon: form.weeklyContractFeeRon,
+      weeklyContractFeeRon: form.weeklyContractFeeRon === "" ? undefined : Math.max(0, Number(form.weeklyContractFeeRon) || 0),
       iban: form.iban.trim() || undefined,
       status: courierStatus,
       incompleteFields: incomplete,
@@ -645,17 +647,15 @@ export function AddCourierDialog({
           <FormCard title="Contract" icon={FileText}>
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Tip colaborare" required>
-                <select
+                <input
+                  type="text"
                   value={form.collaboration}
-                  onChange={(e) => setForm({ ...form, collaboration: e.target.value as CollaborationType })}
+                  onChange={(e) => setForm({ ...form, collaboration: e.target.value })}
+                  placeholder="Ex.: Contract colaborare, PFA, CIM 8h"
                   className="dd-input"
-                >
-                  {(Object.keys(COLLABORATION_LABEL) as CollaborationType[]).map((c) => (
-                    <option key={c} value={c}>{COLLABORATION_LABEL[c]}</option>
-                  ))}
-                </select>
+                />
               </Field>
-              <Field label="Comision flotă (%)" required hint="Prestabilit 10%">
+              <Field label="Comision flotă (%)" required>
                 <div className="relative">
                   <input
                     type="number"
@@ -669,18 +669,20 @@ export function AddCourierDialog({
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-fg-dim">%</span>
                 </div>
               </Field>
-              <Field label="Taxă contract săptămânală" required hint="Prestabilit 210 RON — se scade din plată">
+              <Field label="Taxă contract / săptămână">
                 <div className="relative">
                   <input
                     type="number"
+                    inputMode="decimal"
                     min={0}
-                    step={10}
                     value={form.weeklyContractFeeRon}
-                    onChange={(e) => setForm({ ...form, weeklyContractFeeRon: Math.max(0, Number(e.target.value) || 0) })}
+                    onChange={(e) => setForm({ ...form, weeklyContractFeeRon: e.target.value })}
+                    placeholder="Suma dorită"
                     className="dd-input pr-12"
                   />
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-fg-dim">RON</span>
                 </div>
+                <span className="text-[10.5px] text-fg-dim">Se scade din plata săptămânală.</span>
               </Field>
             </div>
             <Field label="IBAN" hint="Opțional">

@@ -15,12 +15,14 @@ export const VEHICLE_OWNERSHIP_LABEL: Record<VehicleOwnership, string> = {
   rented:   "Închiriat",
 };
 
-export type CollaborationType = "collaboration" | "cim_8h" | "cim_4h";
-export const COLLABORATION_LABEL: Record<CollaborationType, string> = {
+/** Text liber scris de flotă/subcontractor (ex. „PFA", „CIM 6h"). Cheile vechi rămân doar pentru afișare. */
+export type CollaborationType = string;
+export const COLLABORATION_LABEL: Record<string, string> = {
   collaboration:  "Contract colaborare",
   cim_8h:         "CIM 8h",
   cim_4h:         "CIM 4h",
 };
+export const collaborationLabel = (c: string | undefined) => (c ? COLLABORATION_LABEL[c] ?? c : "—");
 
 export type CourierStatus = "pending" | "active" | "rejected" | "in_activation" | "paused" | "stopped" | "draft";
 export const COURIER_STATUS_LABEL: Record<CourierStatus, string> = {
