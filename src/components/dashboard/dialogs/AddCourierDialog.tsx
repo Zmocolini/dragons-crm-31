@@ -400,7 +400,7 @@ export function AddCourierDialog({
           <div className="grid gap-4 md:grid-cols-2">
             {/* Date curier */}
             <FormCard title="Date curier" icon={UserPlus}>
-              <IdCardScan onScanned={applyIdCard} />
+              <IdCardScan onScanned={applyIdCard} onPickName={(fullName) => setForm((prev) => ({ ...prev, fullName }))} />
               <Field label="Nume complet" required incomplete={isIncomplete("fullName")} error={errors.fullName}>
                 <input
                   type="text"

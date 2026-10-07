@@ -1,8 +1,9 @@
 "use client";
 
 import { CheckCircle2, IdCard, Loader2, ScanLine, TriangleAlert } from "lucide-react";
-import { useState } from "react";
-import { parseIdCardText, type IdCardFields } from "@/lib/couriers/id-card";
+import { useEffect, useState } from "react";
+import type { IdCardFields } from "@/lib/couriers/id-card";
+import { scanIdImage, warmIdOcr } from "@/lib/couriers/id-ocr";
 import { resizeImageFile } from "@/lib/utils/image";
 
 export type ScannedIdDoc = { name: string; size: number; type: string; dataUrl: string };
@@ -10,15 +11,22 @@ export type ScannedIdDoc = { name: string; size: number; type: string; dataUrl: 
 type State =
   | { kind: "idle" }
   | { kind: "scanning"; pct: number }
-  | { kind: "done"; found: string[] }
+  | { kind: "done"; found: string[]; nameAlt?: string }
   | { kind: "failed"; msg: string };
 
 /**
  * Încărcare buletin/permis/pașaport → OCR local în browser (tesseract.js).
  * Imaginea NU pleacă din browser: se descarcă doar motorul OCR, nu se trimit date.
  */
-export function IdCardScan({ onScanned }: { onScanned: (fields: IdCardFields, doc: ScannedIdDoc) => void }) {
+export function IdCardScan({ onScanned, onPickName }: {
+  onScanned: (fields: IdCardFields, doc: ScannedIdDoc) => void;
+  /** Userul alege a doua citire a numelui (fața vs banda MRZ). */
+  onPickName: (name: string) => void;
+}) {
   const [state, setState] = useState<State>({ kind: "idle" });
+
+  // Motorul se încarcă cât timp userul completează restul formularului → scanarea pornește instant.
+  useEffect(() => { warmIdOcr().catch(() => {}); }, []);
 
   async function scan(file?: File) {
     if (!file) return;
@@ -28,23 +36,15 @@ export function IdCardScan({ onScanned }: { onScanned: (fields: IdCardFields, do
     }
     setState({ kind: "scanning", pct: 0 });
     try {
-      // 2000px păstrează lizibilă zona MRZ; varianta mică (800px) e cea salvată ca document.
-      const [ocrSrc, docUrl] = await Promise.all([
-        resizeImageFile(file, 2000, { format: "jpeg", quality: 0.92 }),
+      // Documentul salvat e varianta de 1200px; OCR-ul lucrează pe original (scalat la 2000px, gri).
+      const [fields, docUrl] = await Promise.all([
+        scanIdImage(file, (pct) => setState({ kind: "scanning", pct })),
         resizeImageFile(file, 1200, { format: "jpeg", quality: 0.8 }),
       ]);
-      const { createWorker } = await import("tesseract.js");
-      const worker = await createWorker("eng", 1, {
-        logger: (m) => { if (m.status === "recognizing text") setState({ kind: "scanning", pct: Math.round(m.progress * 100) }); },
-      });
-      const { data } = await worker.recognize(ocrSrc);
-      await worker.terminate();
-
-      const fields = parseIdCardText(data.text);
       onScanned(fields, { name: `Act identitate · ${file.name}`, size: file.size, type: "image/jpeg", dataUrl: docUrl });
       const found = [fields.fullName && "nume", fields.cnp && "CNP", fields.expiryIso && "expirare act"].filter(Boolean) as string[];
       setState(found.length
-        ? { kind: "done", found }
+        ? { kind: "done", found, nameAlt: fields.nameAlt }
         : { kind: "failed", msg: "Actul a fost atașat, dar textul nu s-a putut citi. Fă o poză dreaptă, fără reflexii, cu banda de jos (<<<) vizibilă — sau completează manual." });
     } catch {
       setState({ kind: "failed", msg: "Scanarea a eșuat (conexiune sau imagine). Completează manual sau încearcă din nou." });
@@ -78,6 +78,18 @@ export function IdCardScan({ onScanned }: { onScanned: (fields: IdCardFields, do
       {state.kind === "done" && (
         <p className="mt-2 flex items-center gap-1.5 text-[11px] text-emerald-300">
           <CheckCircle2 size={12} /> Completat: {state.found.join(", ")}. Verifică datele înainte de trimitere.
+        </p>
+      )}
+      {state.kind === "done" && state.nameAlt && (
+        <p className="mt-1.5 text-[11px] text-amber-200">
+          Fața actului se citește altfel:{" "}
+          <button
+            type="button"
+            onClick={() => { onPickName(state.nameAlt!); setState({ ...state, nameAlt: undefined }); }}
+            className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 font-semibold hover:bg-amber-500/20"
+          >
+            {state.nameAlt}
+          </button>{" "}— apasă dacă e corect.
         </p>
       )}
       {state.kind === "failed" && (
