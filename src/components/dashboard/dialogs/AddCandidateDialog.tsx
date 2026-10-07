@@ -11,7 +11,7 @@ import { PlatformLogo } from "@/components/ui/PlatformLogo";
 import { useToast } from "@/components/ui/Toast";
 import { useCandidates } from "@/lib/candidates/context";
 import {
-  CANDIDATE_SOURCE_LABEL, CANDIDATE_STATUS_LABEL, NATIONALITY_LABEL,
+  CANDIDATE_SOURCE_LABEL, CANDIDATE_STATUS_LABEL, NATIONALITY_LABEL, NATIONALITY_OPTIONS,
   type Candidate, type CandidateSource, type CandidateStatus,
   type DuplicateMatch, type Nationality,
 } from "@/lib/candidates/types";
@@ -275,7 +275,7 @@ export function AddCandidateDialog({
                   onChange={(e) => setForm({ ...form, nationality: e.target.value as Nationality })}
                   className="input-dark"
                 >
-                  {(Object.keys(NATIONALITY_LABEL) as Nationality[]).map((n) => (
+                  {NATIONALITY_OPTIONS.map((n) => (
                     <option key={n} value={n}>{NATIONALITY_LABEL[n]}</option>
                   ))}
                 </select>

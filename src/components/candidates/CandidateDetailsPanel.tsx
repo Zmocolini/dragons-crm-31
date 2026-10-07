@@ -9,7 +9,7 @@ import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useDocuments } from "@/lib/documents/context";
 import { DOCUMENT_STATUS_LABEL, DOCUMENT_TYPE_LABEL } from "@/lib/documents/types";
-import type { Candidate } from "@/lib/candidates/types";
+import { isNonEu, type Candidate } from "@/lib/candidates/types";
 import {
   ACTIVITY_DOT, ACTIVITY_LABEL, STAGE_COLOR, STAGE_LABEL,
   useCandidatesStage, type CandidateStage,
@@ -19,6 +19,11 @@ import { cn } from "@/lib/utils/cn";
 const NATIONALITY_INFO: Record<string, { flag: string; label: string }> = {
   ro:     { flag: "🇷🇴", label: "România" },
   eu:     { flag: "🇪🇺", label: "Uniunea Europeană" },
+  md:     { flag: "🇲🇩", label: "Moldova" },
+  in:     { flag: "🇮🇳", label: "India" },
+  bd:     { flag: "🇧🇩", label: "Bangladesh" },
+  np:     { flag: "🇳🇵", label: "Nepal" },
+  lk:     { flag: "🇱🇰", label: "Sri Lanka" },
   non_eu: { flag: "🌐", label: "Non-UE" },
 };
 
@@ -330,7 +335,7 @@ function InfoTab({
         <Row label="Email"             value={candidate.email ?? "—"} />
         <Row label="Naționalitate"     value={`${nat.flag} ${nat.label}`} />
         <Row label="Oraș preferat"     value={candidate.city} />
-        <Row label="Permis de ședere"  value={candidate.nationality === "non_eu" ? "De verificat" : "Nu necesită"} />
+        <Row label="Permis de ședere"  value={isNonEu(candidate.nationality) ? "De verificat" : "Nu necesită"} />
         <Row label="Data disponibilitate" value="De completat" />
       </InfoCard>
 

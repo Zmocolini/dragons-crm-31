@@ -53,7 +53,7 @@ export const COPILOT_TOOLS: ToolDef[] = [
     vehicleType: str("vehicul", { enum: ["bike", "e_bike", "scooter", "car"] }),
     vehicleOwnership: str("proprietate vehicul", { enum: ["own", "rented"] }),
     collaboration: str("tip contract, text liber (ex. Contract colaborare, PFA, CIM 8h)"),
-    nationality: str("naționalitate", { enum: ["ro", "eu", "non_eu"] }),
+    nationality: str("naționalitate", { enum: ["ro", "md", "eu", "in", "bd", "np", "lk", "non_eu"] }),
     status: str("status inițial, implicit in_activation", { enum: COURIER_STATUS }),
   }, ["fullName", "city"])),
   tool("update_courier", "Modifică un curier (status, oraș, telefon, email, platforme, vehicul, contract, comision).", obj({

@@ -78,7 +78,7 @@ export function CourierDocStatusBadge({ status }: { status: CourierDocStatus }) 
   );
 }
 
-const NAT_SHORT: Record<Nationality, string> = { ro: "RO", eu: "UE", non_eu: "Non-UE" };
+const NAT_SHORT: Record<Nationality, string> = { ro: "RO", md: "MD", eu: "UE", in: "IN", bd: "BD", np: "NP", lk: "LK", non_eu: "Non-UE" };
 export function NationalityBadge({ nationality }: { nationality: Nationality }) {
   return (
     <span

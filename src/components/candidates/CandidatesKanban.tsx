@@ -15,6 +15,11 @@ import { cn } from "@/lib/utils/cn";
 const NATIONALITY_LABEL: Record<string, { flag: string; label: string }> = {
   ro:     { flag: "🇷🇴", label: "România" },
   eu:     { flag: "🇪🇺", label: "UE" },
+  md:     { flag: "🇲🇩", label: "Moldova" },
+  in:     { flag: "🇮🇳", label: "India" },
+  bd:     { flag: "🇧🇩", label: "Bangladesh" },
+  np:     { flag: "🇳🇵", label: "Nepal" },
+  lk:     { flag: "🇱🇰", label: "Sri Lanka" },
   non_eu: { flag: "🌐", label: "Non-UE" },
 };
 

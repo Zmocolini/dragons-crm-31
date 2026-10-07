@@ -13,7 +13,7 @@ import { PlatformLogo } from "@/components/ui/PlatformLogo";
 import { useToast } from "@/components/ui/Toast";
 import { useCandidates } from "@/lib/candidates/context";
 import type { Nationality } from "@/lib/candidates/types";
-import { NATIONALITY_LABEL } from "@/lib/candidates/types";
+import { NATIONALITY_LABEL, NATIONALITY_OPTIONS } from "@/lib/candidates/types";
 import { useCouriers } from "@/lib/couriers/context";
 import { useDocuments } from "@/lib/documents/context";
 import { resizeImageFile } from "@/lib/utils/image";
@@ -489,7 +489,7 @@ export function AddCourierDialog({
                   onChange={(e) => setForm({ ...form, nationality: e.target.value as Nationality })}
                   className="dd-input"
                 >
-                  {(Object.keys(NATIONALITY_LABEL) as Nationality[]).map((n) => (
+                  {NATIONALITY_OPTIONS.map((n) => (
                     <option key={n} value={n}>{NATIONALITY_LABEL[n]}</option>
                   ))}
                 </select>

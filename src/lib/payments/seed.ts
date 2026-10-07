@@ -1,4 +1,5 @@
 import { SEED_COURIERS } from "@/lib/couriers/mock-seed";
+import { isNonEu } from "@/lib/candidates/types";
 import {
   calculateTotal, ibanForCourier, round2,
   type Payment, type PaymentBreakdown, type PaymentStatus,
@@ -68,7 +69,7 @@ function buildPayment(courierId: string): Payment {
   const penalty       = rand() < 0.15 ? round2(30 + rand() * 90) : 0;
   const advance       = rand() < 0.12 ? round2(100 + rand() * 200) : 0;
   const vehicleCost   = c.vehicleOwnership === "rented" ? round2(80 + rand() * 70) : 0;
-  const housingCost   = c.nationality === "non_eu" && rand() < 0.5 ? round2(150 + rand() * 100) : 0;
+  const housingCost   = isNonEu(c.nationality) && rand() < 0.5 ? round2(150 + rand() * 100) : 0;
   const tax           = round2(grossRevenue * 0.01);
 
   const breakdown: PaymentBreakdown = {

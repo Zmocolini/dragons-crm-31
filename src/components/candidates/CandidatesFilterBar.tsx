@@ -38,7 +38,12 @@ const NATIONALITY_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "all",    label: "Toate naționalitățile" },
   { value: "ro",     label: "Român" },
   { value: "eu",     label: "UE" },
-  { value: "non_eu", label: "Non-UE" },
+  { value: "md",     label: "Moldova" },
+  { value: "in",     label: "India" },
+  { value: "bd",     label: "Bangladesh" },
+  { value: "np",     label: "Nepal" },
+  { value: "lk",     label: "Sri Lanka" },
+  { value: "non_eu", label: "Non-UE (alte)" },
 ];
 
 const PLATFORM_OPTIONS: Array<{ value: string; label: string }> = [

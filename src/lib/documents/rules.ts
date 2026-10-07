@@ -1,4 +1,5 @@
 import type { Courier } from "@/lib/couriers/types";
+import { isNonEu } from "@/lib/candidates/types";
 import type { CrmDocument, DocumentType } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -53,8 +54,8 @@ export type Requirement = "required" | "optional" | "not_applicable";
 export function requirementFor(courier: Pick<Courier, "nationality" | "collaboration">, col: DocColumnKey): Requirement {
   switch (col) {
     case "identity": return "required";
-    case "cnp":       return courier.nationality === "non_eu" ? "optional" : "required";
-    case "residence": return courier.nationality === "non_eu" ? "required" : "not_applicable";
+    case "cnp":       return isNonEu(courier.nationality) ? "optional" : "required";
+    case "residence": return isNonEu(courier.nationality) ? "required" : "not_applicable";
     case "contract":  return "required";
     case "banking":   return "required";
     case "selfie":    return "required";

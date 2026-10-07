@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { ChevronDown, Search, SlidersHorizontal } from "lucide-react";
 import { CheckRow, Chip, Popover, Select } from "@/components/reports/controls";
 import { useDocumentFilters } from "@/lib/documents/filters-context";
-import { NATIONALITY_LABEL, type Nationality } from "@/lib/candidates/types";
+import { NATIONALITY_LABEL, NATIONALITY_OPTIONS, type Nationality } from "@/lib/candidates/types";
 import { COURIER_DOC_STATUS_LABEL, type CourierDocStatus } from "@/lib/documents/rules";
 import type { PlatformKey } from "@/lib/dashboard/types";
 import { cn } from "@/lib/utils/cn";
@@ -14,7 +14,7 @@ const PLATFORMS: Array<{ key: PlatformKey; label: string; color: string }> = [
   { key: "wolt", label: "Wolt", color: "#38bdf8" },
   { key: "glovo", label: "Glovo", color: "#facc15" },
 ];
-const NATS: Nationality[] = ["ro", "eu", "non_eu"];
+const NATS: Nationality[] = [...NATIONALITY_OPTIONS, "non_eu"];
 const STATUS_OPTIONS: Array<{ value: CourierDocStatus | "all"; label: string }> = [
   { value: "all", label: "Toate statusurile" },
   ...(["complete", "pending_review", "missing", "expiring_soon", "expired"] as CourierDocStatus[]).map((s) => ({ value: s, label: COURIER_DOC_STATUS_LABEL[s] })),

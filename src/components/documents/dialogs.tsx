@@ -5,7 +5,7 @@ import { Dialog, DialogFooter } from "@/components/ui/Dialog";
 import { Chip, Select } from "@/components/reports/controls";
 import { useDocumentFilters } from "@/lib/documents/filters-context";
 import { DOC_COLUMNS, COURIER_DOC_STATUS_LABEL, type CourierDocStatus, type DocColumnKey } from "@/lib/documents/rules";
-import { NATIONALITY_LABEL, type Nationality } from "@/lib/candidates/types";
+import { NATIONALITY_LABEL, NATIONALITY_OPTIONS, type Nationality } from "@/lib/candidates/types";
 import type { PlatformKey } from "@/lib/dashboard/types";
 import { cn } from "@/lib/utils/cn";
 
@@ -14,7 +14,7 @@ const PLATFORMS: Array<{ key: PlatformKey; label: string; color: string }> = [
   { key: "wolt", label: "Wolt", color: "#38bdf8" },
   { key: "glovo", label: "Glovo", color: "#facc15" },
 ];
-const NATS: Nationality[] = ["ro", "eu", "non_eu"];
+const NATS: Nationality[] = [...NATIONALITY_OPTIONS, "non_eu"];
 
 export function AdvancedFiltersDialog({
   open,

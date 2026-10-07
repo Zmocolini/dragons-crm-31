@@ -38,12 +38,21 @@ export const CANDIDATE_STATUS_LABEL: Record<CandidateStatus, string> = {
   declined:    "Refuzat",
 };
 
-export type Nationality = "ro" | "eu" | "non_eu";
+export type Nationality = "ro" | "md" | "eu" | "in" | "bd" | "np" | "lk" | "non_eu";
 export const NATIONALITY_LABEL: Record<Nationality, string> = {
   ro:     "Română",
+  md:     "Moldova",
   eu:     "UE (non-RO)",
+  in:     "India",
+  bd:     "Bangladesh",
+  np:     "Nepal",
+  lk:     "Sri Lanka",
   non_eu: "Non-UE",
 };
+/** Ordinea din dropdown-uri. `non_eu` rămâne doar pentru datele vechi. */
+export const NATIONALITY_OPTIONS: Nationality[] = ["ro", "md", "eu", "in", "bd", "np", "lk"];
+/** Cetățenii din afara UE au nevoie de permis de ședere; RO și UE nu. */
+export const isNonEu = (n: Nationality) => n !== "ro" && n !== "eu";
 
 export type Candidate = {
   id: string;

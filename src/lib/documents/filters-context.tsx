@@ -6,7 +6,7 @@ import {
 } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { PlatformKey } from "@/lib/dashboard/types";
-import type { Nationality } from "@/lib/candidates/types";
+import { NATIONALITY_OPTIONS, type Nationality } from "@/lib/candidates/types";
 import { EMPTY_DOC_FILTERS, type DocFilterState, type DocStatusTab } from "./analytics";
 import type { CourierDocStatus, DocColumnKey } from "./rules";
 
@@ -33,7 +33,7 @@ type FiltersValue = {
 const Ctx = createContext<FiltersValue | null>(null);
 
 const PLATFORMS: PlatformKey[] = ["bolt", "wolt", "glovo"];
-const NATS: Nationality[] = ["ro", "eu", "non_eu"];
+const NATS: Nationality[] = [...NATIONALITY_OPTIONS, "non_eu"];
 
 function parse(sp: URLSearchParams): { filters: DocFilterState; page: number; pageSize: number; courier: string | null } {
   const list = (k: string) => (sp.get(k) ?? "").split(",").map((s) => decodeURIComponent(s.trim())).filter(Boolean);
