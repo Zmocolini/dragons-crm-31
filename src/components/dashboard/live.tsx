@@ -8,21 +8,28 @@ import { usePayments } from "@/lib/payments/context";
 import { useDocuments } from "@/lib/documents/context";
 import { useSettings } from "@/lib/settings/context";
 import { getFactsBundle } from "@/lib/reports/facts";
-import { buildTickets } from "@/lib/issues/data";
+import { useAuth } from "@/lib/auth/context";
+import { useFleetTasks } from "@/lib/tasks/context";
+import { rankUrgent, type FleetTask } from "@/lib/tasks/types";
 import { DOC_COLUMNS, columnForType } from "@/lib/documents/rules";
 import { COURIER_STATUS_LABEL, PENDING_ALERT_DAYS, pendingDays } from "@/lib/couriers/types";
 import type {
   CourierActivityPoint, ExpiringDocument, Platform, PlatformKey,
-  RecentCourier, RecentIssue, RecentPayment, RevenuePoint, Trend, UpcomingTask,
+  RecentCourier, RecentIssue, RecentPayment, WeeklyRevenue,
 } from "@/lib/dashboard/types";
 import { CourierActivityChart } from "./CourierActivityChart";
 import { WeeklyRevenueChart } from "./WeeklyRevenueChart";
 import { ActivePlatformsCard } from "./ActivePlatformsCard";
 import { RecentActivityTabs } from "./RecentActivityTabs";
 import { ExpiringDocumentsCard } from "./ExpiringDocumentsCard";
-import { UpcomingTasksCard } from "./UpcomingTasksCard";
+import { FleetTasksCard } from "./FleetTasksCard";
 
-const RO_MONTHS = ["Ian", "Feb", "Mar", "Apr", "Mai", "Iun", "Iul", "Aug", "Sep", "Oct", "Noi", "Dec"];
+/** Lunea săptămânii (YYYY-MM-DD) — cheie sortabilă peste ani, spre deosebire de numărul săptămânii. */
+function mondayOf(iso: string): string {
+  const d = new Date(iso + "T00:00:00Z");
+  d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+  return d.toISOString().slice(0, 10);
+}
 function isoWeek(iso: string): number {
   const d = new Date(iso + "T00:00:00Z");
   const day = (d.getUTCDay() + 6) % 7;
@@ -41,37 +48,38 @@ function useFacts() {
   return useMemo(() => getFactsBundle(activeFleetId, user.activeTenant.planUsage.used, fleetCouriers, fleetPayments), [activeFleetId, user.activeTenant.planUsage.used, fleetCouriers, fleetPayments]);
 }
 
-export function CourierActivityLive() {
+/** Un raport săptămânal = săptămâna (luni) în care cad zilele plăților importate. */
+function useWeeklyReports() {
   const bundle = useFacts();
-  const data = useMemo<CourierActivityPoint[]>(() => {
-    const byDay = new Map<string, { bolt: number; wolt: number; glovo: number }>();
+  return useMemo(() => {
+    const weeks = new Map<string, { revenue: WeeklyRevenue["byPlatform"]; couriers: Record<PlatformKey, Set<string>> }>();
     for (const f of bundle.facts) {
-      const cur = byDay.get(f.dateIso) ?? { bolt: 0, wolt: 0, glovo: 0 };
-      if (f.platform === "bolt" || f.platform === "wolt" || f.platform === "glovo") cur[f.platform] += f.orders;
-      byDay.set(f.dateIso, cur);
+      const key = mondayOf(f.dateIso);
+      let w = weeks.get(key);
+      if (!w) { w = { revenue: { bolt: 0, wolt: 0, glovo: 0, other: 0 }, couriers: { bolt: new Set(), wolt: new Set(), glovo: new Set() } }; weeks.set(key, w); }
+      w.revenue[f.platform] += f.gross;
+      if (f.platform !== "other") w.couriers[f.platform].add(f.courierId);
     }
-    return Array.from(byDay.entries()).sort((a, b) => (a[0] < b[0] ? -1 : 1)).slice(-90).map(([iso, v]) => {
-      const d = new Date(iso + "T00:00:00Z");
-      return { label: `${d.getUTCDate()} ${RO_MONTHS[d.getUTCMonth()]}`, ...v };
-    });
+    return Array.from(weeks.entries()).sort((a, b) => (a[0] < b[0] ? -1 : 1)).slice(-12)
+      .map(([startIso, w]) => ({ startIso, label: `S${isoWeek(startIso)}`, ...w }));
   }, [bundle]);
+}
+
+export function CourierActivityLive() {
+  const reports = useWeeklyReports();
+  const data = useMemo<CourierActivityPoint[]>(() => reports.map((r) => ({
+    label: r.label, bolt: r.couriers.bolt.size, wolt: r.couriers.wolt.size, glovo: r.couriers.glovo.size,
+  })), [reports]);
   return <CourierActivityChart data={data} />;
 }
 
 export function WeeklyRevenueLive() {
-  const bundle = useFacts();
-  const { data, trend } = useMemo(() => {
-    const byWeek = new Map<number, number>();
-    for (const f of bundle.facts) { const w = isoWeek(f.dateIso); byWeek.set(w, (byWeek.get(w) ?? 0) + f.gross); }
-    const weeks = Array.from(byWeek.entries()).sort((a, b) => a[0] - b[0]).slice(-12);
-    const points: RevenuePoint[] = weeks.map(([w, amount]) => ({ label: `S${w}`, amount: Math.round(amount) }));
-    const last = points[points.length - 1]?.amount ?? 0;
-    const prev = points[points.length - 2]?.amount ?? 0;
-    const pct = prev > 0 ? Math.round(((last - prev) / prev) * 100) : 0;
-    const t: Trend = { direction: pct >= 0 ? "up" : "down", value: `${pct >= 0 ? "+" : ""}${pct}%` };
-    return { data: points, trend: t };
-  }, [bundle]);
-  return <WeeklyRevenueChart data={data} trend={trend} />;
+  const reports = useWeeklyReports();
+  const weeks = useMemo<WeeklyRevenue[]>(() => reports.map((r) => {
+    const byPlatform = { bolt: Math.round(r.revenue.bolt), wolt: Math.round(r.revenue.wolt), glovo: Math.round(r.revenue.glovo), other: Math.round(r.revenue.other) };
+    return { label: r.label, startIso: r.startIso, byPlatform, total: byPlatform.bolt + byPlatform.wolt + byPlatform.glovo + byPlatform.other };
+  }), [reports]);
+  return <WeeklyRevenueChart weeks={weeks} />;
 }
 
 export function ActivePlatformsLive() {
@@ -115,6 +123,7 @@ export function RecentActivityLive() {
   const { allRows } = useCouriers();
   const { fleetPayments } = usePayments();
   const accounts = useAccountDirectory();
+  const { urgent } = useFleetUrgent();
 
   const value = useMemo(() => {
     const fleet = allRows.filter((c) => c.tenantId === activeFleetId);
@@ -124,36 +133,57 @@ export function RecentActivityLive() {
     const payStatus = (s: string): RecentPayment["status"] => s === "paid" ? "platit" : (s === "unpaid" || s === "issue" || s === "blocked") ? "esuat" : "pending";
     const payments: RecentPayment[] = [...fleetPayments].filter((p) => p.paidAtIso).sort((a, b) => ((a.paidAtIso ?? "") < (b.paidAtIso ?? "") ? 1 : -1)).slice(0, 5).map((p) => ({ id: p.id, courierName: p.recipient.name, amount: p.totalCalculated, method: payMethod(p.method), status: payStatus(p.status), paidAt: (p.paidAtIso ?? p.paymentDateIso).slice(0, 10) }));
 
-    const tickets = buildTickets(fleet);
-    const sev = (p: string): RecentIssue["severity"] => p === "urgent" ? "high" : p === "high" ? "medium" : "low";
-    const issues: RecentIssue[] = tickets.slice(0, 5).map((t) => ({ id: t.id, title: t.subject, severity: sev(t.priority), courierName: t.requesterName, createdAt: t.createdIso.slice(0, 10) }));
+    // Probleme = task-urile reale deschise (nu mai sunt tichete generate din seed).
+    const sev = (p: FleetTask["priority"]): RecentIssue["severity"] => p === "urgent" ? "high" : p === "high" ? "medium" : "low";
+    const issues: RecentIssue[] = urgent.flatMap((u) => u.source === "task" ? [u.task] : []).slice(0, 5)
+      .map((t) => ({ id: t.id, title: t.title, severity: sev(t.priority), courierName: t.courierName ?? accountLabel(accounts, t.createdBy), createdAt: t.createdAtIso.slice(0, 10) }));
 
     return { couriers, payments, issues };
-  }, [allRows, activeFleetId, fleetPayments, accounts]);
+  }, [allRows, activeFleetId, fleetPayments, accounts, urgent]);
 
   return <RecentActivityTabs couriers={value.couriers} payments={value.payments} issues={value.issues} />;
 }
 
-const STATIC_TASKS = [
-  { id: "t1", title: "Sună curieri noi", due: "azi", done: false },
-  { id: "t2", title: "Verifică documente expirate", due: "azi", done: false },
-  { id: "t3", title: "Pregătește plățile săptămânale", due: "maine", done: false },
-  { id: "t4", title: "Follow-up cu subcontractori", due: "maine", done: false },
-  { id: "t5", title: "Rezolvă problemele deschise", due: "vineri", done: false },
-];
-export function UpcomingTasksLive() {
+/** Numele contului din createdBy (validat de server la sync); raisedBy e text liber și nu se afișează owner-ului. */
+const accountLabel = (accounts: ReturnType<typeof useAccountDirectory>, email: string) =>
+  accounts.get(email.toLowerCase())?.name ?? email;
+
+/** Urgențele flotei active: task-urile deschise + curierii pending peste prag, ordonate de rankUrgent. */
+function useFleetUrgent() {
   const { activeFleetId } = useSession();
   const { allRows } = useCouriers();
-  const tasks = useMemo<UpcomingTask[]>(() => {
-    const stuck = allRows
-      .filter((c) => c.tenantId === activeFleetId)
-      .map((c) => ({ c, days: pendingDays(c) }))
-      .filter((x): x is { c: typeof x.c; days: number } => x.days !== null && x.days >= PENDING_ALERT_DAYS)
-      .sort((a, b) => b.days - a.days);
-    const top = stuck.slice(0, 3).map(({ c, days }) => ({ id: `stuck_${c.id}`, title: `Urmărește ${c.fullName} — ${COURIER_STATUS_LABEL[c.status].toLowerCase()} de ${days} zile`, due: "azi", done: false }));
-    const rest = stuck.length > 3 ? [{ id: "stuck_rest", title: `Încă ${stuck.length - 3} curieri pending de peste ${PENDING_ALERT_DAYS} zile`, due: "azi", done: false }] : [];
-    return [...top, ...rest, ...STATIC_TASKS];
-  }, [allRows, activeFleetId]);
-  return <UpcomingTasksCard tasks={tasks} />;
+  const { tasks } = useFleetTasks();
+  return useMemo(() => {
+    const fleet = allRows.filter((c) => c.tenantId === activeFleetId);
+    const stuck = fleet.flatMap((c) => {
+      if (c.status === "pending") {
+        const days = pendingDays(c) ?? 0;
+        return [{ courierId: c.id, courierName: c.fullName, statusLabel: "În așteptare activare", days }];
+      }
+      const days = pendingDays(c);
+      return days !== null && days >= PENDING_ALERT_DAYS ? [{ courierId: c.id, courierName: c.fullName, statusLabel: COURIER_STATUS_LABEL[c.status], days }] : [];
+    });
+    return { fleet, urgent: rankUrgent(tasks.filter((t) => t.tenantId === activeFleetId), stuck) };
+  }, [allRows, activeFleetId, tasks]);
+}
+
+export function UpcomingTasksLive() {
+  const { activeFleetId } = useSession();
+  const { current } = useAuth();
+  const { addTask, updateTask, canCreate } = useFleetTasks();
+  const accounts = useAccountDirectory();
+  const { fleet, urgent } = useFleetUrgent();
+  const couriers = useMemo(() => fleet.map((c) => ({ id: c.id, name: c.fullName })).sort((a, b) => a.name.localeCompare(b.name, "ro")), [fleet]);
+  return (
+    <FleetTasksCard
+      items={urgent}
+      couriers={couriers}
+      isOwner={current?.role === "global_owner"}
+      raisedByLabel={(t) => accountLabel(accounts, t.createdBy)}
+      canCreate={canCreate}
+      onAdd={(d) => addTask({ ...d, tenantId: activeFleetId })}
+      onUpdate={updateTask}
+    />
+  );
 }
 

@@ -5,11 +5,10 @@ import Link from "next/link";
 import { Bell, FileText, LifeBuoy, Wallet } from "lucide-react";
 import { useSession } from "@/lib/rbac/session";
 import { useProfile } from "@/lib/profile/context";
-import { useCouriers } from "@/lib/couriers/context";
+import { useFleetTasks } from "@/lib/tasks/context";
 import { usePayments } from "@/lib/payments/context";
 import { useDocuments } from "@/lib/documents/context";
 import { UNPAID_STATUSES } from "@/lib/payments/types";
-import { buildTickets } from "@/lib/issues/data";
 import { cn } from "@/lib/utils/cn";
 
 type Notif = {
@@ -31,7 +30,7 @@ type Notif = {
 export function NotificationBell() {
   const { activeFleetId } = useSession();
   const { profile } = useProfile();
-  const { allRows } = useCouriers();
+  const { tasks } = useFleetTasks();
   const { fleetPayments } = usePayments();
   const { fleetDocuments } = useDocuments();
   const [open, setOpen] = useState(false);
@@ -79,14 +78,13 @@ export function NotificationBell() {
     }
 
     if (prefs.issues_urgent?.in_app) {
-      const fleetCouriers = allRows.filter((c) => c.tenantId === activeFleetId);
-      const openTickets = buildTickets(fleetCouriers).filter((t) => t.status === "open" || t.status === "in_progress").length;
-      if (openTickets > 0) out.push({
+      const openTasks = tasks.filter((t) => t.tenantId === activeFleetId && t.status !== "resolved").length;
+      if (openTasks > 0) out.push({
         id: "issues",
         icon: LifeBuoy,
-        title: `${openTickets} tichete deschise`,
-        body: "Curieri care așteaptă răspuns. Deschide secțiunea Suport pentru a rezolva.",
-        href: "/ai?tab=issues",
+        title: `${openTasks} ${openTasks === 1 ? "task deschis" : "task-uri deschise"} în flotă`,
+        body: "Activări, mutări și tichete ridicate de subcontractori. Vezi „Urgențe flotă” în dashboard.",
+        href: "/#urgente",
         tone: "text-sky-300",
         bgTone: "bg-sky-500/15 border-sky-500/30",
         when: "Acum",
@@ -94,7 +92,7 @@ export function NotificationBell() {
     }
 
     return out;
-  }, [fleetDocuments, fleetPayments, allRows, activeFleetId, profile.notifications]);
+  }, [fleetDocuments, fleetPayments, tasks, activeFleetId, profile.notifications]);
 
   const count = notifs.length;
 

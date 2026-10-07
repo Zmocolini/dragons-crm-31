@@ -45,7 +45,7 @@ export const COPILOT_TOOLS: ToolDef[] = [
     city: str("oraș"), platforms: PLATFORMS,
     vehicleType: str("vehicul", { enum: ["bike", "e_bike", "scooter", "car"] }),
     vehicleOwnership: str("proprietate vehicul", { enum: ["own", "rented"] }),
-    collaboration: str("tip contract", { enum: ["collaboration", "cim_8h", "cim_4h"] }),
+    collaboration: str("tip contract, text liber (ex. Contract colaborare, PFA, CIM 8h)"),
     nationality: str("naționalitate", { enum: ["ro", "eu", "non_eu"] }),
     status: str("status inițial, implicit in_activation", { enum: COURIER_STATUS }),
   }, ["fullName", "city"])),
@@ -54,7 +54,7 @@ export const COPILOT_TOOLS: ToolDef[] = [
     patch: obj({
       fullName: str("nume"), phone: str("telefon"), email: str("email"), city: str("oraș"), platforms: PLATFORMS,
       status: str("status", { enum: COURIER_STATUS }), vehicleType: str("vehicul", { enum: ["bike", "e_bike", "scooter", "car"] }),
-      collaboration: str("contract", { enum: ["collaboration", "cim_8h", "cim_4h"] }), commissionPct: num("comision %"),
+      collaboration: str("tip contract, text liber"), commissionPct: num("comision %"),
       weeklyContractFeeRon: num("taxă săptămânală RON"),
     }),
   }, ["id", "patch"])),

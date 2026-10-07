@@ -1,5 +1,6 @@
 import { DashboardGreeting } from "@/components/dashboard/DashboardGreeting";
 import { DashboardStatsLive } from "@/components/dashboard/DashboardStatsLive";
+import { SubcontractorAlertBanner } from "@/components/dashboard/SubcontractorAlertBanner";
 import {
   ActivePlatformsLive, CourierActivityLive,
   ExpiringDocumentsLive, RecentActivityLive, UpcomingTasksLive, WeeklyRevenueLive,
@@ -10,6 +11,7 @@ export default function DashboardPage() {
   return (
     <div className="mx-auto w-full max-w-[1520px] space-y-5 px-5 pt-5 pb-4 md:px-6 md:pt-6">
       <DashboardGreeting />
+      <SubcontractorAlertBanner />
       <DashboardStatsLive />
 
       <div className="grid gap-4 lg:grid-cols-12">

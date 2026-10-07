@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
+import { useToast } from "@/components/ui/Toast";
 import { CourierAvatar, StatusDot } from "@/components/reports/bits";
 import { useSession } from "@/lib/rbac/session";
 import { useCouriers } from "@/lib/couriers/context";
@@ -18,10 +19,11 @@ import { buildCourierRow, COURIER_DOC_STATUS_LABEL } from "@/lib/documents/rules
 import { DOCUMENT_TYPE_LABEL } from "@/lib/documents/types";
 import { cn } from "@/lib/utils/cn";
 import { NATIONALITY_LABEL } from "@/lib/candidates/types";
-import { VEHICLE_TYPE_LABEL, VEHICLE_OWNERSHIP_LABEL, COLLABORATION_LABEL, type VehicleType } from "@/lib/couriers/types";
+import { VEHICLE_TYPE_LABEL, VEHICLE_OWNERSHIP_LABEL, collaborationLabel, type VehicleType } from "@/lib/couriers/types";
 import { EditCourierDialog } from "@/components/couriers/EditCourierDialog";
 import { UploadDocumentDialog } from "@/components/dashboard/dialogs/UploadDocumentDialog";
 import { CourierDocumentsSection } from "@/components/couriers/CourierDocumentsSection";
+import { RequestChangeDialog } from "@/components/couriers/RequestChangeDialog";
 
 // Hub central curier (Etapa 8): agregă din TOATE modulele prin courierId — o singură
 // identitate. Deep-link-urile „Deschide profil" din orice modul ajung aici.
@@ -29,13 +31,16 @@ export default function CourierProfilePage() {
   const router = useRouter();
   const params = useParams<{ id: string }>();
   const id = params.id;
-  const { activeFleetId, can } = useSession();
-  const { allRows, deleteCourier } = useCouriers();
+  const { activeFleetId, can, user } = useSession();
+  const isSubcontractor = user.role === "subcontractor_owner";
+  const toast = useToast();
+  const { allRows, deleteCourier, updateCourier } = useCouriers();
   const canDelete = can("couriers.create");
   const canEdit = can("couriers.edit");
   const canUpload = can("documents.upload");
   const [editOpen, setEditOpen] = useState(false);
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [requestChangeOpen, setRequestChangeOpen] = useState(false);
   const { documentsForSubject } = useDocuments();
 
   const fleetCouriers = useMemo(() => allRows.filter((c) => c.tenantId === activeFleetId), [allRows, activeFleetId]);
@@ -74,6 +79,15 @@ export default function CourierProfilePage() {
               <Upload size={13} /> Adaugă document
             </button>
           )}
+          {isSubcontractor && (
+            <button
+              type="button"
+              onClick={() => setRequestChangeOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/15 px-3 py-1.5 text-[12.5px] font-semibold text-amber-200 hover:bg-amber-500/25 transition-colors"
+            >
+              <FileText size={13} /> Solicită modificare flotă
+            </button>
+          )}
           {canEdit && (
             <button
               type="button"
@@ -83,7 +97,7 @@ export default function CourierProfilePage() {
               <Pencil size={13} /> Editează
             </button>
           )}
-          {canDelete && (
+          {canDelete && (!isSubcontractor || courier.status !== "active") && (
             <button
               type="button"
               onClick={() => {
@@ -100,8 +114,56 @@ export default function CourierProfilePage() {
         </div>
       </div>
 
+      {courier.status === "pending" && (
+        isSubcontractor ? (
+          <div className="flex items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3.5 text-[12.5px] text-amber-200">
+            <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400 animate-pulse" />
+            <span>Acest curier este <b>în așteptare</b> pentru confirmarea și activarea de către flotă. Odată confirmat, va apărea ca Activ.</span>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4">
+            <div className="flex items-center gap-3">
+              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/20 text-amber-300">
+                <span className="h-3 w-3 rounded-full bg-amber-400 animate-pulse" />
+              </span>
+              <div>
+                <div className="text-[13.5px] font-bold text-amber-100">
+                  Curier în așteptare aprobare flotă
+                </div>
+                <div className="text-[12px] text-amber-200/80">
+                  Subcontractorul a propus acest curier. Confirmi activarea sau îl respingi?
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  updateCourier(courier.id, { status: "active" });
+                  toast.success("Curier aprobat și activat", courier.fullName);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-1.5 text-[12.5px] font-semibold text-white shadow hover:bg-emerald-500"
+              >
+                <Check size={14} /> Activează curier
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  updateCourier(courier.id, { status: "rejected" });
+                  toast.error("Curier marcat ca respins", courier.fullName);
+                }}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/20 px-3.5 py-1.5 text-[12.5px] font-semibold text-rose-200 hover:bg-rose-500/30"
+              >
+                <X size={14} /> Respinge
+              </button>
+            </div>
+          </div>
+        )
+      )}
+
       {editOpen && <EditCourierDialog row={courier} onClose={() => setEditOpen(false)} />}
       {uploadOpen && <UploadDocumentDialog open onClose={() => setUploadOpen(false)} prefillSubjectId={courier.id} />}
+      {requestChangeOpen && <RequestChangeDialog courier={courier} open={requestChangeOpen} onClose={() => setRequestChangeOpen(false)} />}
 
       {/* Header profil */}
       <Card className="p-5">
@@ -126,7 +188,7 @@ export default function CourierProfilePage() {
             <div className="mt-2 flex flex-wrap items-center gap-1.5">
               {courier.platforms.map((p) => <Badge key={p} tone={p as "bolt"}>{p}</Badge>)}
               <span className="rounded-md border border-line bg-white/[0.04] px-2 py-0.5 text-[11px] text-fg-muted">{NATIONALITY_LABEL[courier.nationality]}</span>
-              <span className="rounded-md border border-line bg-white/[0.04] px-2 py-0.5 text-[11px] text-fg-muted">{COLLABORATION_LABEL[courier.collaboration]}</span>
+              <span className="rounded-md border border-line bg-white/[0.04] px-2 py-0.5 text-[11px] text-fg-muted">{collaborationLabel(courier.collaboration)}</span>
               <span className="rounded-md border border-line bg-white/[0.04] px-2 py-0.5 text-[11px] text-fg-muted">#{courier.id.toUpperCase()}</span>
             </div>
           </div>
@@ -165,7 +227,7 @@ export default function CourierProfilePage() {
           </CardHeader>
           <CardBody>
             <dl className="grid grid-cols-1 gap-2 text-[12.5px]">
-              <InfoRow label="Tip colaborare" value={COLLABORATION_LABEL[courier.collaboration]} copyable />
+              <InfoRow label="Tip colaborare" value={collaborationLabel(courier.collaboration)} copyable />
               <InfoRow label="Comision flotă" value={`${courier.commissionPct ?? 10}%`} copyable />
               <InfoRow label="Platforme" copyValue={courier.platforms.join(", ") || undefined} valueNode={
                 <div className="flex flex-wrap gap-1">

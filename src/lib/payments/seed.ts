@@ -1,5 +1,4 @@
 import { SEED_COURIERS } from "@/lib/couriers/mock-seed";
-import type { CollaborationType } from "@/lib/couriers/types";
 import {
   calculateTotal, ibanForCourier, round2,
   type Payment, type PaymentBreakdown, type PaymentStatus,
@@ -35,7 +34,7 @@ function rng(seed: number): () => number {
   };
 }
 
-const COMMISSION_BY_COLLAB: Record<CollaborationType, number> = {
+const COMMISSION_BY_COLLAB: Record<string, number> = {
   collaboration: 12,
   cim_8h:        10,
   cim_4h:        10,
@@ -61,7 +60,7 @@ function buildPayment(courierId: string): Payment {
   const avgPerOrder = 13 + rand() * 8;                          // 13..21 RON
   const grossRevenue = round2(ordersCount * avgPerOrder);
   const tips = round2(rand() * 120);
-  const commissionPercentage = COMMISSION_BY_COLLAB[c.collaboration];
+  const commissionPercentage = COMMISSION_BY_COLLAB[c.collaboration] ?? 10;
   const fleetCommission = round2((grossRevenue * commissionPercentage) / 100);
 
   // deduceri ocazionale, deterministe

@@ -27,6 +27,8 @@ import { cn } from "@/lib/utils/cn";
 import { AccountsPanel } from "./AccountsPanel";
 import { EcontracteePage } from "@/components/econtracts/EcontracteePage";
 import { usePersistentList } from "@/lib/utils/use-persistent-list";
+import { useFleetTasks } from "@/lib/tasks/context";
+import { computeRequestsForSub } from "@/lib/subcontractors/use-subcontractor-requests";
 
 const PAGE = 10;
 function fmt(iso: string): string { if (!iso) return "—"; const [y, m, d] = iso.split("-"); return `${d}.${m}.${y}`; }
@@ -37,6 +39,7 @@ export function SubcontractorsPage({ initialView = "list" }: { initialView?: "li
   const { user, activeFleetId, can } = useSession();
   const { allRows } = useCouriers();
   const { payments: allPayments } = usePayments();
+  const { allTasks } = useFleetTasks();
   const canManage = can("subcontractors.view") && user.role === "global_owner";
   const canContracts = can("payments.view");
 
@@ -203,24 +206,44 @@ export function SubcontractorsPage({ initialView = "list" }: { initialView?: "li
 
       <div className={cn(selected && "lg:pr-[340px]")}>
         <Card className="overflow-hidden"><div className="overflow-x-auto"><table className="w-full min-w-[1160px] text-[12px]">
-          <thead><tr className="border-b border-line text-left text-[10.5px] uppercase tracking-wide text-fg-dim"><th className="px-4 py-2.5">#</th><th className="py-2.5 pr-2 font-medium">Nume / Firmă</th><th className="py-2.5 pr-2 font-medium">CUI</th><th className="py-2.5 pr-2 font-medium">Contact</th><th className="py-2.5 pr-2 font-medium">Orașe</th><th className="py-2.5 pr-2 font-medium">Platforme</th><th className="py-2.5 pr-2 text-center font-medium">Curieri</th><th className="py-2.5 pr-2 text-center font-medium">În așteptare</th><th className="py-2.5 pr-2 font-medium">Comision</th><th className="py-2.5 pr-2 text-right font-medium">Net trimis</th><th className="py-2.5 pr-2 font-medium">Contract</th><th className="py-2.5 pr-2 font-medium">Status</th><th className="px-4 py-2.5 text-right font-medium">Acțiuni</th></tr></thead>
-          <tbody>{rows.map((s, i) => (
-            <tr key={s.id} className={cn("border-b border-line/50 hover:bg-white/[0.02]", selected?.id === s.id && "bg-accent/[0.06]")}>
-              <td className="px-4 py-2.5 text-fg-dim tabular-nums">{(safePage - 1) * PAGE + i + 1}</td>
-              <td className="py-2.5 pr-2"><button type="button" onClick={() => setSelected(s)} className="flex items-center gap-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/40 to-blue-500/40 text-[10px] font-bold text-white">{s.company.slice(0, 2).toUpperCase()}</span><span className="max-w-[150px] truncate font-medium text-fg hover:underline">{s.company}</span></button></td>
-              <td className="py-2.5 pr-2 tabular-nums text-fg-muted">{s.cui}</td>
-              <td className="py-2.5 pr-2"><div className="flex items-center gap-2"><CourierAvatar name={s.contactName} size={22} /><div><div className="text-fg">{s.contactName}</div><div className="text-[10.5px] text-fg-dim">{s.contactPhone}</div></div></div></td>
-              <td className="py-2.5 pr-2 max-w-[120px] truncate text-fg-muted">{s.cities.join(", ")}</td>
-              <td className="py-2.5 pr-2"><span className="flex gap-1">{s.platforms.map((p) => <Badge key={p} tone={p as "bolt"}>{p}</Badge>)}</span></td>
-              <td className="py-2.5 pr-2 text-center tabular-nums text-fg">{s.couriersCount}</td>
-              <td className="py-2.5 pr-2 text-center tabular-nums">{s.waitingCount ? <Link href={`/curieri?segment=asteptare&sub=${encodeURIComponent(s.contactEmail)}`} className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/20">{s.waitingCount}</Link> : <span className="text-fg-dim">—</span>}</td>
-              <td className="py-2.5 pr-2"><span className="rounded-md border border-amber-500/25 bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-300 tabular-nums">{s.commissionPct}%</span></td>
-              <td className="py-2.5 pr-2 text-right tabular-nums" title={`Brut ${formatRon(netBySub.get(s.id)?.gross ?? 0)} − comision ${formatRon(netBySub.get(s.id)?.commission ?? 0)} · ${netBySub.get(s.id)?.count ?? 0} plăți`}><span className="font-semibold text-emerald-300">{formatRon(netBySub.get(s.id)?.net ?? 0)}</span></td>
-              <td className="py-2.5 pr-2 tabular-nums text-fg-muted">{fmt(s.contractEndIso)}</td>
-              <td className="py-2.5 pr-2"><span className={cn("inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium", SUB_STATUS_STYLE[s.status])}>{SUB_STATUS_LABEL[s.status]}</span></td>
-              <td className="px-4 py-2.5 text-right"><Popover align="right" className="w-[170px] p-1" trigger={({ toggle }) => <button type="button" onClick={toggle} aria-label="Acțiuni" className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-fg-dim hover:bg-white/[0.06] hover:text-fg"><MoreHorizontal size={16} /></button>}>{(close) => (<div className="flex flex-col"><button type="button" onClick={() => { setSelected(s); close(); }} className="rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-fg hover:bg-white/[0.05]">Vezi detalii</button><button type="button" onClick={() => { setEditing(s); close(); }} className="rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-fg hover:bg-white/[0.05]">Editează</button><button type="button" onClick={() => { toast.success("Mesaj trimis", s.contactName); close(); }} className="rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-fg hover:bg-white/[0.05]">Trimite mesaj</button></div>)}</Popover></td>
-            </tr>
-          ))}</tbody>
+          <thead><tr className="border-b border-line text-left text-[10.5px] uppercase tracking-wide text-fg-dim"><th className="px-4 py-2.5">#</th><th className="py-2.5 pr-2 font-medium">Nume / Firmă</th><th className="py-2.5 pr-2 font-medium">CUI</th><th className="py-2.5 pr-2 font-medium">Contact</th><th className="py-2.5 pr-2 font-medium">Orașe</th><th className="py-2.5 pr-2 font-medium">Platforme</th><th className="py-2.5 pr-2 text-center font-medium">Curieri</th><th className="py-2.5 pr-2 text-center font-medium">În așteptare</th><th className="py-2.5 pr-2 font-medium">Cereri flotă</th><th className="py-2.5 pr-2 font-medium">Comision</th><th className="py-2.5 pr-2 text-right font-medium">Net trimis</th><th className="py-2.5 pr-2 font-medium">Contract</th><th className="py-2.5 pr-2 font-medium">Status</th><th className="px-4 py-2.5 text-right font-medium">Acțiuni</th></tr></thead>
+          <tbody>{rows.map((s, i) => {
+            const reqs = computeRequestsForSub(fleetCouriers, allTasks, { email: s.contactEmail, name: s.company });
+            return (
+              <tr key={s.id} className={cn("border-b border-line/50 hover:bg-white/[0.02]", selected?.id === s.id && "bg-accent/[0.06]")}>
+                <td className="px-4 py-2.5 text-fg-dim tabular-nums">{(safePage - 1) * PAGE + i + 1}</td>
+                <td className="py-2.5 pr-2"><button type="button" onClick={() => setSelected(s)} className="flex items-center gap-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/40 to-blue-500/40 text-[10px] font-bold text-white">{s.company.slice(0, 2).toUpperCase()}</span><span className="max-w-[150px] truncate font-medium text-fg hover:underline">{s.company}</span></button></td>
+                <td className="py-2.5 pr-2 tabular-nums text-fg-muted">{s.cui}</td>
+                <td className="py-2.5 pr-2"><div className="flex items-center gap-2"><CourierAvatar name={s.contactName} size={22} /><div><div className="text-fg">{s.contactName}</div><div className="text-[10.5px] text-fg-dim">{s.contactPhone}</div></div></div></td>
+                <td className="py-2.5 pr-2 max-w-[120px] truncate text-fg-muted">{s.cities.join(", ")}</td>
+                <td className="py-2.5 pr-2"><span className="flex gap-1">{s.platforms.map((p) => <Badge key={p} tone={p as "bolt"}>{p}</Badge>)}</span></td>
+                <td className="py-2.5 pr-2 text-center tabular-nums text-fg">{s.couriersCount}</td>
+                <td className="py-2.5 pr-2 text-center tabular-nums">{s.waitingCount ? <Link href={`/curieri?segment=asteptare&sub=${encodeURIComponent(s.contactEmail)}`} className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/20">{s.waitingCount}</Link> : <span className="text-fg-dim">—</span>}</td>
+                <td className="py-2.5 pr-2">
+                  {reqs.totalCount > 0 ? (
+                    <div className="flex flex-col gap-0.5">
+                      <span className="inline-flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-300 w-fit">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                        {reqs.totalCount} {reqs.totalCount === 1 ? "cerere" : "cereri"}
+                      </span>
+                      <div className="flex flex-wrap gap-1 text-[10px] text-fg-dim">
+                        {reqs.activationsCount > 0 && <span className="text-emerald-300 font-medium">{reqs.activationsCount} activare</span>}
+                        {reqs.phoneChangesCount > 0 && <span className="text-sky-300 font-medium">{reqs.phoneChangesCount} tel</span>}
+                        {reqs.vehicleChangesCount > 0 && <span className="text-purple-300 font-medium">{reqs.vehicleChangesCount} auto</span>}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-[11px] text-emerald-400/80 font-medium">✓ La zi</span>
+                  )}
+                </td>
+                <td className="py-2.5 pr-2"><span className="rounded-md border border-amber-500/25 bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-300 tabular-nums">{s.commissionPct}%</span></td>
+                <td className="py-2.5 pr-2 text-right tabular-nums" title={`Brut ${formatRon(netBySub.get(s.id)?.gross ?? 0)} − comision ${formatRon(netBySub.get(s.id)?.commission ?? 0)} · ${netBySub.get(s.id)?.count ?? 0} plăți`}><span className="font-semibold text-emerald-300">{formatRon(netBySub.get(s.id)?.net ?? 0)}</span></td>
+                <td className="py-2.5 pr-2 tabular-nums text-fg-muted">{fmt(s.contractEndIso)}</td>
+                <td className="py-2.5 pr-2"><span className={cn("inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium", SUB_STATUS_STYLE[s.status])}>{SUB_STATUS_LABEL[s.status]}</span></td>
+                <td className="px-4 py-2.5 text-right"><Popover align="right" className="w-[170px] p-1" trigger={({ toggle }) => <button type="button" onClick={toggle} aria-label="Acțiuni" className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-fg-dim hover:bg-white/[0.06] hover:text-fg"><MoreHorizontal size={16} /></button>}>{(close) => (<div className="flex flex-col"><button type="button" onClick={() => { setSelected(s); close(); }} className="rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-fg hover:bg-white/[0.05]">Vezi detalii</button><button type="button" onClick={() => { setEditing(s); close(); }} className="rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-fg hover:bg-white/[0.05]">Editează</button><button type="button" onClick={() => { toast.success("Mesaj trimis", s.contactName); close(); }} className="rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-fg hover:bg-white/[0.05]">Trimite mesaj</button></div>)}</Popover></td>
+              </tr>
+            );
+          })}</tbody>
         </table>{rows.length === 0 && <EmptyState title="Niciun subcontractor pentru filtrele selectate." />}</div>
         <div className="flex items-center justify-between border-t border-line px-4 py-3 text-[12px] text-fg-muted"><span>Afișează {rows.length} din {filtered.length} subcontractori</span><div className="flex gap-1">{Array.from({ length: pageCount }, (_, i) => i + 1).slice(0, 5).map((n) => <button key={n} type="button" onClick={() => setPage(n)} className={cn("min-w-[30px] rounded-lg border px-2 py-1 tabular-nums", n === safePage ? "border-accent bg-accent/15 text-fg" : "border-line hover:text-fg")}>{n}</button>)}</div></div></Card>
       </div>

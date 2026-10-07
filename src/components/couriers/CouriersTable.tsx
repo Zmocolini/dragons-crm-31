@@ -22,6 +22,8 @@ type Props = {
   onRowDelete?: (row: CourierRow) => void;
   onRowEdit?: (row: CourierRow) => void;
   onRowToggleStatus?: (row: CourierRow) => void;
+  onConfirmStatus?: (row: CourierRow, status: "active" | "rejected") => void;
+  canManageStatus?: boolean;
   /** Segmentul „În așteptare": platformele în așteptare devin chip-uri cu Activat / Scoate. */
   waitingMode?: boolean;
   onActivateWaiting?: (row: CourierRow, platform: PlatformKey) => void;
@@ -38,9 +40,32 @@ const VEHICLE_ICON: Record<VehicleType, LucideIcon> = {
   car:     Car,
 };
 
-const STATUS_TONE = COURIER_STATUS_TONE;
+const STATUS_TONE: Record<CourierStatus, "success" | "warn" | "danger" | "neutral" | "info"> = {
+  pending:       "warn",
+  active:        "success",
+  rejected:      "danger",
+  in_activation: "info",
+  paused:        "neutral",
+  stopped:       "danger",
+  draft:         "neutral",
+};
 
-export function CouriersTable({ rows, totalMatching, onRowClick, onRowAction, onRowDelete, onRowEdit, onRowToggleStatus, waitingMode, onActivateWaiting, onRemoveWaiting, ownerLabel, loading }: Props) {
+export function CouriersTable({
+  rows,
+  totalMatching,
+  onRowClick,
+  onRowAction,
+  onRowDelete,
+  onRowEdit,
+  onRowToggleStatus,
+  onConfirmStatus,
+  canManageStatus = false,
+  waitingMode,
+  onActivateWaiting,
+  onRemoveWaiting,
+  ownerLabel,
+  loading,
+}: Props) {
   const { documentsForSubject } = useDocuments();
   if (loading) {
     return (
@@ -160,23 +185,97 @@ export function CouriersTable({ rows, totalMatching, onRowClick, onRowAction, on
                     <Badge tone="warn">Lipsă</Badge>
                   )}
                 </td>
-                <td className="px-2 py-3">
-                  {onRowToggleStatus ? (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); onRowToggleStatus(row); }}
-                      aria-pressed={row.status === "active"}
-                      title={row.status === "active" ? "Click pentru a dezactiva" : "Click pentru a activa"}
-                      className={row.status === "active"
-                        ? "inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/50 bg-emerald-500/15 px-3 py-1.5 text-[12px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/25"
-                        : "inline-flex items-center gap-1.5 rounded-lg border border-rose-500/50 bg-rose-500/15 px-3 py-1.5 text-[12px] font-semibold text-rose-300 transition-colors hover:bg-rose-500/25"
-                      }
-                    >
-                      <span className={row.status === "active" ? "inline-block h-2 w-2 rounded-full bg-emerald-400" : "inline-block h-2 w-2 rounded-full bg-rose-400"} />
-                      {row.status === "active" ? "Activ" : "Inactiv"}
-                    </button>
+                <td className="px-2 py-3" onClick={(e) => e.stopPropagation()}>
+                  {!canManageStatus ? (
+                    /* Subcontractor: status needitabil (nu se poate juca cu el, nu poate trece activ la inactiv) */
+                    row.status === "pending" ? (
+                      <span
+                        title="În așteptare confirmare de către flotă. Flota va decide activarea sau respingerea."
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/15 px-2.5 py-1 text-[11.5px] font-semibold text-amber-300 shadow-sm"
+                      >
+                        <span className="inline-block h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+                        În așteptare
+                      </span>
+                    ) : row.status === "active" ? (
+                      <span
+                        title="Curier activ confirmat de flotă. Subcontractorul nu poate modifica statusul."
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/15 px-2.5 py-1 text-[11.5px] font-semibold text-emerald-300"
+                      >
+                        <span className="inline-block h-2 w-2 rounded-full bg-emerald-400" />
+                        Activ
+                      </span>
+                    ) : row.status === "rejected" ? (
+                      <span
+                        title="Curier respins de flotă."
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-rose-500/40 bg-rose-500/15 px-2.5 py-1 text-[11.5px] font-semibold text-rose-300"
+                      >
+                        <span className="inline-block h-2 w-2 rounded-full bg-rose-400" />
+                        Respins
+                      </span>
+                    ) : (
+                      <span
+                        title="Status curier gestionat de flotă."
+                        className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-600/40 bg-zinc-800/40 px-2.5 py-1 text-[11.5px] font-semibold text-zinc-300"
+                      >
+                        <span className="inline-block h-2 w-2 rounded-full bg-zinc-400" />
+                        {COURIER_STATUS_LABEL[row.status] || "Inactiv"}
+                      </span>
+                    )
                   ) : (
-                    <Badge tone={STATUS_TONE[row.status]}>{COURIER_STATUS_LABEL[row.status]}</Badge>
+                    /* Flotă (admin): poate confirma direct dacă este activat sau respins */
+                    row.status === "pending" ? (
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => onConfirmStatus?.(row, "active")}
+                          title="Confirmă și activează curierul"
+                          className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/50 bg-emerald-500/20 px-2 py-1 text-[11.5px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/35"
+                        >
+                          <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                          Activează
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onConfirmStatus?.(row, "rejected")}
+                          title="Respinge curierul"
+                          className="inline-flex items-center gap-1 rounded-lg border border-rose-500/50 bg-rose-500/20 px-2 py-1 text-[11.5px] font-semibold text-rose-300 transition-colors hover:bg-rose-500/35"
+                        >
+                          <span className="inline-block h-1.5 w-1.5 rounded-full bg-rose-400" />
+                          Respinge
+                        </button>
+                      </div>
+                    ) : onRowToggleStatus ? (
+                      <button
+                        type="button"
+                        onClick={() => onRowToggleStatus(row)}
+                        aria-pressed={row.status === "active"}
+                        title={
+                          row.status === "active"
+                            ? "Click pentru a dezactiva (opțiune flotă)"
+                            : "Click pentru a activa (opțiune flotă)"
+                        }
+                        className={
+                          row.status === "active"
+                            ? "inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/50 bg-emerald-500/15 px-3 py-1.5 text-[12px] font-semibold text-emerald-300 transition-colors hover:bg-emerald-500/25"
+                            : row.status === "rejected"
+                            ? "inline-flex items-center gap-1.5 rounded-lg border border-rose-500/50 bg-rose-500/15 px-3 py-1.5 text-[12px] font-semibold text-rose-300 transition-colors hover:bg-rose-500/25"
+                            : "inline-flex items-center gap-1.5 rounded-lg border border-zinc-600/50 bg-zinc-800/40 px-3 py-1.5 text-[12px] font-semibold text-zinc-300 transition-colors hover:bg-zinc-700/40"
+                        }
+                      >
+                        <span
+                          className={
+                            row.status === "active"
+                              ? "inline-block h-2 w-2 rounded-full bg-emerald-400"
+                              : row.status === "rejected"
+                              ? "inline-block h-2 w-2 rounded-full bg-rose-400"
+                              : "inline-block h-2 w-2 rounded-full bg-zinc-400"
+                          }
+                        />
+                        {row.status === "active" ? "Activ" : row.status === "rejected" ? "Respins" : "Inactiv"}
+                      </button>
+                    ) : (
+                      <Badge tone={STATUS_TONE[row.status]}>{COURIER_STATUS_LABEL[row.status]}</Badge>
+                    )
                   )}
                 </td>
                 <td className="px-2 py-3">

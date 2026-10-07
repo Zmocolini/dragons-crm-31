@@ -47,6 +47,8 @@ export const SYNC_COLLECTIONS: SyncCollection[] = [
   { key: "crm31-econtracts",                owner: "writer" },
   { key: "crm31-duplicate-pairs",           owner: "writer" },
   { key: "crm31-subcontractors-added",      owner: "writer" },
+  // Task-uri ridicate de subcontractori către owner (activări, mutări, tichete).
+  { key: "crm31-fleet-tasks",               owner: "createdBy" },
 ];
 
 export const SYNC_BY_KEY = new Map(SYNC_COLLECTIONS.map((c) => [c.key, c]));

@@ -18,6 +18,7 @@ import type { CourierRow } from "@/lib/couriers/mock-seed";
 import type { CourierStatus, VehicleType } from "@/lib/couriers/types";
 import type { PlatformKey } from "@/lib/dashboard/types";
 import { useSession } from "@/lib/rbac/session";
+import { useAuth } from "@/lib/auth/context";
 import {
   applyFilters, computeStats, countActiveAdvancedFilters,
   DEFAULT_ADVANCED_FILTERS, uniqueCities, uniqueSubcontractors, waitingByPlatform,
@@ -40,6 +41,9 @@ const PAGE_SIZE = 10;
 
 export function CouriersPage({ initialSegment = "all", initialSub = null, initialView = "list" }: { initialSegment?: CourierSegment; initialSub?: string | null; initialView?: "list" | "teams" }) {
   const { user, activeFleetId } = useSession();
+  const { current } = useAuth();
+  const isSubcontractor = user.role === "subcontractor_owner" || current?.role === "subcontractor_owner";
+  const canManageStatus = !isSubcontractor;
   const { allRows: allCourierRows, hydrated, deleteCourier, updateCourier } = useCouriers();
   const { scope } = useOwnerScope();
   const accounts = useAccountDirectory();
@@ -274,11 +278,20 @@ export function CouriersPage({ initialSegment = "all", initialSub = null, initia
                 onRowClick={handleRowClick}
                 onRowAction={handleRowAction}
                 onRowEdit={(row) => setEditFor(row)}
-                onRowToggleStatus={(row) => {
+                canManageStatus={canManageStatus}
+                onConfirmStatus={(row, newStatus) => {
+                  updateCourier(row.id, { status: newStatus });
+                  if (newStatus === "active") {
+                    toast.success("Curier confirmat și activat!", row.fullName);
+                  } else {
+                    toast.error("Curier marcat ca respins", row.fullName);
+                  }
+                }}
+                onRowToggleStatus={canManageStatus ? (row) => {
                   const next = row.status === "active" ? "paused" : "active";
                   updateCourier(row.id, { status: next });
                   toast.success(next === "active" ? "Curier reactivat" : "Curier dezactivat", row.fullName);
-                }}
+                } : undefined}
                 onRowDelete={(row) => {
                   deleteCourier(row.id);
                   toast.success("Curier șters", row.fullName);
