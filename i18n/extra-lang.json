@@ -26,5 +26,198 @@
  "Ține-mă conectat": {
   "ru": "Оставаться в системе",
   "hi": "मुझे साइन इन रखें"
+ },
+ "Pe echipe": {
+  "en": "By team",
+  "ru": "По командам",
+  "hi": "टीम के अनुसार"
+ },
+ "De confirmat": {
+  "en": "To confirm",
+  "ru": "На подтверждение",
+  "hi": "पुष्टि हेतु"
+ },
+ "Așteaptă loc": {
+  "en": "Waiting for a slot",
+  "ru": "Ждут места",
+  "hi": "स्लॉट की प्रतीक्षा"
+ },
+ "De activat": {
+  "en": "To activate",
+  "ru": "К активации",
+  "hi": "सक्रिय करना है"
+ },
+ "În regulă": {
+  "en": "All good",
+  "ru": "В порядке",
+  "hi": "ठीक है"
+ },
+ "Așteaptă loc / acte": {
+  "en": "Waiting: slot / documents",
+  "ru": "Ждут: место / документы",
+  "hi": "प्रतीक्षा: स्लॉट / दस्तावेज़"
+ },
+ "Inactiv / respins": {
+  "en": "Inactive / rejected",
+  "ru": "Неактивен / отклонён",
+  "hi": "निष्क्रिय / अस्वीकृत"
+ },
+ "Echipa internă": {
+  "en": "In-house team",
+  "ru": "Внутренняя команда",
+  "hi": "आंतरिक टीम"
+ },
+ "Document expirat": {
+  "en": "Expired document",
+  "ru": "Документ просрочен",
+  "hi": "दस्तावेज़ की अवधि समाप्त"
+ },
+ "Plată blocată": {
+  "en": "Payment blocked",
+  "ru": "Платёж заблокирован",
+  "hi": "भुगतान अवरुद्ध"
+ },
+ "Problemă la plată": {
+  "en": "Payment issue",
+  "ru": "Проблема с платежом",
+  "hi": "भुगतान में समस्या"
+ },
+ "Documente în verificare": {
+  "en": "Documents under review",
+  "ru": "Документы на проверке",
+  "hi": "दस्तावेज़ जाँच में"
+ },
+ "Fără documente încărcate": {
+  "en": "No documents uploaded",
+  "ru": "Документы не загружены",
+  "hi": "कोई दस्तावेज़ अपलोड नहीं"
+ },
+ "Așteaptă confirmarea flotei": {
+  "en": "Awaiting fleet confirmation",
+  "ru": "Ждёт подтверждения автопарка",
+  "hi": "फ़्लीट की पुष्टि की प्रतीक्षा"
+ },
+ "Activare blocată: lipsește {n}": {
+  "en": "Activation blocked: missing {n}",
+  "ru": "Активация заблокирована: не хватает {n}",
+  "hi": "सक्रियण अवरुद्ध: {n} नहीं है"
+ },
+ "Aparține de": {
+  "en": "Belongs to",
+  "ru": "Принадлежит",
+  "hi": "किसका है"
+ },
+ "Flota (intern)": {
+  "en": "Fleet (in-house)",
+  "ru": "Автопарк (внутренний)",
+  "hi": "फ़्लीट (आंतरिक)"
+ },
+ "La salvare, curierul și plățile lui trec la noul proprietar; el îi vede, celălalt nu.": {
+  "en": "On save, the courier and their payments move to the new owner; they will see them, the previous owner won't.",
+  "ru": "При сохранении курьер и его платежи переходят к новому владельцу; он их увидит, прежний — нет.",
+  "hi": "सहेजने पर कूरियर और उसके भुगतान नए मालिक के पास चले जाएंगे; वह उन्हें देखेगा, पिछला मालिक नहीं।"
+ },
+ "Curier mutat": {
+  "en": "Courier moved",
+  "ru": "Курьер перемещён",
+  "hi": "कूरियर स्थानांतरित"
+ },
+ "Nu mai așteaptă loc": {
+  "en": "No longer waiting for a slot",
+  "ru": "Больше не ждёт места",
+  "hi": "अब स्लॉट की प्रतीक्षा नहीं"
+ },
+ "Click pentru toate echipele": {
+  "en": "Click for all teams",
+  "ru": "Нажмите, чтобы показать все команды",
+  "hi": "सभी टीमों के लिए क्लिक करें"
+ },
+ "Click: doar echipele cu așa ceva": {
+  "en": "Click: only teams with this",
+  "ru": "Нажмите: только команды с этим",
+  "hi": "क्लिक करें: केवल ऐसी टीमें"
+ },
+ "Nicio echipă nu are curieri în această categorie.": {
+  "en": "No team has couriers in this category.",
+  "ru": "Ни у одной команды нет курьеров в этой категории.",
+  "hi": "किसी भी टीम में इस श्रेणी के कूरियर नहीं हैं।"
+ },
+ "Se încarcă echipele...": {
+  "en": "Loading teams...",
+  "ru": "Загрузка команд...",
+  "hi": "टीमें लोड हो रही हैं..."
+ },
+ "Încă niciun curier în această echipă.": {
+  "en": "No couriers in this team yet.",
+  "ru": "В этой команде пока нет курьеров.",
+  "hi": "इस टीम में अभी कोई कूरियर नहीं है।"
+ },
+ "Așteaptă loc pe platformă": {
+  "en": "Waiting for a platform slot",
+  "ru": "Ждут места на платформе",
+  "hi": "प्लेटफ़ॉर्म स्लॉट की प्रतीक्षा"
+ },
+ "Curieri care așteaptă loc pe cel puțin o platformă (pot fi activi pe alta)": {
+  "en": "Couriers waiting for a slot on at least one platform (may be active on another)",
+  "ru": "Курьеры, ждущие места хотя бы на одной платформе (могут быть активны на другой)",
+  "hi": "कम से कम एक प्लेटफ़ॉर्म पर स्लॉट की प्रतीक्षा कर रहे कूरियर (दूसरे पर सक्रिय हो सकते हैं)"
+ },
+ "Înregistrați de subcontractori: activează sau respinge": {
+  "en": "Registered by subcontractors: activate or reject",
+  "ru": "Зарегистрированы субподрядчиками: активируйте или отклоните",
+  "hi": "सबकॉन्ट्रैक्टर द्वारा पंजीकृत: सक्रिय करें या अस्वीकार करें"
+ },
+ "Nimeni nu așteaptă loc. Adaugă o platformă pe care așteaptă loc la un curier (butonul din stânga rândului) sau din „Curier nou”.": {
+  "en": "Nobody is waiting for a slot. Add a platform a courier is waiting for (button at the left of the row) or from “New courier”.",
+  "ru": "Никто не ждёт места. Добавьте платформу, на которой курьер ждёт место (кнопка слева в строке), или через «Новый курьер».",
+  "hi": "कोई स्लॉट की प्रतीक्षा नहीं कर रहा। किसी कूरियर के लिए प्रतीक्षित प्लेटफ़ॉर्म जोड़ें (पंक्ति के बाईं ओर का बटन) या “नया कूरियर” से।"
+ },
+ "Vedere curieri": {
+  "en": "Courier view",
+  "ru": "Вид курьеров",
+  "hi": "कूरियर दृश्य"
+ },
+ "Filtrează echipele": {
+  "en": "Filter teams",
+  "ru": "Фильтр команд",
+  "hi": "टीमें फ़िल्टर करें"
+ },
+ "Statut curieri": {
+  "en": "Courier status",
+  "ru": "Статус курьеров",
+  "hi": "कूरियर स्थिति"
+ },
+ "Scoate filtrul de subcontractor": {
+  "en": "Remove subcontractor filter",
+  "ru": "Убрать фильтр субподрядчика",
+  "hi": "सबकॉन्ट्रैक्टर फ़िल्टर हटाएँ"
+ },
+ "Marchează activat pe {n}": {
+  "en": "Mark as activated on {n}",
+  "hi": "{n} पर सक्रिय चिह्नित करें"
+ },
+ "Activat pe {n}": {
+  "en": "Activated on {n}",
+  "ru": "Активирован на {n}",
+  "hi": "{n} पर सक्रिय"
+ },
+ "Nu mai așteaptă loc pe {n}": {
+  "en": "No longer waiting for a slot on {n}",
+  "ru": "Больше не ждёт места на {n}",
+  "hi": "अब {n} पर स्लॉट की प्रतीक्षा नहीं"
+ },
+ "Nesetat ({n})": {
+  "en": "Not set ({n})",
+  "ru": "Не задано ({n})",
+  "hi": "सेट नहीं ({n})"
+ },
+ "curier": {
+  "en": "courier",
+  "ru": "курьер",
+  "hi": "कूरियर"
+ },
+ "Subcontractor": {
+  "en": "Subcontractor",
+  "ru": "Субподрядчик"
  }
 }
