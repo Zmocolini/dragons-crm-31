@@ -43,9 +43,9 @@ assert.equal(ownerOf(decide(op({ createdBy: "@", transferFrom: "owner@x.ro" }), 
 // plăți vechi cu createdBy = nume: marcajul LEGACY merge doar dacă proprietarul curent e un cont global
 assert.equal(ownerOf(decide(op({ createdBy: "ahsal@x.ro", transferFrom: LEGACY_OWNER }), OWNER, "owner@x.ro")), "ahsal@x.ro");
 assert.equal(ownerOf(decide(op({ createdBy: "ahsal@x.ro", transferFrom: LEGACY_OWNER }), OWNER, "hussein@x.ro")), "hussein@x.ro");
-// un nume (fără @) nu mută și nu e rescris
+// un nume (fără @) nu mută, dar e aliniat la proprietar (altfel editările lui Ahsal ar fi respinse)
 d = decide(op({ createdBy: "Sistem" }), OWNER, "ahsal@x.ro");
-assert.deepEqual([ownerOf(d), dataOf(d).createdBy], ["ahsal@x.ro", "Sistem"]);
+assert.deepEqual([ownerOf(d), dataOf(d).createdBy], ["ahsal@x.ro", "ahsal@x.ro"]);
 // același proprietar = nu e transfer
 assert.equal(decide(op({ createdBy: "ahsal@x.ro", transferFrom: "ahsal@x.ro" }), OWNER, "ahsal@x.ro").kind === "write", true);
 // subcontractorul NU poate dărui / prelua / edita / șterge ce nu e al lui, nici cu marcaj
@@ -81,5 +81,8 @@ assert.equal(JSON.parse(enforceCourierStatus(AHSAL, st("active"), st("pending", 
 assert.equal(enforceCourierStatus(AHSAL, st("pending"), null), null, "ștergerea trece neschimbată");
 assert.equal(statusOf(enforceCourierStatus(OWNER, st("pending"), st("active"))), "active");
 assert.equal(statusOf(enforceCourierStatus(OWNER, null, st("active"))), "active");
+// curier stocat fără status (date vechi / scrise brut): subcontractorul nu-și pune singur „active"
+assert.equal(statusOf(enforceCourierStatus(AHSAL, JSON.stringify({ phone: "1" }), st("active"))), "pending");
+assert.equal(statusOf(enforceCourierStatus(AHSAL, "[1]", st("active"))), "pending");
 
 console.log("sync-ownership: OK");

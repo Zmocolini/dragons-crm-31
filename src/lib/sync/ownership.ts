@@ -86,12 +86,13 @@ export function decideOwner(
     return { kind: "reject" };
   }
 
-  // Ce se stochează: fără marcaj; la Global, createdBy (email) aliniat la proprietarul real.
+  // Ce se stochează: fără marcaj; createdBy aliniat mereu la proprietarul real (și un nume vechi —
+  // altfel copia proprietarului ar avea alt createdBy și editările lui ar fi respinse).
   let data = op.del ? null : op.data;
-  if (obj && (TRANSFER_FIELD in obj || (cb.includes("@") && cb !== owner))) {
+  if (obj && (TRANSFER_FIELD in obj || cb !== owner)) {
     const clean = { ...obj };
     delete clean[TRANSFER_FIELD];
-    if (cb.includes("@") && cb !== owner) clean.createdBy = owner;
+    if (cb !== owner) clean.createdBy = owner;
     data = JSON.stringify(clean);
   }
   return { kind: "write", owner, transferred, data };
@@ -106,7 +107,9 @@ export function enforceCourierStatus(user: SyncActor, oldData: string | null, ne
   if (user.isGlobal || newData === null) return newData;
   const next = parse(newData);
   if (!next) return newData;
-  const want = oldData === null ? "pending" : parse(oldData)?.status;
-  if (want === undefined || next.status === want) return newData;
+  // Curier nou, sau stocat fără status valid (date vechi / scrise brut) → „pending".
+  const stored = oldData === null ? undefined : parse(oldData)?.status;
+  const want = typeof stored === "string" && stored ? stored : "pending";
+  if (next.status === want) return newData;
   return JSON.stringify({ ...next, status: want });
 }

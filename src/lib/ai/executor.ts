@@ -147,6 +147,7 @@ export function useCopilotExecutor() {
         need("couriers.create");
         const fullName = s(a.fullName), phone = s(a.phone), email = s(a.email) || null;
         if (!fullName) throw new ToolError("Numele e obligatoriu.");
+        if (s(a.status) && !(s(a.status) in COURIER_STATUS_LABEL)) throw new ToolError(`Status necunoscut: ${s(a.status)}.`);
         const dup = findDuplicates(phone, email);
         if (dup.length) return { created: false, reason: "duplicat", matches: dup.slice(0, 3) };
         const platforms = platformsOf(a.platforms);

@@ -42,5 +42,8 @@ assert.equal(needsConfirm("update_courier", { id: "x", patch: { status: "active"
 assert.equal(needsConfirm("update_courier", { id: "x", patch: { phone: "07" } }), false);
 assert.equal(needsConfirm("update_courier", { id: "x", patch: { status: " " } }), false);
 assert.equal(needsConfirm("find_couriers", {}), false);
+// crearea cu status explicit (ex. direct „active") cere click; fără status nu
+assert.equal(needsConfirm("create_courier", { fullName: "X", city: "Iasi", status: "active" }), true);
+assert.equal(needsConfirm("create_courier", { fullName: "X", city: "Iasi" }), false);
 
 console.log("activation: OK");
