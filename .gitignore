@@ -36,8 +36,7 @@ yarn-error.log*
 # vercel
 .vercel
 
-# local db + dev artifacts
-/.data/
+# dev artifacts
 /dev.log
 
 # typescript
