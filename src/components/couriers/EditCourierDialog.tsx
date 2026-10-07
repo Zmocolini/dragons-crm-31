@@ -9,6 +9,8 @@ import type { CourierRow } from "@/lib/couriers/mock-seed";
 import { COLLABORATION_LABEL, type CollaborationType } from "@/lib/couriers/types";
 import type { PlatformKey } from "@/lib/dashboard/types";
 import { useSettings } from "@/lib/settings/context";
+import { useSession } from "@/lib/rbac/session";
+import { COURIER_STATUS_LABEL, type CourierStatus } from "@/lib/couriers/types";
 import { cn } from "@/lib/utils/cn";
 
 const PLATFORMS: PlatformKey[] = ["bolt", "wolt", "glovo"];
@@ -17,6 +19,8 @@ const PLATFORM_LABEL: Record<PlatformKey, string> = { bolt: "Bolt Food", wolt: "
 export function EditCourierDialog({ row, onClose }: { row: CourierRow; onClose: () => void }) {
   const { updateCourier } = useCouriers();
   const { settings } = useSettings();
+  const { user } = useSession();
+  const isSubcontractor = user.role === "subcontractor_owner";
   const toast = useToast();
 
   const [fullName, setFullName] = useState(row.fullName);
@@ -28,6 +32,7 @@ export function EditCourierDialog({ row, onClose }: { row: CourierRow; onClose: 
   const [commissionPct, setCommissionPct] = useState<number>(row.commissionPct ?? 10);
   const [weeklyContractFeeRon, setWeeklyContractFeeRon] = useState<number>(row.weeklyContractFeeRon ?? 210);
   const [iban, setIban] = useState<string>(row.iban ?? "");
+  const [status, setStatus] = useState<CourierStatus>(row.status);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -52,7 +57,7 @@ export function EditCourierDialog({ row, onClose }: { row: CourierRow; onClose: 
       commissionPct,
       weeklyContractFeeRon,
       iban: iban.trim() || undefined,
-      status: "active",
+      ...(isSubcontractor ? {} : { status }),
     });
     toast.success("Curier actualizat", fullName);
     onClose();
@@ -165,6 +170,36 @@ export function EditCourierDialog({ row, onClose }: { row: CourierRow; onClose: 
               className="inp font-mono tracking-wider"
             />
           </F>
+          {isSubcontractor ? (
+            <F label="Status curier">
+              <div className="flex items-center gap-2 rounded-lg border border-line bg-card-2/50 px-3 py-2 text-[12.5px]">
+                <span
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-md px-2 py-0.5 text-[11px] font-semibold",
+                    row.status === "active"
+                      ? "border border-emerald-500/30 bg-emerald-500/15 text-emerald-300"
+                      : row.status === "pending"
+                      ? "border border-amber-500/30 bg-amber-500/15 text-amber-300"
+                      : row.status === "rejected"
+                      ? "border border-rose-500/30 bg-rose-500/15 text-rose-300"
+                      : "border border-zinc-700/40 bg-white/[0.06] text-zinc-300",
+                  )}
+                >
+                  {COURIER_STATUS_LABEL[row.status] || row.status}
+                </span>
+                <span className="text-[11px] text-fg-dim">Statusul este gestionat și confirmat exclusiv de flotă</span>
+              </div>
+            </F>
+          ) : (
+            <F label="Status curier (Flotă)">
+              <select value={status} onChange={(e) => setStatus(e.target.value as CourierStatus)} className="inp">
+                <option value="pending">În așteptare (Pending)</option>
+                <option value="active">Activ</option>
+                <option value="rejected">Respins</option>
+                <option value="paused">Inactiv / Pauză</option>
+              </select>
+            </F>
+          )}
         </div>
 
         <div className="flex items-center justify-end gap-2 border-t border-line/60 bg-card-2/40 px-5 py-3">

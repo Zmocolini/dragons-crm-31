@@ -46,7 +46,8 @@ export function CourierRowMenu({ row, onAction }: Props) {
   const [pos, setPos] = useState<{ top: number; left: number }>({ top: 0, left: 0 });
   const btnRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
-  const { can } = useSession();
+  const { can, user } = useSession();
+  const isFleetAdmin = user.role !== "subcontractor_owner";
 
   useEffect(() => setMounted(true), []);
 
@@ -105,12 +106,12 @@ export function CourierRowMenu({ row, onAction }: Props) {
     ...(can("payments.create") ? [{ action: "record_payment" as Action, label: "Înregistrează plată", icon: Wallet }] : []),
     { action: "create_task", label: "Creează task", icon: FileEdit, divider: true },
     { action: "mark_issue", label: "Marchează problemă", icon: AlertTriangle },
-    ...(row.status === "active" || row.status === "in_activation"
+    ...(isFleetAdmin && (row.status === "active" || row.status === "in_activation")
       ? [{ action: "suspend" as Action, label: "Suspendă", icon: Ban, danger: true, requiresConfirm: true, divider: true }]
-      : row.status === "paused" || row.status === "stopped"
+      : isFleetAdmin && (row.status === "paused" || row.status === "stopped" || row.status === "rejected")
         ? [{ action: "reactivate" as Action, label: "Reactivează", icon: CircleCheck, divider: true }]
         : []),
-    ...(can("couriers.edit") ? [{ action: "archive" as Action, label: "Arhivează", icon: Archive, danger: true, requiresConfirm: true }] : []),
+    ...(isFleetAdmin && can("couriers.edit") ? [{ action: "archive" as Action, label: "Arhivează", icon: Archive, danger: true, requiresConfirm: true }] : []),
   ];
 
   const menu = open && mounted ? createPortal(

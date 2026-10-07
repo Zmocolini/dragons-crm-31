@@ -242,6 +242,8 @@ export function AddCourierDialog({
   function submit(asDraft: boolean) {
     const { incomplete } = analyzeForm();
     setErrors({});
+    const isSubcontractor = user.role === "subcontractor_owner";
+    const courierStatus: CourierStatus = isSubcontractor ? "pending" : (asDraft ? "draft" : form.status);
 
     const courier = addCourier({
       fullName: form.fullName.trim() || "Curier nou (fără nume)",
@@ -257,7 +259,7 @@ export function AddCourierDialog({
       commissionPct: form.commissionPct,
       weeklyContractFeeRon: form.weeklyContractFeeRon,
       iban: form.iban.trim() || undefined,
-      status: asDraft ? "draft" : form.status,
+      status: courierStatus,
       incompleteFields: incomplete,
       createdBy: user.id,
       tenantId: user.activeTenant.id,
@@ -693,6 +695,14 @@ export function AddCourierDialog({
           </FormCard>
         </div>
 
+        {/* Subcontractor notice */}
+        {user.role === "subcontractor_owner" && (
+          <div className="flex items-center gap-2 border-t border-amber-500/30 bg-amber-500/10 px-6 py-2.5 text-[12px] text-amber-200">
+            <Info size={14} className="shrink-0 text-amber-400" />
+            <span>Curierul va fi adăugat cu statusul <b>În așteptare (Pending)</b> până la confirmarea și activarea de către flotă.</span>
+          </div>
+        )}
+
         {/* Footer */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-t border-line/60 bg-card-2/40 px-6 py-4">
           <button
@@ -715,7 +725,7 @@ export function AddCourierDialog({
               onClick={() => submit(false)}
               className="rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 px-5 py-2 text-[12.5px] font-semibold text-white hover:from-violet-500 hover:to-blue-500"
             >
-              Creează curier
+              {user.role === "subcontractor_owner" ? "Trimite spre aprobare flotă" : "Creează curier"}
             </button>
           </div>
         </div>

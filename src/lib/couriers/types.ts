@@ -22,13 +22,15 @@ export const COLLABORATION_LABEL: Record<CollaborationType, string> = {
   cim_4h:         "CIM 4h",
 };
 
-export type CourierStatus = "in_activation" | "active" | "paused" | "stopped" | "draft";
+export type CourierStatus = "pending" | "active" | "rejected" | "in_activation" | "paused" | "stopped" | "draft";
 export const COURIER_STATUS_LABEL: Record<CourierStatus, string> = {
-  draft:          "Draft",
-  in_activation:  "În activare",
+  pending:        "În așteptare",
   active:         "Activ",
-  paused:         "Pauză",
+  rejected:       "Respins",
+  in_activation:  "În activare",
+  paused:         "Inactiv",
   stopped:        "Oprit",
+  draft:          "Draft",
 };
 export const COURIER_STATUS_TONE: Record<CourierStatus, "success" | "warn" | "danger" | "neutral" | "info"> = {
   active:        "success",
