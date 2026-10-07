@@ -33,7 +33,9 @@ export const COURIER_STATUS_LABEL: Record<CourierStatus, string> = {
   draft:          "Draft",
 };
 export const COURIER_STATUS_TONE: Record<CourierStatus, "success" | "warn" | "danger" | "neutral" | "info"> = {
+  pending:       "warn",
   active:        "success",
+  rejected:      "danger",
   in_activation: "warn",
   paused:        "neutral",
   stopped:       "danger",
@@ -41,7 +43,7 @@ export const COURIER_STATUS_TONE: Record<CourierStatus, "success" | "warn" | "da
 };
 
 /** Pending = încă nu lucrează și nu e oprit. Peste PENDING_ALERT_DAYS zile → alertă; peste PENDING_CRITICAL_DAYS → roșu. */
-export const PENDING_STATUSES: readonly CourierStatus[] = ["draft", "in_activation"];
+export const PENDING_STATUSES: readonly CourierStatus[] = ["pending", "draft", "in_activation"];
 export const PENDING_ALERT_DAYS = 5;
 export const PENDING_CRITICAL_DAYS = 10;
 
