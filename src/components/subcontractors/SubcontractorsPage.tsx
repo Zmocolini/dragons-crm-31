@@ -19,7 +19,7 @@ import { formatInt, formatRon } from "@/lib/reports/analytics";
 import { buildXlsx, downloadBlob } from "@/lib/reports/xlsx";
 import {
   SUB_STATUS_LABEL, SUB_STATUS_STYLE, SUB_TYPE_LABEL, buildSubcontractors, computeSubKpi, daysUntil,
-  type SubStatus, type Subcontractor, type SubcontractorContractFile,
+  type SubStatus, type SubType, type Subcontractor, type SubcontractorContractFile,
 } from "@/lib/subcontractors/data";
 import { cn } from "@/lib/utils/cn";
 import { AccountsPanel } from "./AccountsPanel";
@@ -40,6 +40,7 @@ export function SubcontractorsPage({ initialView = "list" }: { initialView?: "li
   const fleetCouriers = useMemo(() => allRows.filter((c) => c.tenantId === activeFleetId), [allRows, activeFleetId]);
   const seed = useMemo(() => buildSubcontractors(fleetCouriers, activeFleetId), [fleetCouriers, activeFleetId]);
   const [added, setAdded] = usePersistentList<Subcontractor>("crm31-subcontractors-added");
+  const [overrides, setOverrides] = usePersistentList<{ id: string } & Partial<Subcontractor>>("crm31-subcontractor-overrides");
 
   // Auto: conturile CRM cu rol subcontractor_owner apar aici (fără să fie adăugate manual).
   const [userSubs, setUserSubs] = useState<Subcontractor[]>([]);
@@ -48,6 +49,7 @@ export function SubcontractorsPage({ initialView = "list" }: { initialView?: "li
       const subs = (j.users ?? []).filter((u: { role: string; active: boolean }) => u.role === "subcontractor_owner" && u.active);
       const mapped: Subcontractor[] = subs.map((u: { id: string; name: string; email: string; createdAtIso: string }) => {
         const couriersOfSub = fleetCouriers.filter((c) => (c.createdBy ?? "").toLowerCase() === u.email.toLowerCase());
+        const isAnton = u.name.toLowerCase().includes("anton") || u.email.toLowerCase().includes("anton");
         return {
           id: `usr_sub_${u.id}`,
           company: u.name,
@@ -62,7 +64,7 @@ export function SubcontractorsPage({ initialView = "list" }: { initialView?: "li
           platforms: Array.from(new Set(couriersOfSub.flatMap((c) => c.platforms))),
           couriersCount: couriersOfSub.length,
           waitingCount: couriersOfSub.filter(isWaiting).length,
-          commissionPct: 10,
+          commissionPct: isAnton ? 3 : 10,
           status: "active",
           type: "srl",
           startIso: (u.createdAtIso ?? "").slice(0, 10),
@@ -81,13 +83,38 @@ export function SubcontractorsPage({ initialView = "list" }: { initialView?: "li
   const { scope } = useOwnerScope();
   const list = useMemo(() => {
     const all = [...userSubs, ...added, ...seed];
-    if (!scope) return all;
-    return all.filter((s) => s.contactEmail.toLowerCase() === scope.email.toLowerCase());
-  }, [userSubs, added, seed, scope]);
+    const withOverrides = all.map((s) => {
+      const ov = overrides.find((o) => o.id === s.id || (s.company && o.company && o.company.toLowerCase() === s.company.toLowerCase()));
+      if (!ov) return s;
+      const merged = { ...s, ...ov };
+      if (ov.commissionPct !== undefined && s.revenue3m) {
+        merged.commissionGenerated = Math.round((s.revenue3m * ov.commissionPct) / 100);
+      }
+      return merged;
+    });
+    if (!scope) return withOverrides;
+    return withOverrides.filter((s) => s.contactEmail.toLowerCase() === scope.email.toLowerCase());
+  }, [userSubs, added, seed, overrides, scope]);
 
   const [q, setQ] = useState(""); const [tab, setTab] = useState<SubStatus | "all">("all"); const [city, setCity] = useState("all"); const [platform, setPlatform] = useState("all"); const [type, setType] = useState("all");
   const [view, setView] = useState<"list" | "accounts" | "contracts">(initialView);
   const [page, setPage] = useState(1); const [selected, setSelected] = useState<Subcontractor | null>(null); const [addOpen, setAddOpen] = useState(false);
+  const [editing, setEditing] = useState<Subcontractor | null>(null);
+
+  const handleUpdateSub = (id: string, patch: Partial<Subcontractor>) => {
+    setOverrides((prev) => {
+      const idx = prev.findIndex((o) => o.id === id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...patch, id };
+        return next;
+      }
+      return [...prev, { ...patch, id }];
+    });
+    setAdded((prev) => prev.map((s) => s.id === id ? { ...s, ...patch } : s));
+    setSelected((prev) => prev && prev.id === id ? { ...prev, ...patch } : prev);
+    toast.success("Subcontractor actualizat", `${patch.company ?? "Modificările au fost salvate"} · Comision: ${patch.commissionPct ?? ""}%`);
+  };
 
   const cities = useMemo(() => Array.from(new Set(list.flatMap((s) => s.cities))).sort(), [list]);
   const kpi = useMemo(() => computeSubKpi(list), [list]);
@@ -174,7 +201,7 @@ export function SubcontractorsPage({ initialView = "list" }: { initialView?: "li
               <td className="py-2.5 pr-2"><span className="rounded-md border border-amber-500/25 bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-300 tabular-nums">{s.commissionPct}%</span></td>
               <td className="py-2.5 pr-2 tabular-nums text-fg-muted">{fmt(s.contractEndIso)}</td>
               <td className="py-2.5 pr-2"><span className={cn("inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium", SUB_STATUS_STYLE[s.status])}>{SUB_STATUS_LABEL[s.status]}</span></td>
-              <td className="px-4 py-2.5 text-right"><Popover align="right" className="w-[170px] p-1" trigger={({ toggle }) => <button type="button" onClick={toggle} aria-label="Acțiuni" className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-fg-dim hover:bg-white/[0.06] hover:text-fg"><MoreHorizontal size={16} /></button>}>{(close) => (<div className="flex flex-col"><button type="button" onClick={() => { setSelected(s); close(); }} className="rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-fg hover:bg-white/[0.05]">Vezi detalii</button><button type="button" onClick={() => { toast.info("Editează", s.company); close(); }} className="rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-fg hover:bg-white/[0.05]">Editează</button><button type="button" onClick={() => { toast.success("Mesaj trimis", s.contactName); close(); }} className="rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-fg hover:bg-white/[0.05]">Trimite mesaj</button></div>)}</Popover></td>
+              <td className="px-4 py-2.5 text-right"><Popover align="right" className="w-[170px] p-1" trigger={({ toggle }) => <button type="button" onClick={toggle} aria-label="Acțiuni" className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-fg-dim hover:bg-white/[0.06] hover:text-fg"><MoreHorizontal size={16} /></button>}>{(close) => (<div className="flex flex-col"><button type="button" onClick={() => { setSelected(s); close(); }} className="rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-fg hover:bg-white/[0.05]">Vezi detalii</button><button type="button" onClick={() => { setEditing(s); close(); }} className="rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-fg hover:bg-white/[0.05]">Editează</button><button type="button" onClick={() => { toast.success("Mesaj trimis", s.contactName); close(); }} className="rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-fg hover:bg-white/[0.05]">Trimite mesaj</button></div>)}</Popover></td>
             </tr>
           ))}</tbody>
         </table>{rows.length === 0 && <EmptyState title="Niciun subcontractor pentru filtrele selectate." />}</div>
@@ -191,10 +218,19 @@ export function SubcontractorsPage({ initialView = "list" }: { initialView?: "li
         <SubDrawer
           sub={selected}
           onClose={() => setSelected(null)}
+          onEdit={() => setEditing(selected)}
           onUpdate={(patch) => {
-            setAdded((prev) => prev.map((s) => s.id === selected.id ? { ...s, ...patch } : s));
-            setSelected((prev) => prev ? { ...prev, ...patch } : prev);
+            handleUpdateSub(selected.id, patch);
           }}
+        />
+      )}
+
+      {editing && (
+        <EditSubDialog
+          sub={editing}
+          open={!!editing}
+          onClose={() => setEditing(null)}
+          onSave={handleUpdateSub}
         />
       )}
       </>)}
@@ -208,7 +244,7 @@ function Kpi({ icon: Icon, tint, color, label, value, sub, money }: { icon: type
 }
 
 const SUB_TABS = [["general", "General"], ["couriers", "Curieri"], ["payments", "Plăți"], ["docs", "Documente"], ["notes", "Note"]] as const;
-function SubDrawer({ sub, onClose, onUpdate }: { sub: Subcontractor; onClose: () => void; onUpdate: (patch: Partial<Subcontractor>) => void }) {
+function SubDrawer({ sub, onClose, onEdit, onUpdate }: { sub: Subcontractor; onClose: () => void; onEdit?: () => void; onUpdate: (patch: Partial<Subcontractor>) => void }) {
   const toast = useToast();
   const [tab, setTab] = useState<(typeof SUB_TABS)[number][0]>("general");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -311,7 +347,7 @@ function SubDrawer({ sub, onClose, onUpdate }: { sub: Subcontractor; onClose: ()
             {tab === "notes" && <textarea rows={4} placeholder="Adaugă o notă..." className="w-full rounded-lg border border-line bg-card-hover px-3 py-2 text-[12.5px] text-fg outline-none focus:border-accent/60" />}
           </div>
         </div>
-        <div className="grid grid-cols-2 gap-2 border-t border-line p-3"><button type="button" onClick={() => toast.info("Editează", sub.company)} className="rounded-lg border border-line bg-card-hover py-2 text-[12.5px] font-medium text-fg hover:bg-white/[0.06]">Editează</button><button type="button" onClick={() => toast.success("Mesaj trimis", sub.contactName)} className="rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 py-2 text-[12.5px] font-semibold text-white">Trimite mesaj</button></div>
+        <div className="grid grid-cols-2 gap-2 border-t border-line p-3"><button type="button" onClick={() => onEdit?.()} className="rounded-lg border border-line bg-card-hover py-2 text-[12.5px] font-medium text-fg hover:bg-white/[0.06]">Editează</button><button type="button" onClick={() => toast.success("Mesaj trimis", sub.contactName)} className="rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 py-2 text-[12.5px] font-semibold text-white">Trimite mesaj</button></div>
       </aside>
     </>
   );
@@ -323,5 +359,114 @@ function AddSubDialog({ open, onClose, onAdd, tenantId }: { open: boolean; onClo
   const [company, setCompany] = useState(""); const [cui, setCui] = useState(""); const [contact, setContact] = useState(""); const [comm, setComm] = useState("5");
   return <Dialog open={open} onClose={onClose} title="Adaugă subcontractor" size="lg"><div className="grid grid-cols-2 gap-3"><L l="Firmă"><input value={company} onChange={(e) => setCompany(e.target.value)} className={inp} /></L><L l="CUI"><input value={cui} onChange={(e) => setCui(e.target.value)} className={inp} /></L><L l="Persoană contact"><input value={contact} onChange={(e) => setContact(e.target.value)} className={inp} /></L><L l="Comision %"><input type="number" value={comm} onChange={(e) => setComm(e.target.value)} className={inp} /></L></div><DialogFooter><button type="button" onClick={onClose} className="rounded-lg border border-line bg-card-hover px-4 py-2 text-[12.5px] font-medium text-fg">Anulează</button><button type="button" onClick={() => { onAdd({ id: `sub_new_${Date.now()}`, company: company || "Firmă nouă", tagline: "Partener nou", cui: cui || "RO0000000", contactName: contact || "—", contactPhone: "—", contactEmail: "—", website: "—", location: "București", cities: ["București"], platforms: ["bolt"], couriersCount: 0, commissionPct: Number(comm) || 5, status: "evaluation", type: "srl", startIso: "2026-01-01", contractEndIso: "2026-12-31", tenantId, revenue3m: 0, commissionGenerated: 0, payRate: 0 }); onClose(); }} className="rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 px-4 py-2 text-[12.5px] font-semibold text-white">Adaugă</button></DialogFooter></Dialog>;
 }
+
+function EditSubDialog({
+  sub,
+  open,
+  onClose,
+  onSave,
+}: {
+  sub: Subcontractor | null;
+  open: boolean;
+  onClose: () => void;
+  onSave: (id: string, patch: Partial<Subcontractor>) => void;
+}) {
+  const [company, setCompany] = useState("");
+  const [cui, setCui] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [contactPhone, setContactPhone] = useState("");
+  const [contactEmail, setContactEmail] = useState("");
+  const [comm, setComm] = useState("10");
+  const [status, setStatus] = useState<SubStatus>("active");
+  const [type, setType] = useState<SubType>("srl");
+
+  useEffect(() => {
+    if (sub) {
+      setCompany(sub.company);
+      setCui(sub.cui === "—" ? "" : sub.cui);
+      setContactName(sub.contactName);
+      setContactPhone(sub.contactPhone);
+      setContactEmail(sub.contactEmail);
+      setComm(String(sub.commissionPct ?? 10));
+      setStatus(sub.status);
+      setType(sub.type);
+    }
+  }, [sub]);
+
+  if (!sub) return null;
+
+  return (
+    <Dialog open={open} onClose={onClose} title={`Editează subcontractor: ${sub.company}`} size="lg">
+      <div className="grid grid-cols-2 gap-3">
+        <L l="Nume / Firmă">
+          <input value={company} onChange={(e) => setCompany(e.target.value)} className={inp} />
+        </L>
+        <L l="Comision %">
+          <input
+            type="number"
+            step="0.5"
+            min="0"
+            max="100"
+            value={comm}
+            onChange={(e) => setComm(e.target.value)}
+            className={inp}
+            placeholder="ex: 3"
+          />
+        </L>
+        <L l="CUI">
+          <input value={cui} onChange={(e) => setCui(e.target.value)} className={inp} placeholder="RO..." />
+        </L>
+        <L l="Persoană contact">
+          <input value={contactName} onChange={(e) => setContactName(e.target.value)} className={inp} />
+        </L>
+        <L l="Telefon">
+          <input value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} className={inp} />
+        </L>
+        <L l="Email">
+          <input value={contactEmail} onChange={(e) => setContactEmail(e.target.value)} className={inp} />
+        </L>
+        <L l="Status">
+          <select value={status} onChange={(e) => setStatus(e.target.value as SubStatus)} className={inp}>
+            <option value="active">Activ</option>
+            <option value="evaluation">În evaluare</option>
+            <option value="inactive">Inactiv</option>
+          </select>
+        </L>
+        <L l="Tip colaborare">
+          <select value={type} onChange={(e) => setType(e.target.value as SubType)} className={inp}>
+            <option value="srl">SRL (factură)</option>
+            <option value="pfa">PFA</option>
+          </select>
+        </L>
+      </div>
+      <DialogFooter>
+        <button type="button" onClick={onClose} className="rounded-lg border border-line bg-card-hover px-4 py-2 text-[12.5px] font-medium text-fg">
+          Anulează
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            const numComm = parseFloat(comm) || 0;
+            onSave(sub.id, {
+              company: company || sub.company,
+              cui: cui || "—",
+              contactName: contactName || sub.contactName,
+              contactPhone,
+              contactEmail,
+              commissionPct: numComm,
+              status,
+              type,
+            });
+            onClose();
+          }}
+          className="rounded-lg bg-gradient-to-r from-violet-600 to-blue-600 px-4 py-2 text-[12.5px] font-semibold text-white"
+        >
+          Salvează modificările
+        </button>
+      </DialogFooter>
+    </Dialog>
+  );
+}
+
 const inp = "w-full rounded-lg border border-line bg-card-hover px-3 py-2 text-[12.5px] text-fg outline-none focus:border-accent/60";
 function L({ l, children }: { l: string; children: React.ReactNode }) { return <label className="block"><span className="mb-1.5 block text-[11.5px] font-medium text-fg-muted">{l}</span>{children}</label>; }
