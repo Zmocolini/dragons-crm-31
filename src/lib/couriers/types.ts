@@ -1,5 +1,6 @@
 import type { PlatformKey } from "@/lib/dashboard/types";
 import type { Nationality } from "@/lib/candidates/types";
+import type { VehicleCost } from "@/lib/couriers/vehicle-cost";
 
 export type VehicleType = "bike" | "e_bike" | "scooter" | "car";
 export const VEHICLE_TYPE_LABEL: Record<VehicleType, string> = {
@@ -95,6 +96,10 @@ export type Courier = {
   boltUid?: string;
   /** IBAN pentru plăți. */
   iban?: string;
+  /** CNP (din buletin/permis, scanat sau introdus manual). */
+  cnp?: string;
+  /** Evidența costului de vehicul pe săptămână (calculatorul din „Curier nou"). */
+  vehicleCost?: VehicleCost;
   status: CourierStatus;
   /** Când a intrat în statusul curent. Îl setează CouriersProvider la fiecare schimbare de status. */
   statusSinceIso?: string;
