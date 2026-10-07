@@ -69,7 +69,7 @@ export function AICopilotPage() {
   const exec = useCopilotExecutor();
   const endRef = useRef<HTMLDivElement>(null);
 
-  const greeting = `Salut, ${user.name.split(" ")[0]}! 👋\n\nSunt AI Copilot — agent, nu doar chat. Îmi poți scrie sau vorbi (🎤) și fac direct în CRM:\n• Înregistrez și modific curieri\n• Citesc plăți, rapoarte, documente, vehicule\n• Emit facturi (și din raport, cu TVA după regim)\n• Schimb statusuri de plăți și facturi (cu confirmarea ta)\n• Deschid pagini, creez tichete, explic orice modul\n\nSpune-mi ce ai nevoie.`;
+  const greeting = `Salut, ${user.name.split(" ")[0]}! 👋\n\nSunt AI Copilot — agent, nu doar chat. Îmi poți scrie sau vorbi (🎤) și fac direct în CRM:\n• Înregistrez și modific curieri\n• Văd ce are de activat fiecare echipă și activez / confirm curierii (cu click-ul tău)\n• Citesc plăți, rapoarte, documente, vehicule\n• Emit facturi (și din raport, cu TVA după regim)\n• Schimb statusuri de plăți și facturi (cu confirmarea ta)\n• Deschid pagini, creez tichete, explic orice modul\n\nSpune-mi ce ai nevoie.`;
   const [messages, setMessages] = useState<Msg[]>([{ id: "g", role: "ai", text: "" }]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
