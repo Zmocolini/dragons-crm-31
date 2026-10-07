@@ -5,6 +5,8 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { useToast } from "@/components/ui/Toast";
 import { useCouriers } from "@/lib/couriers/context";
+import { useAccountDirectory } from "@/lib/couriers/use-account-directory";
+import { usePayments } from "@/lib/payments/context";
 import type { CourierRow } from "@/lib/couriers/mock-seed";
 import { COLLABORATION_LABEL } from "@/lib/couriers/types";
 import type { PlatformKey } from "@/lib/dashboard/types";
@@ -21,7 +23,10 @@ export function EditCourierDialog({ row, onClose }: { row: CourierRow; onClose: 
   const { settings } = useSettings();
   const { user } = useSession();
   const isSubcontractor = user.role === "subcontractor_owner";
+  const isGlobalOwner = user.role === "global_owner";
   const toast = useToast();
+  const accounts = useAccountDirectory();
+  const { reassignPaymentsOf } = usePayments();
 
   const [fullName, setFullName] = useState(row.fullName);
   const [phone, setPhone] = useState(row.phone);
@@ -33,6 +38,19 @@ export function EditCourierDialog({ row, onClose }: { row: CourierRow; onClose: 
   const [weeklyContractFeeRon, setWeeklyContractFeeRon] = useState<number>(row.weeklyContractFeeRon ?? 210);
   const [iban, setIban] = useState<string>(row.iban ?? "");
   const [status, setStatus] = useState<CourierStatus>(row.status);
+  const initialOwner = (row.createdBy ?? "").trim().toLowerCase();
+  const [ownerEmail, setOwnerEmail] = useState(initialOwner);
+  // „Aparține de": flota (contul tău) sau un subcontractor activ; proprietarul curent rămâne în listă oricum.
+  const selfEmail = user.email.trim().toLowerCase();
+  const ownerOptions = [
+    { email: selfEmail, label: "Flota (intern)" },
+    ...[...accounts.entries()]
+      .filter(([, a]) => a.role === "subcontractor_owner" && a.active !== false)
+      .map(([email, a]) => ({ email, label: a.name || email })),
+  ];
+  if (initialOwner.includes("@") && !ownerOptions.some((o) => o.email === initialOwner)) {
+    ownerOptions.push({ email: initialOwner, label: accounts.get(initialOwner)?.name ?? initialOwner });
+  }
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -47,6 +65,7 @@ export function EditCourierDialog({ row, onClose }: { row: CourierRow; onClose: 
 
   function save() {
     if (!fullName.trim()) { toast.error("Numele e obligatoriu"); return; }
+    const transfer = isGlobalOwner && ownerEmail.includes("@") && ownerEmail !== initialOwner;
     updateCourier(row.id, {
       fullName: fullName.trim(),
       phone: phone.trim(),
@@ -58,7 +77,13 @@ export function EditCourierDialog({ row, onClose }: { row: CourierRow; onClose: 
       weeklyContractFeeRon,
       iban: iban.trim() || undefined,
       ...(isSubcontractor ? {} : { status }),
+      ...(transfer ? { createdBy: ownerEmail } : {}),
     });
+    if (transfer) {
+      // Plățile curierului îl urmează; serverul mută și notele/patch-urile lor (sync/ownership.ts).
+      reassignPaymentsOf(row.id, ownerEmail);
+      toast.success("Curier mutat", `${fullName} → ${ownerOptions.find((o) => o.email === ownerEmail)?.label ?? ownerEmail}`);
+    }
     toast.success("Curier actualizat", fullName);
     onClose();
   }
@@ -189,11 +214,25 @@ export function EditCourierDialog({ row, onClose }: { row: CourierRow; onClose: 
           ) : (
             <F label="Status curier (Flotă)">
               <select value={status} onChange={(e) => setStatus(e.target.value as CourierStatus)} className="inp">
-                <option value="pending">În așteptare (Pending)</option>
-                <option value="active">Activ</option>
-                <option value="rejected">Respins</option>
-                <option value="paused">Inactiv / Pauză</option>
+                {(Object.keys(COURIER_STATUS_LABEL) as CourierStatus[]).map((s) => (
+                  <option key={s} value={s}>{COURIER_STATUS_LABEL[s]}</option>
+                ))}
               </select>
+            </F>
+          )}
+          {isGlobalOwner && accounts.size > 0 && (
+            <F label="Aparține de">
+              <select value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} className="inp">
+                {!initialOwner.includes("@") && <option value={initialOwner}>Nesetat ({initialOwner || "gol"})</option>}
+                {ownerOptions.map((o) => (
+                  <option key={o.email} value={o.email}>{o.label}</option>
+                ))}
+              </select>
+              {ownerEmail !== initialOwner && ownerEmail.includes("@") && (
+                <p className="mt-1 text-[11px] text-amber-300">
+                  La salvare, curierul și plățile lui trec la noul proprietar; el îi vede, celălalt nu.
+                </p>
+              )}
             </F>
           )}
         </div>

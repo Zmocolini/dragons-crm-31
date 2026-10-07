@@ -14,6 +14,8 @@ import { SEED_PAYMENTS } from "./seed";
 import { MERGED_ID_PREFIX } from "./merge-duplicates";
 import { useSession } from "@/lib/rbac/session";
 import { useOwnerScope } from "@/lib/owner-scope/context";
+import { useCouriers } from "@/lib/couriers/context";
+import { paymentOwner } from "./owner";
 
 // TODO(real-users): server action `createPayment(input)` cu authorize(role, "payments.create")
 // + insert în tabelul `payments` + audit log server-side. Momentan: seed determinist +
@@ -37,6 +39,8 @@ type PaymentsContextValue = {
   fleetPayments: Payment[];
 
   addPayment: (p: Omit<Payment, "id" | "createdAtIso">) => Payment;
+  /** Mută plățile unui curier la noul lui proprietar (după transferul curierului). Doar Global Owner. */
+  reassignPaymentsOf: (courierId: string, ownerEmail: string) => void;
   /** Legacy: schimbă doar statusul (fără audit explicit). Păstrat pentru compatibilitate. */
   updatePaymentStatus: (id: string, status: PaymentStatus) => void;
 
@@ -183,6 +187,7 @@ function nowIso(): string {
 export function PaymentsProvider({ children }: { children: ReactNode }) {
   const { activeFleetId, user: sessionUser } = useSession();
   const { scope: ownerScope } = useOwnerScope();
+  const { allRows: courierRows } = useCouriers();
 
   const [userPayments, setUserPayments] = useState<Payment[]>([]);
   const [patches, setPatches] = useState<Record<string, Patch>>({});
@@ -294,13 +299,28 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const addPayment = useCallback((p: Omit<Payment, "id" | "createdAtIso">) => {
-    // Forțez createdBy = emailul user-ului curent → filtrarea per rol funcționează.
-    const ownerEmail = sessionUser.email || p.createdBy || "";
+    // createdBy = proprietarul pe server (email). La owner, plata urmează proprietarul curierului,
+    // altfel subcontractorul nu-și vede plățile introduse de flotă.
+    const courierOwner = p.recipient.kind === "courier"
+      ? courierRows.find((c) => c.id === p.recipient.id)?.createdBy ?? null
+      : null;
+    const ownerEmail = paymentOwner({
+      role: sessionUser.role,
+      userEmail: sessionUser.email || p.createdBy || "",
+      scopeEmail: ownerScope?.email ?? null,
+      courierOwner,
+    });
     const created: Payment = { ...p, createdBy: ownerEmail, id: uid("pay"), createdAtIso: nowIso() };
     setUserPayments((prev) => [created, ...prev]);
-    logActivity(created.id, "created", `Plată generată pentru ${created.recipient.name}`, created.createdBy);
+    logActivity(created.id, "created", `Plată generată pentru ${created.recipient.name}`, p.operatorName || sessionUser.name || ownerEmail);
     return created;
-  }, [logActivity, sessionUser]);
+  }, [logActivity, sessionUser, ownerScope, courierRows]);
+
+  const reassignPaymentsOf = useCallback((courierId: string, ownerEmail: string) => {
+    const email = ownerEmail.trim().toLowerCase();
+    if (!email.includes("@")) return;
+    setUserPayments((prev) => prev.map((p) => (p.recipient.id === courierId ? { ...p, createdBy: email } : p)));
+  }, []);
 
   const updatePaymentStatus = useCallback((id: string, status: PaymentStatus) => {
     patchPayment(id, { status });
@@ -582,14 +602,14 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
   const value = useMemo<PaymentsContextValue>(() => ({
     hydrated,
     payments, fleetPayments,
-    addPayment, updatePaymentStatus,
+    addPayment, reassignPaymentsOf, updatePaymentStatus,
     setStatus, approve, markProcessing, markPaid, updatePayment, addDeduction,
     deletePayment, deletePayments, clearPeriod, clearAllImported,
     isDeleted,
     addNote, removeNote, addDocument,
     notesByPayment, documentsByPayment, getActivities,
   }), [
-    hydrated, payments, fleetPayments, addPayment, updatePaymentStatus,
+    hydrated, payments, fleetPayments, addPayment, reassignPaymentsOf, updatePaymentStatus,
     setStatus, approve, markProcessing, markPaid, updatePayment, addDeduction,
     deletePayment, deletePayments, clearPeriod, clearAllImported,
     isDeleted,

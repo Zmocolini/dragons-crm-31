@@ -78,7 +78,6 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration from localStorage; codebase-wide pattern in all providers.
       if (raw) {
         const parsed = JSON.parse(raw) as Courier[];
         const MIGRATION_PENDING_KEY = "crm31-migrated-pending-subcontractors-v2";
@@ -96,6 +95,7 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
         if (!alreadyMigrated) {
           try { localStorage.setItem(MIGRATION_PENDING_KEY, "1"); } catch {}
         }
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration from localStorage; codebase-wide pattern in all providers.
         setCouriers(migrated);
       }
       const rawDel = localStorage.getItem(DELETED_KEY);
@@ -116,15 +116,18 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
   const { scope } = useOwnerScope();
   const currentUserEmailRef = useRef<string>("");
   const currentUserRoleRef = useRef<string>("");
+  const scopeEmailRef = useRef<string>("");
   useEffect(() => {
     currentUserEmailRef.current = current?.email ?? "";
     currentUserRoleRef.current = current?.role ?? "";
   }, [current]);
+  useEffect(() => { scopeEmailRef.current = scope?.email.trim().toLowerCase() ?? ""; }, [scope]);
 
   const addCourier = useCallback((c: Omit<Courier, "id" | "createdAtIso">) => {
-    // ATENȚIE: forțez createdBy = emailul user-ului logat ca să funcționeze filtrarea
-    // per rol (subcontractor vede doar ce a creat el). Ignoră ce trimite caller-ul.
-    const ownerEmail = currentUserEmailRef.current || c.createdBy || "";
+    // ATENȚIE: forțez createdBy = emailul proprietarului (serverul îl folosește ca owner).
+    // Owner-ul cu scope pe un subcontractor creează curierul PENTRU acel subcontractor.
+    const scoped = currentUserRoleRef.current === "global_owner" ? scopeEmailRef.current : "";
+    const ownerEmail = scoped || currentUserEmailRef.current || c.createdBy || "";
     const nowIso = new Date().toISOString();
     const isSubcontractor = currentUserRoleRef.current === "subcontractor_owner";
     // Subcontractorii creează ÎNTOTDEAUNA curieri în status "pending" (în așteptare aprobare de la flotă)
@@ -154,6 +157,8 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
     if (isSubcontractor && safeInput.status !== undefined) {
       delete safeInput.status;
     }
+    // Proprietarul (createdBy) îl mută doar Global Owner; la subcontractor serverul ar respinge tăcut.
+    if (isSubcontractor) delete safeInput.createdBy;
     setCouriers((prev) => {
       // Ceasul pending (pragul de 5 zile) pornește doar la o schimbare reală de status.
       const before = prev.find((c) => c.id === id) ?? SEED_COURIERS.find((c) => c.id === id);
