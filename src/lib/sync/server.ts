@@ -7,6 +7,7 @@ import {
   MAX_RECORD_BYTES, SYNC_BY_KEY,
   type SyncKind, type SyncOp, type SyncRow,
 } from "./config";
+import { childKeysOf, decideOwner } from "./ownership";
 
 export type SyncUser = SessionUser & { emailLc: string; isGlobal: boolean };
 
@@ -150,18 +151,11 @@ function isValidOp(op: unknown): op is SyncOp {
   return true;
 }
 
-function createdByOf(data: string | null): string {
-  if (!data) return "";
-  try {
-    const v = JSON.parse(data) as { createdBy?: unknown };
-    return typeof v?.createdBy === "string" ? v.createdBy.trim().toLowerCase() : "";
-  } catch { return ""; }
-}
-
 /**
- * Aplică operațiile de la client. Reguli de acces (enforce pe server):
+ * Aplică operațiile de la client. Regulile de acces sunt în `decideOwner` (ownership.ts):
  *  - un cont non-Global poate modifica/șterge DOAR înregistrări al căror proprietar e el;
- *  - proprietarul unei înregistrări existente nu se schimbă niciodată;
+ *  - proprietarul unei înregistrări existente se schimbă DOAR prin transfer de la Global Owner
+ *    (createdBy rescris cu alt email); copiii (`parent`) se mută odată cu părintele;
  *  - la creare, proprietarul e decis de regula colecției (createdBy / parent / writer).
  * Returnează operațiile refuzate.
  */
@@ -192,42 +186,34 @@ export async function applyOps(user: SyncUser, rawOps: unknown[]): Promise<{ rej
 
   for (const op of ops) {
     const coll = SYNC_BY_KEY.get(op.k)!;
-    const existing = owners.get(keyOf(op.k, op.id));
-    let owner: string;
-
-    if (existing) {
-      if (!user.isGlobal && existing.owner !== user.emailLc) { rejected.push({ k: op.k, id: op.id }); continue; }
-      owner = existing.owner;
-    } else if (op.del) {
-      continue; // nimic de șters
-    } else if (coll.owner === "createdBy") {
-      const cb = createdByOf(op.data);
-      if (user.isGlobal) owner = cb.includes("@") ? cb : user.emailLc;
-      else if (cb === user.emailLc) owner = user.emailLc;
-      else { rejected.push({ k: op.k, id: op.id }); continue; }
-    } else if (coll.owner === "parent" && coll.parent && owners.has(keyOf(coll.parent, op.id))) {
-      const parentOwner = owners.get(keyOf(coll.parent, op.id))!.owner;
-      if (!user.isGlobal && parentOwner !== user.emailLc) { rejected.push({ k: op.k, id: op.id }); continue; }
-      owner = parentOwner;
-    } else {
-      owner = user.emailLc;
-    }
-
-    // Non-Global nu poate „dărui" o înregistrare altui cont schimbând createdBy.
-    if (!op.del && coll.owner === "createdBy" && !user.isGlobal && createdByOf(op.data) !== owner) {
-      rejected.push({ k: op.k, id: op.id });
-      continue;
-    }
+    const decision = decideOwner(
+      op, coll, user,
+      owners.get(keyOf(op.k, op.id))?.owner,
+      coll.parent ? owners.get(keyOf(coll.parent, op.id))?.owner : undefined,
+    );
+    if (decision.kind === "skip") continue;
+    if (decision.kind === "reject") { rejected.push({ k: op.k, id: op.id }); continue; }
+    const { owner, transferred } = decision;
 
     owners.set(keyOf(op.k, op.id), { owner });
     stmts.push({
       sql: `INSERT INTO crm_records (k, id, kind, owner, data, del, ts, updated_by)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             ON CONFLICT(k, id) DO UPDATE SET
-              kind = excluded.kind, data = excluded.data, del = excluded.del,
+              kind = excluded.kind, owner = excluded.owner, data = excluded.data, del = excluded.del,
               ts = excluded.ts, updated_by = excluded.updated_by`,
       args: [op.k, op.id, op.kind, owner, op.del ? null : op.data, op.del ? 1 : 0, now, user.emailLc],
     });
+    // Transfer: copiii (note, patch-uri, activități pe același id) urmează părintele; ts nou ca
+    // noul proprietar să-i tragă la următorul sync.
+    const children = transferred ? childKeysOf(op.k) : [];
+    if (children.length > 0) {
+      stmts.push({
+        sql: `UPDATE crm_records SET owner = ?, ts = ?, updated_by = ? WHERE id = ? AND k IN (${children.map(() => "?").join(",")})`,
+        args: [owner, now, user.emailLc, op.id, ...children],
+      });
+      for (const ck of children) if (owners.has(keyOf(ck, op.id))) owners.set(keyOf(ck, op.id), { owner });
+    }
   }
 
   if (stmts.length > 0) await rawDb.batch(stmts, "write");
