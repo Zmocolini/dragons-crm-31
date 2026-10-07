@@ -15,6 +15,8 @@ import { useSession } from "@/lib/rbac/session";
 import { useCouriers } from "@/lib/couriers/context";
 import { isWaiting } from "@/lib/couriers/filters";
 import { useOwnerScope } from "@/lib/owner-scope/context";
+import { usePayments } from "@/lib/payments/context";
+import { subNetTotals } from "@/lib/subcontractors/net";
 import { formatInt, formatRon } from "@/lib/reports/analytics";
 import { buildXlsx, downloadBlob } from "@/lib/reports/xlsx";
 import {
@@ -34,6 +36,7 @@ export function SubcontractorsPage({ initialView = "list" }: { initialView?: "li
   const toast = useToast();
   const { user, activeFleetId, can } = useSession();
   const { allRows } = useCouriers();
+  const { payments: allPayments } = usePayments();
   const canManage = can("subcontractors.view") && user.role === "global_owner";
   const canContracts = can("payments.view");
 
@@ -95,6 +98,18 @@ export function SubcontractorsPage({ initialView = "list" }: { initialView?: "li
     if (!scope) return withOverrides;
     return withOverrides.filter((s) => s.contactEmail.toLowerCase() === scope.email.toLowerCase());
   }, [userSubs, added, seed, overrides, scope]);
+
+  // Net trimis (după comision) per subcontractor: plățile contului lui sau către curierii lui.
+  const netBySub = useMemo(() => {
+    const fleetPays = allPayments.filter((p) => p.fleetId === activeFleetId);
+    const m = new Map<string, ReturnType<typeof subNetTotals>>();
+    for (const s of list) {
+      const ids = new Set(fleetCouriers.filter((c) => (c.createdBy ?? "").toLowerCase() === s.contactEmail.toLowerCase()).map((c) => c.id));
+      m.set(s.id, subNetTotals(fleetPays, s.contactEmail, ids));
+    }
+    return m;
+  }, [allPayments, activeFleetId, list, fleetCouriers]);
+  const netTotal = useMemo(() => Array.from(netBySub.values()).reduce((a, n) => a + n.net, 0), [netBySub]);
 
   const [q, setQ] = useState(""); const [tab, setTab] = useState<SubStatus | "all">("all"); const [city, setCity] = useState("all"); const [platform, setPlatform] = useState("all"); const [type, setType] = useState("all");
   const [view, setView] = useState<"list" | "accounts" | "contracts">(initialView);
@@ -167,13 +182,14 @@ export function SubcontractorsPage({ initialView = "list" }: { initialView?: "li
 
       {view === "contracts" && canContracts ? <EcontracteePage /> : view === "accounts" && canManage ? <AccountsPanel /> : (<>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-7">
         <Kpi icon={Briefcase} tint="bg-info/12" color="text-[color:var(--color-info)]" label="Total subcontractori" value={kpi.total} />
         <Kpi icon={CheckCircle2} tint="bg-success/12" color="text-[color:var(--color-success)]" label="Activi" value={kpi.active} />
         <Kpi icon={Briefcase} tint="bg-warn/12" color="text-[color:var(--color-warn)]" label="În evaluare" value={kpi.evaluation} />
         <Kpi icon={Briefcase} tint="bg-danger/12" color="text-[color:var(--color-danger)]" label="Inactivi" value={kpi.inactive} />
         <Kpi icon={Users} tint="bg-info/12" color="text-[color:var(--color-info)]" label="Total curieri" value={kpi.totalCouriers} />
         <Kpi icon={Wallet} tint="bg-accent/15" color="text-[color:var(--color-accent-3)]" label="Comision total" value={kpi.commissionTotal} money sub="luna curentă" />
+        <Kpi icon={Wallet} tint="bg-success/12" color="text-[color:var(--color-success)]" label="Net trimis (după comision)" value={netTotal} money sub="toți subcontractorii" />
       </div>
 
       <div className="overflow-x-auto border-b border-line"><div className="flex min-w-max gap-1">{TABS.map(([k, l]) => <button key={k} type="button" onClick={() => { setTab(k); setPage(1); }} className={cn("relative px-3 py-2.5 text-[13px] font-medium", tab === k ? "text-fg" : "text-fg-muted hover:text-fg")}>{l}<span className="ml-1.5 rounded-full bg-white/[0.07] px-1.5 py-0.5 text-[10.5px] tabular-nums text-fg-muted">{counts[k]}</span>{tab === k && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded-full bg-gradient-to-r from-violet-500 to-blue-500" />}</button>)}</div></div>
@@ -186,8 +202,8 @@ export function SubcontractorsPage({ initialView = "list" }: { initialView?: "li
       </div>
 
       <div className={cn(selected && "lg:pr-[340px]")}>
-        <Card className="overflow-hidden"><div className="overflow-x-auto"><table className="w-full min-w-[1040px] text-[12px]">
-          <thead><tr className="border-b border-line text-left text-[10.5px] uppercase tracking-wide text-fg-dim"><th className="px-4 py-2.5">#</th><th className="py-2.5 pr-2 font-medium">Nume / Firmă</th><th className="py-2.5 pr-2 font-medium">CUI</th><th className="py-2.5 pr-2 font-medium">Contact</th><th className="py-2.5 pr-2 font-medium">Orașe</th><th className="py-2.5 pr-2 font-medium">Platforme</th><th className="py-2.5 pr-2 text-center font-medium">Curieri</th><th className="py-2.5 pr-2 text-center font-medium">În așteptare</th><th className="py-2.5 pr-2 font-medium">Comision</th><th className="py-2.5 pr-2 font-medium">Contract</th><th className="py-2.5 pr-2 font-medium">Status</th><th className="px-4 py-2.5 text-right font-medium">Acțiuni</th></tr></thead>
+        <Card className="overflow-hidden"><div className="overflow-x-auto"><table className="w-full min-w-[1160px] text-[12px]">
+          <thead><tr className="border-b border-line text-left text-[10.5px] uppercase tracking-wide text-fg-dim"><th className="px-4 py-2.5">#</th><th className="py-2.5 pr-2 font-medium">Nume / Firmă</th><th className="py-2.5 pr-2 font-medium">CUI</th><th className="py-2.5 pr-2 font-medium">Contact</th><th className="py-2.5 pr-2 font-medium">Orașe</th><th className="py-2.5 pr-2 font-medium">Platforme</th><th className="py-2.5 pr-2 text-center font-medium">Curieri</th><th className="py-2.5 pr-2 text-center font-medium">În așteptare</th><th className="py-2.5 pr-2 font-medium">Comision</th><th className="py-2.5 pr-2 text-right font-medium">Net trimis</th><th className="py-2.5 pr-2 font-medium">Contract</th><th className="py-2.5 pr-2 font-medium">Status</th><th className="px-4 py-2.5 text-right font-medium">Acțiuni</th></tr></thead>
           <tbody>{rows.map((s, i) => (
             <tr key={s.id} className={cn("border-b border-line/50 hover:bg-white/[0.02]", selected?.id === s.id && "bg-accent/[0.06]")}>
               <td className="px-4 py-2.5 text-fg-dim tabular-nums">{(safePage - 1) * PAGE + i + 1}</td>
@@ -199,6 +215,7 @@ export function SubcontractorsPage({ initialView = "list" }: { initialView?: "li
               <td className="py-2.5 pr-2 text-center tabular-nums text-fg">{s.couriersCount}</td>
               <td className="py-2.5 pr-2 text-center tabular-nums">{s.waitingCount ? <Link href={`/curieri?segment=asteptare&sub=${encodeURIComponent(s.contactEmail)}`} className="rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-[11px] font-semibold text-amber-200 hover:bg-amber-500/20">{s.waitingCount}</Link> : <span className="text-fg-dim">—</span>}</td>
               <td className="py-2.5 pr-2"><span className="rounded-md border border-amber-500/25 bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-300 tabular-nums">{s.commissionPct}%</span></td>
+              <td className="py-2.5 pr-2 text-right tabular-nums" title={`Brut ${formatRon(netBySub.get(s.id)?.gross ?? 0)} − comision ${formatRon(netBySub.get(s.id)?.commission ?? 0)} · ${netBySub.get(s.id)?.count ?? 0} plăți`}><span className="font-semibold text-emerald-300">{formatRon(netBySub.get(s.id)?.net ?? 0)}</span></td>
               <td className="py-2.5 pr-2 tabular-nums text-fg-muted">{fmt(s.contractEndIso)}</td>
               <td className="py-2.5 pr-2"><span className={cn("inline-flex rounded-md border px-2 py-0.5 text-[11px] font-medium", SUB_STATUS_STYLE[s.status])}>{SUB_STATUS_LABEL[s.status]}</span></td>
               <td className="px-4 py-2.5 text-right"><Popover align="right" className="w-[170px] p-1" trigger={({ toggle }) => <button type="button" onClick={toggle} aria-label="Acțiuni" className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-fg-dim hover:bg-white/[0.06] hover:text-fg"><MoreHorizontal size={16} /></button>}>{(close) => (<div className="flex flex-col"><button type="button" onClick={() => { setSelected(s); close(); }} className="rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-fg hover:bg-white/[0.05]">Vezi detalii</button><button type="button" onClick={() => { setEditing(s); close(); }} className="rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-fg hover:bg-white/[0.05]">Editează</button><button type="button" onClick={() => { toast.success("Mesaj trimis", s.contactName); close(); }} className="rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-fg hover:bg-white/[0.05]">Trimite mesaj</button></div>)}</Popover></td>

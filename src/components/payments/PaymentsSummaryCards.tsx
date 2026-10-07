@@ -10,13 +10,13 @@ export type PaymentsSummary = {
   net: number;
 };
 
-export function PaymentsSummaryCards({ summary, currency }: { summary: PaymentsSummary; currency: Currency }) {
+export function PaymentsSummaryCards({ summary, currency, netLabel = "Total de plată" }: { summary: PaymentsSummary; currency: Currency; netLabel?: string }) {
   const cards = [
     { label: "Număr plăți", value: String(summary.count) },
     { label: "Valoare brută", value: formatMoney(summary.gross, currency) },
     { label: "Total comisioane", value: formatMoney(summary.commissions, currency) },
     { label: "Total deduceri", value: formatMoney(summary.deductions, currency) },
-    { label: "Total de plată", value: formatMoney(summary.net, currency), strong: true },
+    { label: netLabel, value: formatMoney(summary.net, currency), strong: true },
   ];
   return (
     <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-5">

@@ -63,7 +63,10 @@ export function CouriersPage({ initialSegment = "all", initialSub = null, initia
   const [vehicleFilter, setVehicleFilter] = useState<VehicleType | "any">("any");
   const [advanced, setAdvanced] = useState<AdvancedFilters>(DEFAULT_ADVANCED_FILTERS);
   const [page, setPage] = useState(1);
-  const [view, setView] = useState<"list" | "teams">(initialView);
+  const [viewState, setView] = useState<"list" | "teams">(initialView);
+  // Subcontractorii nu au vederea „Pe echipe": doar lista (și dacă vin cu ?view=teams).
+  const isSub = user.role === "subcontractor_owner";
+  const view = isSub ? "list" : viewState;
 
   // Dialog state
   const [showAdd, setShowAdd] = useState(false);
@@ -185,7 +188,7 @@ export function CouriersPage({ initialSegment = "all", initialSub = null, initia
       <div className="space-y-5">
           <CouriersHeader onAddCourier={() => setShowAdd(true)} />
 
-          <div role="tablist" aria-label="Vedere curieri" className="inline-flex self-start rounded-lg border border-line bg-card p-0.5">
+          {!isSub && <div role="tablist" aria-label="Vedere curieri" className="inline-flex self-start rounded-lg border border-line bg-card p-0.5">
             {([["list", "Listă"], ["teams", "Pe echipe"]] as const).map(([key, label]) => (
               <button
                 key={key}
@@ -200,7 +203,7 @@ export function CouriersPage({ initialSegment = "all", initialSub = null, initia
                 {label}
               </button>
             ))}
-          </div>
+          </div>}
 
           {view === "list" && <CouriersSegments value={segment} counts={segmentCounts} onChange={handleSegment} />}
 

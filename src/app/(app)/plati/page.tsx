@@ -995,7 +995,7 @@ export default function PlatiPage() {
           <PaymentsPagination page={safePage} pageSize={PAGE_SIZE} total={displayRows.length} onPage={setPage} />
         </div>
         <div className="mt-4">
-          <PaymentsSummaryCards summary={summary} currency={currency} />
+          <PaymentsSummaryCards summary={summary} currency={currency} netLabel={user.role === "subcontractor_owner" ? "Net trimis (după comision)" : undefined} />
         </div>
       </div>
 
