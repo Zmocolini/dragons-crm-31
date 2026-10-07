@@ -6,11 +6,8 @@ import { useState } from "react";
 import { Avatar } from "./Avatar";
 import { Badge } from "@/components/ui/Badge";
 import { PlatformChip } from "@/components/ui/PlatformLogo";
-import {
-  formatShortDate,
-  STATUS_LABEL,
-  STATUS_TONE,
-} from "./shared";
+import { formatShortDate } from "./shared";
+import { COURIER_STATUS_LABEL, COURIER_STATUS_TONE, PENDING_ALERT_DAYS, PENDING_CRITICAL_DAYS } from "@/lib/couriers/types";
 import type {
   RecentCourier,
   RecentIssue,
@@ -183,9 +180,13 @@ function CouriersTable({ rows }: { rows: RecentCourier[] }) {
               </TD>
             )}
             <TD>
-              <Badge tone={STATUS_TONE[r.status]}>
-                {STATUS_LABEL[r.status]}
-              </Badge>
+              {r.pendingDays !== null && r.pendingDays >= PENDING_ALERT_DAYS ? (
+                <Badge tone={r.pendingDays >= PENDING_CRITICAL_DAYS ? "danger" : "warn"} className="whitespace-nowrap">
+                  {COURIER_STATUS_LABEL[r.status]} · {r.pendingDays} zile
+                </Badge>
+              ) : (
+                <Badge tone={COURIER_STATUS_TONE[r.status]}>{COURIER_STATUS_LABEL[r.status]}</Badge>
+              )}
             </TD>
             <TD className="font-mono text-[12.5px] text-fg-muted">
               {formatShortDate(r.registeredAt)}

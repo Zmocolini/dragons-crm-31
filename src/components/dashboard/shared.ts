@@ -1,20 +1,6 @@
-import type { CourierStatus, PlatformKey } from "@/lib/dashboard/types";
+import type { PlatformKey } from "@/lib/dashboard/types";
 
 type BadgeTone = "success" | "info" | "warn" | "danger" | "neutral" | "bolt" | "wolt" | "glovo";
-
-export const STATUS_TONE: Record<CourierStatus, BadgeTone> = {
-  activ: "success",
-  in_proces: "warn",
-  documente: "info",
-  asteptare: "neutral",
-};
-
-export const STATUS_LABEL: Record<CourierStatus, string> = {
-  activ: "Activ",
-  in_proces: "În proces",
-  documente: "Documente",
-  asteptare: "În așteptare",
-};
 
 export const PLATFORM_TONE: Record<PlatformKey, BadgeTone> = {
   bolt: "bolt",

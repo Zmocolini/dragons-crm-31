@@ -10,9 +10,10 @@ import { useSettings } from "@/lib/settings/context";
 import { getFactsBundle } from "@/lib/reports/facts";
 import { buildTickets } from "@/lib/issues/data";
 import { DOC_COLUMNS, columnForType } from "@/lib/documents/rules";
+import { COURIER_STATUS_LABEL, PENDING_ALERT_DAYS, pendingDays } from "@/lib/couriers/types";
 import type {
   CourierActivityPoint, ExpiringDocument, Platform, PlatformKey,
-  RecentCourier, RecentIssue, RecentPayment, RevenuePoint, Trend,
+  RecentCourier, RecentIssue, RecentPayment, RevenuePoint, Trend, UpcomingTask,
 } from "@/lib/dashboard/types";
 import { CourierActivityChart } from "./CourierActivityChart";
 import { WeeklyRevenueChart } from "./WeeklyRevenueChart";
@@ -117,8 +118,7 @@ export function RecentActivityLive() {
 
   const value = useMemo(() => {
     const fleet = allRows.filter((c) => c.tenantId === activeFleetId);
-    const courStatus = (s: string): RecentCourier["status"] => s === "active" ? "activ" : s === "in_activation" ? "in_proces" : s === "paused" ? "asteptare" : "documente";
-    const couriers: RecentCourier[] = [...fleet].sort((a, b) => (a.createdAtIso < b.createdAtIso ? 1 : -1)).slice(0, 5).map((c) => ({ id: c.id, name: c.fullName, phone: c.phone, city: c.city, platform: c.platforms[0] ?? "bolt", status: courStatus(c.status), registeredAt: c.createdAtIso.slice(0, 10), avatarUrl: null, owner: accounts.size > 0 ? courierOwner(c, accounts) : undefined }));
+    const couriers: RecentCourier[] = [...fleet].sort((a, b) => (a.createdAtIso < b.createdAtIso ? 1 : -1)).slice(0, 5).map((c) => ({ id: c.id, name: c.fullName, phone: c.phone, city: c.city, platform: c.platforms[0] ?? "bolt", status: c.status, pendingDays: pendingDays(c), registeredAt: c.createdAtIso.slice(0, 10), avatarUrl: null, owner: accounts.size > 0 ? courierOwner(c, accounts) : undefined }));
 
     const payMethod = (m: string): RecentPayment["method"] => m === "cash" ? "cash" : m === "bank_transfer" ? "transfer" : "card";
     const payStatus = (s: string): RecentPayment["status"] => s === "paid" ? "platit" : (s === "unpaid" || s === "issue" || s === "blocked") ? "esuat" : "pending";
@@ -142,6 +142,18 @@ const STATIC_TASKS = [
   { id: "t5", title: "Rezolvă problemele deschise", due: "vineri", done: false },
 ];
 export function UpcomingTasksLive() {
-  return <UpcomingTasksCard tasks={STATIC_TASKS} />;
+  const { activeFleetId } = useSession();
+  const { allRows } = useCouriers();
+  const tasks = useMemo<UpcomingTask[]>(() => {
+    const stuck = allRows
+      .filter((c) => c.tenantId === activeFleetId)
+      .map((c) => ({ c, days: pendingDays(c) }))
+      .filter((x): x is { c: typeof x.c; days: number } => x.days !== null && x.days >= PENDING_ALERT_DAYS)
+      .sort((a, b) => b.days - a.days);
+    const top = stuck.slice(0, 3).map(({ c, days }) => ({ id: `stuck_${c.id}`, title: `Urmărește ${c.fullName} — ${COURIER_STATUS_LABEL[c.status].toLowerCase()} de ${days} zile`, due: "azi", done: false }));
+    const rest = stuck.length > 3 ? [{ id: "stuck_rest", title: `Încă ${stuck.length - 3} curieri pending de peste ${PENDING_ALERT_DAYS} zile`, due: "azi", done: false }] : [];
+    return [...top, ...rest, ...STATIC_TASKS];
+  }, [allRows, activeFleetId]);
+  return <UpcomingTasksCard tasks={tasks} />;
 }
 

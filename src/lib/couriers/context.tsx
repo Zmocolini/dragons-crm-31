@@ -108,11 +108,13 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
     // ATENȚIE: forțez createdBy = emailul user-ului logat ca să funcționeze filtrarea
     // per rol (subcontractor vede doar ce a creat el). Ignoră ce trimite caller-ul.
     const ownerEmail = currentUserEmailRef.current || c.createdBy || "";
+    const nowIso = new Date().toISOString();
     const created: Courier = {
       ...c,
       createdBy: ownerEmail,
       id: `courier_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
-      createdAtIso: new Date().toISOString(),
+      createdAtIso: nowIso,
+      statusSinceIso: nowIso,
     };
     if (c.fullName && (c.commissionPct !== undefined || c.weeklyContractFeeRon !== undefined)) {
       saveCourierRate(c.fullName, {
@@ -124,8 +126,11 @@ export function CouriersProvider({ children }: { children: ReactNode }) {
     return created;
   }, []);
 
-  const updateCourier = useCallback((id: string, patch: Partial<Omit<Courier, "id" | "createdAtIso" | "tenantId">>) => {
+  const updateCourier = useCallback((id: string, input: Partial<Omit<Courier, "id" | "createdAtIso" | "tenantId">>) => {
     setCouriers((prev) => {
+      // Ceasul pending (pragul de 5 zile) pornește doar la o schimbare reală de status.
+      const before = prev.find((c) => c.id === id) ?? SEED_COURIERS.find((c) => c.id === id);
+      const patch = input.status && before && input.status !== before.status ? { ...input, statusSinceIso: new Date().toISOString() } : input;
       const idx = prev.findIndex((c) => c.id === id);
       if (idx !== -1) {
         const target = prev[idx];

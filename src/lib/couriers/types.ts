@@ -30,6 +30,25 @@ export const COURIER_STATUS_LABEL: Record<CourierStatus, string> = {
   paused:         "Pauză",
   stopped:        "Oprit",
 };
+export const COURIER_STATUS_TONE: Record<CourierStatus, "success" | "warn" | "danger" | "neutral" | "info"> = {
+  active:        "success",
+  in_activation: "warn",
+  paused:        "neutral",
+  stopped:       "danger",
+  draft:         "neutral",
+};
+
+/** Pending = încă nu lucrează și nu e oprit. Peste PENDING_ALERT_DAYS zile → alertă; peste PENDING_CRITICAL_DAYS → roșu. */
+export const PENDING_STATUSES: readonly CourierStatus[] = ["draft", "in_activation"];
+export const PENDING_ALERT_DAYS = 5;
+export const PENDING_CRITICAL_DAYS = 10;
+
+/** Zile întregi în statusul pending curent, sau null dacă nu e pending. Fără statusSinceIso (date vechi) numără de la înregistrare. */
+export function pendingDays(c: { status: CourierStatus; statusSinceIso?: string; createdAtIso: string }, nowMs = Date.now()): number | null {
+  if (!PENDING_STATUSES.includes(c.status)) return null;
+  const since = Date.parse(c.statusSinceIso ?? c.createdAtIso);
+  return Number.isNaN(since) ? null : Math.max(0, Math.floor((nowMs - since) / 86_400_000));
+}
 
 /** Câmpuri cheie tracked pentru checklist „completează mai târziu". */
 export type IncompleteFieldKey =
@@ -71,6 +90,8 @@ export type Courier = {
   /** IBAN pentru plăți. */
   iban?: string;
   status: CourierStatus;
+  /** Când a intrat în statusul curent. Îl setează CouriersProvider la fiecare schimbare de status. */
+  statusSinceIso?: string;
   incompleteFields: IncompleteFieldKey[];
   createdAtIso: string;
   createdBy: string;

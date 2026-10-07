@@ -1,3 +1,5 @@
+import type { CourierStatus } from "@/lib/couriers/types";
+
 export type Trend = {
   direction: "up" | "down" | "flat";
   value: string;
@@ -40,15 +42,16 @@ export type Platform = {
   active: boolean;
 };
 
-export type CourierStatus = "activ" | "in_proces" | "documente" | "asteptare";
-
 export type RecentCourier = {
   id: string;
   name: string;
   phone: string;
   city: string;
   platform: PlatformKey;
+  /** Statusul real al curierului, 1:1 cu pagina Curieri. */
   status: CourierStatus;
+  /** Zile în pending (draft / în activare); null dacă nu e pending. */
+  pendingDays: number | null;
   registeredAt: string;
   avatarUrl: string | null;
   /** Intern (al flotei noastre) sau al unui subcontractor. Lipsește pentru conturile care nu văd toate conturile. */
