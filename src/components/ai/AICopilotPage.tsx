@@ -8,7 +8,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useSession } from "@/lib/rbac/session";
 import { useOwnerScope } from "@/lib/owner-scope/context";
 import { useCopilotExecutor, ToolError } from "@/lib/ai/executor";
-import { CONFIRM_TOOLS, TOOL_LABEL } from "@/lib/ai/tools";
+import { needsConfirm, TOOL_LABEL } from "@/lib/ai/tools";
 import { cn } from "@/lib/utils/cn";
 
 type Msg = { id: string; role: "ai" | "user"; text: string; actions?: boolean; steps?: string[] };
@@ -137,7 +137,7 @@ export function AICopilotPage() {
           let args: Record<string, unknown> = {};
           try { args = JSON.parse(call.function.arguments || "{}"); } catch { /* argumente invalide → {} */ }
           let result: unknown;
-          if (CONFIRM_TOOLS.has(name) && !(await askConfirm(describe(name, args)))) {
+          if (needsConfirm(name, args) && !(await askConfirm(describe(name, args)))) {
             result = { refused: true, note: "Utilizatorul a refuzat acțiunea." };
             patchAi((m) => ({ ...m, steps: [...(m.steps ?? []), `✕ ${TOOL_LABEL[name] ?? name} (refuzat)`] }));
           } else {

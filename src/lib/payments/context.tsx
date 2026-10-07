@@ -319,7 +319,12 @@ export function PaymentsProvider({ children }: { children: ReactNode }) {
   const reassignPaymentsOf = useCallback((courierId: string, ownerEmail: string) => {
     const email = ownerEmail.trim().toLowerCase();
     if (!email.includes("@")) return;
-    setUserPayments((prev) => prev.map((p) => (p.recipient.id === courierId ? { ...p, createdBy: email } : p)));
+    // transferFrom = intenția explicită; fără ea serverul nu mută nimic (vezi sync/ownership.ts).
+    setUserPayments((prev) => prev.map((p) => {
+      if (p.recipient.id !== courierId) return p;
+      const from = (p.createdBy ?? "").trim().toLowerCase();
+      return { ...p, createdBy: email, transferFrom: from.includes("@") ? from : "*" };
+    }));
   }, []);
 
   const updatePaymentStatus = useCallback((id: string, status: PaymentStatus) => {

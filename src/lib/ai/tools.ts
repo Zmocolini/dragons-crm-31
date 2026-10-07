@@ -106,6 +106,13 @@ export const CONFIRM_TOOLS = new Set([
   "activate_couriers", "reject_couriers", "remove_from_waitlist",
 ]);
 
+/** Confirmarea se cere și pentru `update_courier` când schimbă statusul — altfel ar ocoli activate/reject_couriers. */
+export function needsConfirm(name: string, args: Record<string, unknown>): boolean {
+  if (CONFIRM_TOOLS.has(name)) return true;
+  const patch = args.patch as Record<string, unknown> | undefined;
+  return name === "update_courier" && typeof patch?.status === "string" && patch.status.trim() !== "";
+}
+
 export const TOOL_LABEL: Record<string, string> = {
   overview: "Rezumat flotă", find_couriers: "Caut curieri", list_payments: "Citesc plăți", report_summary: "Raport",
   list_invoices: "Citesc facturi", list_expiring_documents: "Documente care expiră", list_vehicles: "Vehicule",

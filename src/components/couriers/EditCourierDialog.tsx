@@ -77,7 +77,7 @@ export function EditCourierDialog({ row, onClose }: { row: CourierRow; onClose: 
       weeklyContractFeeRon,
       iban: iban.trim() || undefined,
       ...(isSubcontractor ? {} : { status }),
-      ...(transfer ? { createdBy: ownerEmail } : {}),
+      ...(transfer ? { createdBy: ownerEmail, transferFrom: initialOwner.includes("@") ? initialOwner : "*" } : {}),
     });
     if (transfer) {
       // Plățile curierului îl urmează; serverul mută și notele/patch-urile lor (sync/ownership.ts).

@@ -18,7 +18,7 @@ import { useDocuments } from "@/lib/documents/context";
 import { useVehicles } from "@/lib/vehicles/context";
 import { reportBase, vatRateFor, vatRegimeLabel } from "@/lib/invoices/vat";
 import { todayIsoLocal } from "@/lib/invoices/types";
-import type { Courier, CourierStatus } from "@/lib/couriers/types";
+import { COURIER_STATUS_LABEL, type Courier, type CourierStatus } from "@/lib/couriers/types";
 import type { PaymentStatus } from "@/lib/payments/types";
 import type { PlatformKey } from "@/lib/settings/types";
 
@@ -173,6 +173,7 @@ export function useCopilotExecutor() {
         const p = (a.patch ?? {}) as Args;
         // Contextul ignoră tăcut statusul trimis de un subcontractor — nu raportăm „modificat" fals.
         if (s(p.status) && !isGlobalOwner) throw new ToolError("Statusul curierului îl schimbă doar flota (Global Owner).");
+        if (s(p.status) && !(s(p.status) in COURIER_STATUS_LABEL)) throw new ToolError(`Status necunoscut: ${s(p.status)}.`);
         const patch: Partial<Courier> = {};
         for (const k of ["fullName", "phone", "email", "city", "status", "vehicleType", "collaboration"] as const) if (s(p[k])) (patch as Args)[k] = s(p[k]);
         for (const k of ["commissionPct", "weeklyContractFeeRon"] as const) if (typeof p[k] === "number") patch[k] = p[k] as number;

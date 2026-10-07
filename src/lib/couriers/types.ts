@@ -101,6 +101,8 @@ export type Courier = {
   incompleteFields: IncompleteFieldKey[];
   createdAtIso: string;
   createdBy: string;
+  /** Intenție de transfer (doar Global Owner): proprietarul DE LA care se mută. Serverul îl consumă și nu-l stochează. */
+  transferFrom?: string;
   tenantId: string;
 };
 

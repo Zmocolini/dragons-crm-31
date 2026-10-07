@@ -249,6 +249,8 @@ export type Payment = {
 
   createdAtIso: string;
   createdBy: string;
+  /** Intenție de transfer (doar Global Owner): proprietarul DE LA care se mută; „*" = createdBy vechi (nume). */
+  transferFrom?: string;
   /** Motiv pentru sume peste totalCalculated sau modificări post-confirmare. */
   overrideReason: string | null;
 

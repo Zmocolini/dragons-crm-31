@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { planActivation } from "../src/lib/couriers/activation";
+import { needsConfirm } from "../src/lib/ai/tools";
 
 const c = (id: string, o: object = {}) => ({ id, fullName: id.toUpperCase(), status: "pending", platforms: ["bolt"], waitlistedPlatforms: [], incompleteFields: [], ...o }) as never;
 const rows = [
@@ -34,5 +35,12 @@ assert.throws(() => planActivation(rows, ["p1"], { action: "reject", ...SUB }), 
 p = planActivation(rows, ["p1", "a1", "r1"], { action: "reject", ...OWNER });
 assert.deepEqual(p.patches, [{ id: "p1", patch: { status: "rejected" } }]);
 assert.deepEqual(p.skipped.map((x) => x.id), ["a1", "r1"]);
+
+// poarta de confirmare a AI-ului: orice schimbare de status cere click
+for (const t of ["activate_couriers", "reject_couriers", "remove_from_waitlist", "delete_courier"]) assert.equal(needsConfirm(t, {}), true, t);
+assert.equal(needsConfirm("update_courier", { id: "x", patch: { status: "active" } }), true);
+assert.equal(needsConfirm("update_courier", { id: "x", patch: { phone: "07" } }), false);
+assert.equal(needsConfirm("update_courier", { id: "x", patch: { status: " " } }), false);
+assert.equal(needsConfirm("find_couriers", {}), false);
 
 console.log("activation: OK");

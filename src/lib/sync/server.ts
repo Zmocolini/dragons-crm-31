@@ -7,7 +7,7 @@ import {
   MAX_RECORD_BYTES, SYNC_BY_KEY,
   type SyncKind, type SyncOp, type SyncRow,
 } from "./config";
-import { childKeysOf, decideOwner } from "./ownership";
+import { childKeysOf, decideOwner, enforceCourierStatus, type AccountCheck } from "./ownership";
 
 export type SyncUser = SessionUser & { emailLc: string; isGlobal: boolean };
 
@@ -138,6 +138,26 @@ async function loadOwners(pairs: { k: string; id: string }[]): Promise<Map<strin
   return out;
 }
 
+/** Conturile active (pentru transfer: destinația trebuie să existe; LEGACY: proprietarul curent e global). */
+async function loadAccounts(): Promise<AccountCheck> {
+  const res = await rawDb.execute("SELECT lower(trim(email)) AS e, role FROM users WHERE active = 1");
+  const roles = new Map(res.rows.map((r) => [String(r.e), String(r.role)]));
+  return { exists: (e) => roles.has(e), isGlobal: (e) => roles.get(e) === "global_owner" };
+}
+
+async function loadData(k: string, ids: string[]): Promise<Map<string, string | null>> {
+  const out = new Map<string, string | null>();
+  for (let i = 0; i < ids.length; i += 200) {
+    const chunk = ids.slice(i, i + 200);
+    const res = await rawDb.execute({
+      sql: `SELECT id, data FROM crm_records WHERE k = ? AND del = 0 AND id IN (${chunk.map(() => "?").join(",")})`,
+      args: [k, ...chunk],
+    });
+    for (const r of res.rows) out.set(String(r.id), r.data == null ? null : String(r.data));
+  }
+  return out;
+}
+
 function isValidOp(op: unknown): op is SyncOp {
   if (!op || typeof op !== "object") return false;
   const o = op as Record<string, unknown>;
@@ -180,6 +200,10 @@ export async function applyOps(user: SyncUser, rawOps: unknown[]): Promise<{ rej
   }
   const owners = await loadOwners(lookups);
   const keyOf = (k: string, id: string) => `${k}\u0000${id}`;
+  const accounts = await loadAccounts();
+  // Statusul stocat al curierilor atinși de un non-Global (regula „statusul îl decide flota").
+  const courierIds = user.isGlobal ? [] : ops.filter((o) => o.k === "crm31-couriers").map((o) => o.id);
+  const oldCourierData = await loadData("crm31-couriers", courierIds);
 
   const now = Date.now();
   const stmts: { sql: string; args: InValue[] }[] = [];
@@ -190,10 +214,12 @@ export async function applyOps(user: SyncUser, rawOps: unknown[]): Promise<{ rej
       op, coll, user,
       owners.get(keyOf(op.k, op.id))?.owner,
       coll.parent ? owners.get(keyOf(coll.parent, op.id))?.owner : undefined,
+      accounts,
     );
     if (decision.kind === "skip") continue;
     if (decision.kind === "reject") { rejected.push({ k: op.k, id: op.id }); continue; }
     const { owner, transferred } = decision;
+    const data = op.k === "crm31-couriers" ? enforceCourierStatus(user, oldCourierData.get(op.id) ?? null, decision.data) : decision.data;
 
     owners.set(keyOf(op.k, op.id), { owner });
     stmts.push({
@@ -202,7 +228,7 @@ export async function applyOps(user: SyncUser, rawOps: unknown[]): Promise<{ rej
             ON CONFLICT(k, id) DO UPDATE SET
               kind = excluded.kind, owner = excluded.owner, data = excluded.data, del = excluded.del,
               ts = excluded.ts, updated_by = excluded.updated_by`,
-      args: [op.k, op.id, op.kind, owner, op.del ? null : op.data, op.del ? 1 : 0, now, user.emailLc],
+      args: [op.k, op.id, op.kind, owner, op.del ? null : data, op.del ? 1 : 0, now, user.emailLc],
     });
     // Transfer: copiii (note, patch-uri, activități pe același id) urmează părintele; ts nou ca
     // noul proprietar să-i tragă la următorul sync.
