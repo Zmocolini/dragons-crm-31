@@ -95,7 +95,10 @@ function safeRead(): SettingsState {
         vehicleTypesAllowed: {
           ...DEFAULT_SETTINGS.fleet.vehicleTypesAllowed,
           ...(parsed.fleet?.vehicleTypesAllowed ?? {}),
+          // Migrare v2: „Mașină" pornită o dată pentru setările salvate înainte; după, decide flota.
+          ...((parsed.fleet?.vehicleDefaultsV ?? 0) < 2 ? { car: true } : {}),
         },
+        vehicleDefaultsV: 2,
       },
       // Auto-migrate: dacă user-ul are lista veche (<10 orașe), forțăm defaultul cu toate cele 63.
       cities:    withMandatoryCities((parsed.cities && parsed.cities.length >= 10) ? parsed.cities : DEFAULT_SETTINGS.cities),

@@ -7,6 +7,8 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
+import { IdCardScan, type ScannedIdDoc } from "@/components/couriers/IdCardScan";
+import { VehicleCostCalculator } from "@/components/couriers/VehicleCostCalculator";
 import { PlatformLogo } from "@/components/ui/PlatformLogo";
 import { useToast } from "@/components/ui/Toast";
 import { useCandidates } from "@/lib/candidates/context";
@@ -27,6 +29,8 @@ import { useProfile } from "@/lib/profile/context";
 import { useSession } from "@/lib/rbac/session";
 import { useSettings } from "@/lib/settings/context";
 import { cn } from "@/lib/utils/cn";
+import { isValidCnp, type IdCardFields } from "@/lib/couriers/id-card";
+import { costDefaults, weeklyVehicleCost, type VehicleCost } from "@/lib/couriers/vehicle-cost";
 
 const PLATFORM_NAME: Record<PlatformKey, string> = {
   bolt:  "Bolt Food",
@@ -65,6 +69,7 @@ const COUNTRY_CODES: { code: string; flag: string; label: string }[] = [
 
 type FormState = {
   fullName: string;
+  cnp: string;
   phoneCode: string;
   phone: string;
   email: string;
@@ -74,6 +79,7 @@ type FormState = {
   waitlistedPlatforms: PlatformKey[];
   vehicleType: VehicleType;
   vehicleOwnership: VehicleOwnership;
+  vehicleCost: Omit<VehicleCost, "weeklyRon">;
   collaboration: string;
   commissionPct: number;
   /** Gol = nesetat (la import se aplică regula implicită a flotei). */
@@ -84,6 +90,7 @@ type FormState = {
 
 const EMPTY_FORM: FormState = {
   fullName: "",
+  cnp: "",
   phoneCode: "+40",
   phone: "",
   email: "",
@@ -93,6 +100,7 @@ const EMPTY_FORM: FormState = {
   waitlistedPlatforms: [],
   vehicleType: "bike",
   vehicleOwnership: "own",
+  vehicleCost: {},
   collaboration: "",
   commissionPct: 10,
   weeklyContractFeeRon: "",
@@ -120,7 +128,7 @@ export function AddCourierDialog({
   const { logActivity } = useProfile();
   const toast = useToast();
 
-  type PendingDoc = { id: string; name: string; size: number; type: string; dataUrl: string };
+  type PendingDoc = { id: string; name: string; size: number; type: string; dataUrl: string; docType?: DocumentType; expiryIso?: string | null };
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -170,6 +178,24 @@ export function AddCourierDialog({
         toast.error("Eroare", `Nu s-a putut citi ${f.name}.`);
       }
     }
+  }
+
+  function applyIdCard(f: IdCardFields, doc: ScannedIdDoc) {
+    setForm((prev) => ({ ...prev, fullName: f.fullName ?? prev.fullName, cnp: f.cnp ?? prev.cnp }));
+    // Un singur act de identitate per curier nou: rescanarea îl înlocuiește.
+    setPendingDocs((prev) => [
+      ...prev.filter((d) => d.docType !== "id_card"),
+      { id: `pdoc_id_${Date.now()}`, ...doc, docType: "id_card", expiryIso: f.expiryIso ?? null },
+    ]);
+  }
+
+  function setVehicle(patch: Partial<Pick<FormState, "vehicleType" | "vehicleOwnership">>) {
+    setForm((prev) => {
+      const next = { ...prev, ...patch };
+      // Valorile de pornire ale calculatorului se schimbă cu tipul (mașină vs scuter); chiria rămâne.
+      const typeChanged = patch.vehicleType && patch.vehicleType !== prev.vehicleType;
+      return typeChanged ? { ...next, vehicleCost: { ...costDefaults(next.vehicleType), rentWeeklyRon: prev.vehicleCost.rentWeeklyRon } } : next;
+    });
   }
 
   useEffect(() => {
@@ -233,6 +259,7 @@ export function AddCourierDialog({
     if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) {
       hardErrors.email = "Format email invalid.";
     }
+    if (form.cnp && !isValidCnp(form.cnp)) hardErrors.cnp = "CNP invalid (13 cifre, cifra de control nu se potrivește).";
 
     if (!form.city) incomplete.push("city");
     if (form.platforms.length === 0) incomplete.push("platforms");
@@ -249,7 +276,7 @@ export function AddCourierDialog({
 
     const courier = addCourier({
       fullName: form.fullName.trim() || "Curier nou (fără nume)",
-      phone: form.phone.trim() ? `${form.phoneCode} ${form.phone.trim().replace(/^\+?\d{1,3}[\s-]?/, "").replace(/^0+/, "")}` : "",
+      phone: form.phone.trim() ? `${form.phoneCode} ${form.phone.trim().replace(/^\+\d{1,3}[\s-]?/, "").replace(/^0+/, "")}` : "",
       email: form.email.trim() || null,
       nationality: form.nationality,
       city: form.city,
@@ -261,6 +288,8 @@ export function AddCourierDialog({
       commissionPct: form.commissionPct,
       weeklyContractFeeRon: form.weeklyContractFeeRon === "" ? undefined : Math.max(0, Number(form.weeklyContractFeeRon) || 0),
       iban: form.iban.trim() || undefined,
+      cnp: form.cnp || undefined,
+      vehicleCost: { ...form.vehicleCost, weeklyRon: weeklyVehicleCost(form.vehicleOwnership, form.vehicleType, form.vehicleCost) },
       status: courierStatus,
       incompleteFields: incomplete,
       createdBy: user.id,
@@ -271,8 +300,8 @@ export function AddCourierDialog({
     const subject = { id: courier.id, name: courier.fullName, kind: "courier" as const, city: courier.city, platform: null };
     pendingDocs.forEach((pd) => {
       addDocument({
-        tenantId: user.activeTenant.id, fleetId: activeFleetId, subject, type: "other", status: "in_review",
-        expiryIso: null,
+        tenantId: user.activeTenant.id, fleetId: activeFleetId, subject, type: pd.docType ?? "other", status: "in_review",
+        expiryIso: pd.expiryIso ?? null,
         file: { name: pd.name, size: pd.size, type: pd.type, objectUrl: pd.dataUrl },
         ocrEnabled: false, ocrProposed: null, verifiedManually: false, notes: null,
         createdBy: user.name,
@@ -302,7 +331,9 @@ export function AddCourierDialog({
   }
 
   // Live warnings — soft, nu blochează
-  const liveIncomplete = useMemo(() => analyzeForm().incomplete, [form]);
+  const live = useMemo(() => analyzeForm(), [form]);
+  const liveIncomplete = live.incomplete;
+  const liveErrors = live.hardErrors;
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const isIncomplete = (key: IncompleteFieldKey) => liveIncomplete.includes(key);
 
@@ -367,6 +398,7 @@ export function AddCourierDialog({
           <div className="grid gap-4 md:grid-cols-2">
             {/* Date curier */}
             <FormCard title="Date curier" icon={UserPlus}>
+              <IdCardScan onScanned={applyIdCard} />
               <Field label="Nume complet" required incomplete={isIncomplete("fullName")} error={errors.fullName}>
                 <input
                   type="text"
@@ -374,6 +406,18 @@ export function AddCourierDialog({
                   onChange={(e) => setForm({ ...form, fullName: e.target.value })}
                   placeholder="Ex.: Andrei Popescu"
                   className="dd-input"
+                />
+              </Field>
+
+              <Field label="CNP" hint="Din buletin sau manual" error={liveErrors.cnp}>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={13}
+                  value={form.cnp}
+                  onChange={(e) => setForm({ ...form, cnp: e.target.value.replace(/\D/g, "").slice(0, 13) })}
+                  placeholder="13 cifre"
+                  className="dd-input font-mono tracking-wider"
                 />
               </Field>
 
@@ -559,7 +603,7 @@ export function AddCourierDialog({
                       <button
                         key={v}
                         type="button"
-                        onClick={() => setForm({ ...form, vehicleType: v })}
+                        onClick={() => setVehicle({ vehicleType: v })}
                         aria-pressed={on}
                         className={cn(
                           "flex flex-col items-center gap-1 rounded-xl border p-2 text-[10.5px] font-medium leading-tight transition-colors",
@@ -585,7 +629,7 @@ export function AddCourierDialog({
                       <button
                         key={o}
                         type="button"
-                        onClick={() => setForm({ ...form, vehicleOwnership: o })}
+                        onClick={() => setVehicle({ vehicleOwnership: o })}
                         aria-pressed={on}
                         className={cn(
                           "inline-flex items-center justify-center gap-2 rounded-lg border py-2 text-[12px] font-semibold transition-colors",
@@ -603,6 +647,18 @@ export function AddCourierDialog({
               </Field>
             </FormCard>
           </div>
+
+          {/* Evidență vehicul */}
+          <FormCard title={`Evidență vehicul · ${VEHICLE_TYPE_LABEL[form.vehicleType]} (${VEHICLE_OWNERSHIP_LABEL[form.vehicleOwnership].toLowerCase()})`} icon={Car}>
+            <VehicleCostCalculator
+              ownership={form.vehicleOwnership}
+              type={form.vehicleType}
+              value={form.vehicleCost}
+              onChange={(vehicleCost) => setForm({ ...form, vehicleCost })}
+              commissionPct={form.commissionPct}
+              contractFeeRon={Number(form.weeklyContractFeeRon) || 0}
+            />
+          </FormCard>
 
           {/* Documente (opțional) */}
           <FormCard title="Documente" icon={FileText}>
@@ -678,7 +734,7 @@ export function AddCourierDialog({
                     value={form.weeklyContractFeeRon}
                     onChange={(e) => setForm({ ...form, weeklyContractFeeRon: e.target.value })}
                     placeholder="Suma dorită"
-                    className="dd-input pr-12"
+                    className="dd-input pr-14 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   />
                   <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[12px] text-fg-dim">RON</span>
                 </div>

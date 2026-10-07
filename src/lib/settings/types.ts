@@ -39,6 +39,8 @@ export type FleetConfig = {
   vehicleTypesAllowed: Record<VehicleType, boolean>;
   allowOwnVehicle: boolean;
   allowRentedVehicle: boolean;
+  /** Versiunea default-urilor de vehicul deja aplicate setărilor salvate (2 = „Mașină" pornită). */
+  vehicleDefaultsV?: number;
 };
 
 export type CityStatus = "active" | "waitlist" | "unavailable";
@@ -539,10 +541,11 @@ export const DEFAULT_FLEET: FleetConfig = {
     bike:    true,
     e_bike:  true,
     scooter: true,
-    car:     false,
+    car:     true,
   },
   allowOwnVehicle:    true,
   allowRentedVehicle: true,
+  vehicleDefaultsV:   2,
 };
 
 // Cele 63 de orașe din Prezența Națională Dragon Delivery (dragondelivery.ro).

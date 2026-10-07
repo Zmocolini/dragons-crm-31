@@ -213,6 +213,7 @@ export default function CourierProfilePage() {
               <InfoRow label="Nume complet" value={courier.fullName} copyable />
               <InfoRow label="Telefon" value={courier.phone || "—"} copyable={!!courier.phone} />
               <InfoRow label="Email" value={courier.email || "—"} copyable={!!courier.email} />
+              {courier.cnp && <InfoRow label="CNP" value={courier.cnp} mono copyable />}
               <InfoRow label="Naționalitate" value={NATIONALITY_LABEL[courier.nationality]} />
               <InfoRow label="Oraș" value={courier.city} copyable />
               <InfoRow label="IBAN" value={courier.iban || "—"} mono copyable={!!courier.iban} />
@@ -229,6 +230,7 @@ export default function CourierProfilePage() {
             <dl className="grid grid-cols-1 gap-2 text-[12.5px]">
               <InfoRow label="Tip colaborare" value={collaborationLabel(courier.collaboration)} copyable />
               <InfoRow label="Comision flotă" value={`${courier.commissionPct ?? 10}%`} copyable />
+              {courier.vehicleCost && <InfoRow label="Cost vehicul / săpt." value={`${courier.vehicleCost.weeklyRon.toLocaleString("ro-RO")} RON`} />}
               <InfoRow label="Platforme" copyValue={courier.platforms.join(", ") || undefined} valueNode={
                 <div className="flex flex-wrap gap-1">
                   {courier.platforms.length > 0
