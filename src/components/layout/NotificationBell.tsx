@@ -84,7 +84,7 @@ export function NotificationBell() {
         icon: LifeBuoy,
         title: `${openTasks} ${openTasks === 1 ? "task deschis" : "task-uri deschise"} în flotă`,
         body: "Activări, mutări și tichete ridicate de subcontractori. Vezi „Urgențe flotă” în dashboard.",
-        href: "/",
+        href: "/#urgente",
         tone: "text-sky-300",
         bgTone: "bg-sky-500/15 border-sky-500/30",
         when: "Acum",

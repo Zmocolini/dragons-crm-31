@@ -9,7 +9,7 @@ import { useSession } from "@/lib/rbac/session";
 import { useCouriers } from "@/lib/couriers/context";
 import { usePayments } from "@/lib/payments/context";
 import { PAID_STATUSES } from "@/lib/payments/types";
-import { buildTickets, computeTicketKpi } from "@/lib/issues/data";
+import { useFleetTasks } from "@/lib/tasks/context";
 import { formatRon } from "@/lib/reports/analytics";
 
 const STAT_ICON: Record<StatKey, LucideIcon> = {
@@ -25,13 +25,14 @@ const STAT_HREF: Record<StatKey, string> = {
   new_candidates: "/recrutare",
   processed_payments: "/plati",
   completed_activations: "/activari",
-  open_issues: "/ai?tab=issues",
+  open_issues: "/#urgente",
 };
 
 export function DashboardStatsLive() {
   const { activeFleetId } = useSession();
   const { allRows } = useCouriers();
   const { fleetPayments } = usePayments();
+  const { tasks } = useFleetTasks();
 
   const stats = useMemo<Stat[]>(() => {
     const fleetCouriers = allRows.filter((c) => c.tenantId === activeFleetId);
@@ -40,15 +41,15 @@ export function DashboardStatsLive() {
 
     const paid = fleetPayments.filter((p) => PAID_STATUSES.includes(p.status)).reduce((s, p) => s + p.amountPaid, 0);
 
-    const tickets = buildTickets(fleetCouriers);
-    const openIssues = computeTicketKpi(tickets).total - tickets.filter((t) => t.status === "resolved" || t.status === "closed").length;
+    // Task-urile reale de flotă (ridicate de subcontractori), nu tichete generate.
+    const openIssues = tasks.filter((t) => t.tenantId === activeFleetId && t.status !== "resolved").length;
 
     return [
       { key: "active_couriers", label: "Curieri activi", value: String(active), subtext: `din ${roster} în flotă`, tone: "success", trend: roster > 0 ? { direction: "up", value: `${Math.round((active / roster) * 100)}%` } : undefined },
       { key: "processed_payments", label: "Plăți procesate", value: formatRon(paid), subtext: "achitate", tone: "warn" },
       { key: "open_issues", label: "Probleme deschise", value: String(openIssues), subtext: "necesită atenție", tone: "danger" },
     ];
-  }, [allRows, activeFleetId, fleetPayments]);
+  }, [allRows, activeFleetId, fleetPayments, tasks]);
 
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">

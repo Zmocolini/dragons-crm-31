@@ -40,6 +40,34 @@ export type UrgentItem =
 const PRIORITY_WEIGHT: Record<FleetTaskPriority, number> = { urgent: 100, high: 50, normal: 10 };
 const DAY_MS = 86_400_000;
 
+const pick = <T extends string>(v: unknown, allowed: Record<T, string>, fallback: T): T =>
+  typeof v === "string" && Object.hasOwn(allowed, v) ? (v as T) : fallback;
+const str = (v: unknown) => (typeof v === "string" ? v : "");
+
+/** Granița de încredere: task-urile vin din localStorage/sync ca JSON scris de alți clienți (alt subcontractor, versiune veche).
+ *  Un kind/prioritate necunoscut nu are voie să pice UI-ul sau să dea NaN în scor. Înregistrările fără id/createdBy se aruncă. */
+export function normalizeTask(raw: unknown): FleetTask | null {
+  if (!raw || typeof raw !== "object") return null;
+  const r = raw as Record<string, unknown>;
+  if (!str(r.id) || !str(r.createdBy)) return null;
+  return {
+    id: str(r.id),
+    kind: pick(r.kind, TASK_KIND_LABEL, "other"),
+    title: str(r.title).slice(0, 140) || "(fără titlu)",
+    details: str(r.details).slice(0, 1000),
+    priority: pick(r.priority, TASK_PRIORITY_LABEL, "normal"),
+    status: pick(r.status, TASK_STATUS_LABEL, "open"),
+    courierId: str(r.courierId) || undefined,
+    courierName: str(r.courierName) || undefined,
+    createdBy: str(r.createdBy),
+    raisedBy: str(r.raisedBy),
+    tenantId: str(r.tenantId),
+    createdAtIso: str(r.createdAtIso),
+    updatedAtIso: str(r.updatedAtIso),
+    resolvedAtIso: str(r.resolvedAtIso) || undefined,
+  };
+}
+
 /** Ordonează după urgență: prioritate + vechime (3 puncte/zi); alertele automate valorează cât o prioritate „ridicată" minus puțin. Rezolvatele ies. */
 export function rankUrgent(
   tasks: FleetTask[],
@@ -50,7 +78,7 @@ export function rankUrgent(
   for (const t of tasks) {
     if (t.status === "resolved") continue;
     const days = Math.max(0, Math.floor((nowMs - Date.parse(t.createdAtIso)) / DAY_MS)) || 0;
-    items.push({ source: "task", id: t.id, days, task: t, score: PRIORITY_WEIGHT[t.priority] + days * 3 + (t.status === "open" ? 5 : 0) });
+    items.push({ source: "task", id: t.id, days, task: t, score: (PRIORITY_WEIGHT[t.priority] ?? PRIORITY_WEIGHT.normal) + days * 3 + (t.status === "open" ? 5 : 0) });
   }
   for (const s of stuck) items.push({ source: "auto", id: `auto_${s.courierId}`, days: s.days, courierId: s.courierId, courierName: s.courierName, statusLabel: s.statusLabel, score: 40 + s.days * 3 });
   return items.sort((a, b) => b.score - a.score);

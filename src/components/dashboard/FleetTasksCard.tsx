@@ -22,36 +22,40 @@ type Props = {
   items: UrgentItem[];
   couriers: { id: string; name: string }[];
   isOwner: boolean;
-  onAdd: (d: Omit<Draft, "courierId"> & { courierId?: string; courierName?: string }) => void;
+  /** Cine a ridicat task-ul, derivat din createdBy (validat de server) — nu din raisedBy, care e text liber. */
+  raisedByLabel: (t: FleetTask) => string;
+  canCreate: boolean;
+  onAdd: (d: Omit<Draft, "courierId"> & { courierId?: string; courierName?: string }) => boolean;
   onUpdate: (id: string, patch: Partial<FleetTask>) => void;
 };
 
 const ago = (days: number) => (days === 0 ? "azi" : days === 1 ? "de ieri" : `de ${days} zile`);
 
 /** Top urgențe de flotă: task-uri ridicate de subcontractori + alerte automate; editabile pe loc. */
-export function FleetTasksCard({ items, couriers, isOwner, onAdd, onUpdate }: Props) {
+export function FleetTasksCard({ items, couriers, isOwner, raisedByLabel, canCreate, onAdd, onUpdate }: Props) {
+  const [error, setError] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [editing, setEditing] = useState<string | "new" | null>(null);
   const [draft, setDraft] = useState<Draft>(EMPTY);
   const shown = showAll ? items : items.slice(0, 5);
   const courierName = useMemo(() => new Map(couriers.map((c) => [c.id, c.name])), [couriers]);
 
-  const openNew = () => { setDraft(EMPTY); setEditing("new"); };
+  const openNew = () => { setDraft(EMPTY); setError(null); setEditing("new"); };
   const openEdit = (t: FleetTask) => { setDraft({ kind: t.kind, title: t.title, details: t.details, priority: t.priority, courierId: t.courierId ?? "" }); setEditing(t.id); };
   const save = () => {
     const title = draft.title.trim();
     if (!title) return;
     const courier = draft.courierId ? { courierId: draft.courierId, courierName: courierName.get(draft.courierId) } : { courierId: undefined, courierName: undefined };
-    if (editing === "new") onAdd({ ...draft, title, ...courier });
+    if (editing === "new" && !onAdd({ ...draft, title, ...courier })) { setError("Sesiunea nu e încă încărcată — reîncearcă în câteva secunde."); return; }
     else if (editing) onUpdate(editing, { kind: draft.kind, title, details: draft.details.trim(), priority: draft.priority, ...courier });
     setEditing(null);
   };
 
   return (
-    <Card>
+    <Card id="urgente" className="scroll-mt-24">
       <CardHeader>
         <CardTitle>Urgențe flotă</CardTitle>
-        <button type="button" onClick={openNew} className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-[12px] font-medium text-fg hover:bg-white/[0.05]">
+        <button type="button" onClick={openNew} disabled={!canCreate} className="inline-flex items-center gap-1 rounded-lg border border-line px-2.5 py-1 text-[12px] font-medium text-fg hover:bg-white/[0.05] disabled:opacity-50">
           <Plus size={13} /> Task nou
         </button>
       </CardHeader>
@@ -72,6 +76,7 @@ export function FleetTasksCard({ items, couriers, isOwner, onAdd, onUpdate }: Pr
               {couriers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
             <textarea aria-label="Detalii" value={draft.details} onChange={(e) => setDraft({ ...draft, details: e.target.value })} rows={2} placeholder={draft.kind === "transfer" ? "De unde → unde (oraș, platformă, cazare)" : "Detalii pentru owner"} className={inp} maxLength={1000} />
+            {error && <div className="rounded-md border border-rose-500/40 bg-rose-500/10 px-2.5 py-1.5 text-[12px] text-rose-200">{error}</div>}
             <div className="flex gap-2">
               <button type="button" onClick={save} disabled={!draft.title.trim()} className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1.5 text-[12px] font-semibold text-white disabled:opacity-50"><Check size={13} /> {editing === "new" ? "Trimite" : "Salvează"}</button>
               <button type="button" onClick={() => setEditing(null)} className="rounded-lg border border-line px-3 py-1.5 text-[12px] text-fg-muted hover:text-fg">Anulează</button>
@@ -96,7 +101,7 @@ export function FleetTasksCard({ items, couriers, isOwner, onAdd, onUpdate }: Pr
               <Badge tone={it.days >= 10 ? "danger" : "warn"} className="shrink-0">Automat</Badge>
             </li>
           ) : (
-            <TaskRow key={it.id} task={it.task} days={it.days} isOwner={isOwner} onEdit={() => openEdit(it.task)} onUpdate={onUpdate} />
+            <TaskRow key={it.id} task={it.task} days={it.days} raisedBy={isOwner ? raisedByLabel(it.task) : null} onEdit={() => openEdit(it.task)} onUpdate={onUpdate} />
           ))}
         </ul>
 
@@ -110,15 +115,15 @@ export function FleetTasksCard({ items, couriers, isOwner, onAdd, onUpdate }: Pr
   );
 }
 
-function TaskRow({ task, days, isOwner, onEdit, onUpdate }: { task: FleetTask; days: number; isOwner: boolean; onEdit: () => void; onUpdate: Props["onUpdate"] }) {
-  const Icon = KIND_ICON[task.kind];
+function TaskRow({ task, days, raisedBy, onEdit, onUpdate }: { task: FleetTask; days: number; raisedBy: string | null; onEdit: () => void; onUpdate: Props["onUpdate"] }) {
+  const Icon = KIND_ICON[task.kind] ?? CircleDot;
   return (
     <li className="flex items-start gap-3 py-2">
       <Icon size={15} className="mt-0.5 shrink-0 text-violet-300" />
       <div className="min-w-0 flex-1">
         <div className="truncate text-[12.5px] font-medium text-fg" title={task.details || task.title}>{task.title}</div>
         <div className="truncate text-[11px] text-fg-dim">
-          {TASK_KIND_LABEL[task.kind]}{isOwner ? ` · ${task.raisedBy}` : ""}{task.courierName ? ` · ${task.courierName}` : ""} · {ago(days)} · {TASK_STATUS_LABEL[task.status]}
+          {TASK_KIND_LABEL[task.kind]}{raisedBy ? ` · ${raisedBy}` : ""}{task.courierName ? ` · ${task.courierName}` : ""} · {ago(days)} · {TASK_STATUS_LABEL[task.status]}
         </div>
       </div>
       <Badge tone={PRIORITY_TONE[task.priority]} className="shrink-0">{TASK_PRIORITY_LABEL[task.priority]}</Badge>

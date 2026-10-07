@@ -136,13 +136,17 @@ export function RecentActivityLive() {
     // Probleme = task-urile reale deschise (nu mai sunt tichete generate din seed).
     const sev = (p: FleetTask["priority"]): RecentIssue["severity"] => p === "urgent" ? "high" : p === "high" ? "medium" : "low";
     const issues: RecentIssue[] = urgent.flatMap((u) => u.source === "task" ? [u.task] : []).slice(0, 5)
-      .map((t) => ({ id: t.id, title: t.title, severity: sev(t.priority), courierName: t.courierName ?? t.raisedBy, createdAt: t.createdAtIso.slice(0, 10) }));
+      .map((t) => ({ id: t.id, title: t.title, severity: sev(t.priority), courierName: t.courierName ?? accountLabel(accounts, t.createdBy), createdAt: t.createdAtIso.slice(0, 10) }));
 
     return { couriers, payments, issues };
   }, [allRows, activeFleetId, fleetPayments, accounts, urgent]);
 
   return <RecentActivityTabs couriers={value.couriers} payments={value.payments} issues={value.issues} />;
 }
+
+/** Numele contului din createdBy (validat de server la sync); raisedBy e text liber și nu se afișează owner-ului. */
+const accountLabel = (accounts: ReturnType<typeof useAccountDirectory>, email: string) =>
+  accounts.get(email.toLowerCase())?.name ?? email;
 
 /** Urgențele flotei active: task-urile deschise + curierii pending peste prag, ordonate de rankUrgent. */
 function useFleetUrgent() {
@@ -162,7 +166,8 @@ function useFleetUrgent() {
 export function UpcomingTasksLive() {
   const { activeFleetId } = useSession();
   const { current } = useAuth();
-  const { addTask, updateTask } = useFleetTasks();
+  const { addTask, updateTask, canCreate } = useFleetTasks();
+  const accounts = useAccountDirectory();
   const { fleet, urgent } = useFleetUrgent();
   const couriers = useMemo(() => fleet.map((c) => ({ id: c.id, name: c.fullName })).sort((a, b) => a.name.localeCompare(b.name, "ro")), [fleet]);
   return (
@@ -170,6 +175,8 @@ export function UpcomingTasksLive() {
       items={urgent}
       couriers={couriers}
       isOwner={current?.role === "global_owner"}
+      raisedByLabel={(t) => accountLabel(accounts, t.createdBy)}
+      canCreate={canCreate}
       onAdd={(d) => addTask({ ...d, tenantId: activeFleetId })}
       onUpdate={updateTask}
     />

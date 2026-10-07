@@ -43,11 +43,11 @@ function EmptyState() {
 }
 
 export function WeeklyRevenueChart({ weeks }: { weeks: WeeklyRevenue[] }) {
-  const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+  const [selectedLabel, setSelectedLabel] = useState<string | null>(null); // startIso — eticheta „S40" se repetă de la un an la altul
 
   const view = useMemo(() => {
     if (weeks.length === 0) return null;
-    const found = weeks.findIndex((w) => w.label === selectedLabel);
+    const found = weeks.findIndex((w) => w.startIso === selectedLabel);
     const idx = found >= 0 ? found : weeks.length - 1;
     const week = weeks[idx];
     const prev = idx > 0 ? weeks[idx - 1] : null;
@@ -79,6 +79,7 @@ export function WeeklyRevenueChart({ weeks }: { weeks: WeeklyRevenue[] }) {
     const barMax = bars.reduce((m, w) => (w.total > m ? w.total : m), 0);
     const barItems = bars.map((w) => ({
       label: w.label,
+      startIso: w.startIso,
       total: w.total,
       h: barMax > 0 ? Math.max(3, Math.round((w.total / barMax) * BAR_MAX_H)) : 3,
     }));
@@ -86,6 +87,7 @@ export function WeeklyRevenueChart({ weeks }: { weeks: WeeklyRevenue[] }) {
     return {
       idx,
       label: week.label,
+      startIso: week.startIso,
       total,
       delta,
       segments,
@@ -96,7 +98,7 @@ export function WeeklyRevenueChart({ weeks }: { weeks: WeeklyRevenue[] }) {
 
   if (!view) return <EmptyState />;
 
-  const { label, total, delta, segments, legend, barItems } = view;
+  const { label, startIso, total, delta, segments, legend, barItems } = view;
   const up = delta !== null && delta >= 0;
 
   return (
@@ -105,13 +107,13 @@ export function WeeklyRevenueChart({ weeks }: { weeks: WeeklyRevenue[] }) {
         <CardTitle>Venituri săptămânale</CardTitle>
         <div className="relative">
           <select
-            value={label}
+            value={startIso}
             onChange={(e) => setSelectedLabel(e.target.value)}
             aria-label="Săptămâna afișată"
             className="appearance-none rounded-lg border border-line bg-card-2 py-1.5 pl-2.5 pr-7 text-[11.5px] font-medium text-fg-muted transition-colors hover:text-fg focus:outline-none focus-visible:ring-2 focus-visible:ring-line"
           >
             {weeks.map((w) => (
-              <option key={w.label} value={w.label}>
+              <option key={w.startIso} value={w.startIso}>
                 {w.label}
               </option>
             ))}
@@ -204,14 +206,14 @@ export function WeeklyRevenueChart({ weeks }: { weeks: WeeklyRevenue[] }) {
 
         <div className="mt-4 flex items-end justify-between gap-1.5 border-t border-line/70 pt-3">
           {barItems.map((b) => {
-            const selected = b.label === label;
+            const selected = b.startIso === startIso;
             return (
               <button
-                key={b.label}
+                key={b.startIso}
                 type="button"
                 aria-pressed={selected}
                 aria-label={`${b.label}: ${fmt(b.total)} RON`}
-                onClick={() => setSelectedLabel(b.label)}
+                onClick={() => setSelectedLabel(b.startIso)}
                 className="group flex min-w-0 flex-1 flex-col items-center gap-1 focus:outline-none"
               >
                 <span

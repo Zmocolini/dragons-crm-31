@@ -2,45 +2,37 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useAuth } from "@/lib/auth/context";
+import { useOwnerScope } from "@/lib/owner-scope/context";
 import type { FleetTask } from "./types";
-
-// Sincronizat prin SyncProvider (`crm31-fleet-tasks`, owner = createdBy) — vezi lib/sync/config.ts.
-const STORAGE_KEY = "crm31-fleet-tasks";
+import { mutateStored, readStored } from "./store";
 
 type NewTask = Pick<FleetTask, "kind" | "title" | "details" | "priority" | "courierId" | "courierName" | "tenantId">;
 type TaskPatch = Partial<Pick<FleetTask, "kind" | "title" | "details" | "priority" | "status" | "courierId" | "courierName">>;
 
 type FleetTasksValue = {
+  /** Task-urile vizibile: toate pentru Global Owner, doar ale subcontractorului ales dacă e activ un scope. */
   tasks: FleetTask[];
-  addTask: (t: NewTask) => void;
+  /** false = sesiunea nu e încă încărcată (fără email nu putem atribui task-ul). */
+  canCreate: boolean;
+  addTask: (t: NewTask) => boolean;
   updateTask: (id: string, patch: TaskPatch) => void;
 };
 
 const FleetTasksContext = createContext<FleetTasksValue | null>(null);
 
 export function FleetTasksProvider({ children }: { children: ReactNode }) {
-  const [tasks, setTasks] = useState<FleetTask[]>([]);
-  const [hydrated, setHydrated] = useState(false);
+  const [stored, setStored] = useState<FleetTask[]>([]);
   const { current } = useAuth();
+  const { scope } = useOwnerScope();
 
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration from localStorage; codebase-wide pattern in all providers.
-      if (raw) setTasks(JSON.parse(raw) as FleetTask[]);
-    } catch {}
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); } catch {}
-  }, [tasks, hydrated]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- hydration from localStorage; codebase-wide pattern in all providers.
+  useEffect(() => { setStored(readStored()); }, []);
 
   const email = current?.email ?? "";
   const name = current?.name ?? email;
 
   const addTask = useCallback((t: NewTask) => {
+    if (!email) return false;
     const now = new Date().toISOString();
     const created: FleetTask = {
       ...t,
@@ -51,19 +43,27 @@ export function FleetTasksProvider({ children }: { children: ReactNode }) {
       createdAtIso: now,
       updatedAtIso: now,
     };
-    setTasks((prev) => [created, ...prev]);
+    setStored(mutateStored((cur) => [created, ...cur]));
+    return true;
   }, [email, name]);
 
   const updateTask = useCallback((id: string, patch: TaskPatch) => {
     const now = new Date().toISOString();
-    setTasks((prev) => prev.map((t) => {
+    setStored(mutateStored((cur) => cur.map((t) => {
       if (t.id !== id) return t;
       const resolvedAtIso = patch.status === "resolved" ? (t.resolvedAtIso ?? now) : patch.status ? undefined : t.resolvedAtIso;
       return { ...t, ...patch, resolvedAtIso, updatedAtIso: now };
-    }));
+    })));
   }, []);
 
-  const value = useMemo(() => ({ tasks, addTask, updateTask }), [tasks, addTask, updateTask]);
+  // Același scoping ca la curieri (couriers/context.tsx): scope activ → doar task-urile acelui subcontractor.
+  const tasks = useMemo(() => {
+    if (!scope) return stored;
+    const scopeEmail = scope.email.toLowerCase();
+    return stored.filter((t) => t.createdBy.toLowerCase() === scopeEmail);
+  }, [stored, scope]);
+
+  const value = useMemo(() => ({ tasks, canCreate: !!email, addTask, updateTask }), [tasks, email, addTask, updateTask]);
   return <FleetTasksContext.Provider value={value}>{children}</FleetTasksContext.Provider>;
 }
 
