@@ -479,5 +479,10 @@
 "• Emit facturi (și din raport, cu TVA după regim)": "• I issue invoices (also from a report, with VAT by regime)",
 "• Schimb statusuri de plăți și facturi (cu confirmarea ta)": "• I change payment and invoice statuses (with your confirmation)",
 "• Deschid pagini, creez tichete, explic orice modul": "• I open pages, create tickets, explain any module",
-"Spune-mi ce ai nevoie.": "Tell me what you need."
+"Spune-mi ce ai nevoie.": "Tell me what you need.",
+"Micro-calculator chirie": "Rental micro-calculator",
+"Marjă": "Margin",
+"Estimat / lună": "Estimated / month",
+"Pierdere": "Loss",
+"Vehicul închiriat — chiria se ține în evidență săptămânal (micro-calculatorul e lângă tipul vehiculului).": "Rented vehicle — rent is tracked weekly (the micro-calculator is next to the vehicle type)."
 }
