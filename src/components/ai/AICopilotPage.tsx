@@ -201,7 +201,7 @@ export function AICopilotPage() {
     <div className="flex min-h-full flex-col gap-4 overflow-x-hidden p-4 lg:p-6">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2"><h1 className="text-[26px] font-bold tracking-tight text-fg">AI Copilot</h1><span className="rounded-md bg-gradient-to-r from-violet-500 to-fuchsia-500 px-2 py-0.5 text-[10px] font-bold text-white shadow-[0_0_12px_rgba(168,85,247,0.6)]">NOU</span></div>
+          <div className="flex items-center gap-2"><h1 className="text-[26px] font-bold tracking-tight text-fg">AI Copilot</h1><span className="rounded-md bg-gradient-to-r from-violet-600 to-fuchsia-700 px-2 py-0.5 text-[10px] font-bold text-white shadow-[0_0_12px_rgba(168,85,247,0.6)]">NOU</span></div>
           <p className="mt-1 max-w-2xl text-[13px] text-fg-muted">Asistentul tău inteligent pentru o flotă mai eficientă. Îți oferă răspunsuri, analize și automatizări în timp real.</p>
         </div>
       </header>
@@ -212,7 +212,7 @@ export function AICopilotPage() {
           <div className="flex-1 space-y-4 overflow-y-auto p-4">
             {messages.map((m) => (
               <div key={m.id} className={cn("flex gap-2.5", m.role === "user" && "flex-row-reverse")}>
-                {m.role === "ai" ? <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-fuchsia-500"><Bot size={16} className="text-white" /></span> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/30 text-[11px] font-bold text-blue-200">{user.name.slice(0, 2).toUpperCase()}</span>}
+                {m.role === "ai" ? <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-700"><Bot size={16} className="text-white" /></span> : <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-500/30 text-[11px] font-bold text-blue-200">{user.name.slice(0, 2).toUpperCase()}</span>}
                 <div className={cn("max-w-[78%] rounded-2xl px-3.5 py-2.5 text-[13px] leading-relaxed", m.role === "user" ? "bg-blue-600 text-white" : "border border-line bg-card-2 text-fg")}>
                   {m.steps && m.steps.length > 0 && <div className="mb-1.5 flex flex-wrap gap-1">{m.steps.map((st, i) => <span key={i} className="inline-flex items-center gap-1 rounded-md border border-line bg-card-hover px-1.5 py-0.5 text-[10.5px] text-fg-muted"><Wrench size={10} />{st}</span>)}</div>}
                   {!m.text && loading && <span className="text-fg-muted"><Loader2 size={14} className="inline animate-spin" /> Lucrez...</span>}

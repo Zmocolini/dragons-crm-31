@@ -73,7 +73,7 @@ export function UserMenu() {
           open && "bg-card-hover",
         )}
       >
-        <span className="relative inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-indigo-500 to-purple-600 text-[11px] font-bold text-white">
+        <span className="relative inline-flex h-8 w-8 items-center justify-center overflow-hidden rounded-lg bg-gradient-to-br from-indigo-600 to-purple-700 text-[11px] font-bold text-white">
           {profile.avatarDataUrl ? (
             <Image src={profile.avatarDataUrl} alt={displayName} fill sizes="32px" className="object-cover" unoptimized />
           ) : (
@@ -98,7 +98,7 @@ export function UserMenu() {
         >
           {/* Header — user info */}
           <div className="flex items-center gap-3 border-b border-line/70 px-4 py-3.5">
-            <span className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-[13px] font-bold text-white ring-1 ring-white/10">
+            <span className="relative inline-flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-indigo-600 to-purple-700 text-[13px] font-bold text-white ring-1 ring-white/10">
               {profile.avatarDataUrl ? (
                 <Image src={profile.avatarDataUrl} alt={displayName} fill sizes="44px" className="object-cover" unoptimized />
               ) : (

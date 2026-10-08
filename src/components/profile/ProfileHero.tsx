@@ -26,7 +26,7 @@ export function ProfileHero() {
     <section className="rounded-2xl border border-line bg-card p-6">
       <div className="flex flex-col gap-5 md:flex-row md:items-center md:gap-7">
         <div className="relative shrink-0">
-          <span className="relative inline-flex h-[140px] w-[140px] items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-[38px] font-bold text-white ring-4 ring-violet-500/25">
+          <span className="relative inline-flex h-[140px] w-[140px] items-center justify-center overflow-hidden rounded-full bg-gradient-to-br from-indigo-600 to-purple-700 text-[38px] font-bold text-white ring-4 ring-violet-500/25">
             {profile.avatarDataUrl ? (
               <Image
                 src={profile.avatarDataUrl}

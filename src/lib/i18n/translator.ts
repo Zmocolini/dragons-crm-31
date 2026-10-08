@@ -111,10 +111,22 @@ export function startTranslator(lang: Lang, dict: Record<string, string>): () =>
     const cur = n.data;
     if (applied.get(n) === cur) return;
     const tr = lookup(cur);
-    if (tr === null) return;
-    const lead = /^\s*/.exec(cur)![0];
-    const trail = /\s*$/.exec(cur)![0];
-    const next = lead + tr + trail;
+    let next: string;
+    if (tr !== null) {
+      const lead = /^\s*/.exec(cur)![0];
+      const trail = /\s*$/.exec(cur)![0];
+      next = lead + tr + trail;
+    } else if (cur.includes("\n")) {
+      // text pe mai multe rânduri (ex. mesajul AI, pre-wrap): traducem rând cu rând
+      let hit = false;
+      next = cur.split("\n").map((ln) => {
+        const t = lookup(ln);
+        if (t === null) return ln;
+        hit = true;
+        return /^\s*/.exec(ln)![0] + t + /\s*$/.exec(ln)![0];
+      }).join("\n");
+      if (!hit) return;
+    } else return;
     applied.set(n, next);
     n.data = next;
   };

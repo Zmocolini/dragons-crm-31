@@ -1,12 +1,12 @@
 import { cn } from "@/lib/utils/cn";
 
 const GRADIENTS = [
-  "from-indigo-500 to-purple-600",
-  "from-emerald-500 to-teal-600",
-  "from-sky-500 to-cyan-600",
-  "from-rose-500 to-pink-600",
-  "from-amber-500 to-orange-600",
-  "from-violet-500 to-fuchsia-600",
+  "from-indigo-600 to-purple-700",
+  "from-emerald-700 to-teal-700",
+  "from-sky-700 to-cyan-700",
+  "from-rose-600 to-pink-700",
+  "from-amber-700 to-orange-700",
+  "from-violet-600 to-fuchsia-700",
 ];
 
 function hashIndex(str: string, mod: number) {
