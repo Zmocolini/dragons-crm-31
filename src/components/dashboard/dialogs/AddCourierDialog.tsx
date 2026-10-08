@@ -8,7 +8,7 @@ import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { IdCardScan, type ScannedIdDoc } from "@/components/couriers/IdCardScan";
-import { VehicleCostCalculator } from "@/components/couriers/VehicleCostCalculator";
+import { RentProfitPanel, VehicleCostCalculator } from "@/components/couriers/VehicleCostCalculator";
 import { PlatformLogo } from "@/components/ui/PlatformLogo";
 import { useToast } from "@/components/ui/Toast";
 import { useCandidates } from "@/lib/candidates/context";
@@ -647,6 +647,10 @@ export function AddCourierDialog({
                   })}
                 </div>
               </Field>
+
+              {form.vehicleOwnership === "rented" && (
+                <RentProfitPanel value={form.vehicleCost} onChange={(vehicleCost) => setForm({ ...form, vehicleCost })} />
+              )}
             </FormCard>
           </div>
 
