@@ -509,7 +509,7 @@ function SortableTh({
     <th className={cn("px-3 py-2.5", align === "right" && "text-right")}>
       <button type="button" onClick={() => onSort(k)} className={cn("inline-flex items-center gap-1 hover:text-fg", on ? "text-fg" : "")}>
         {label}
-        <ArrowDownUp size={11} className={cn(on ? "text-violet-300" : "text-fg-dim/50")} />
+        <ArrowDownUp size={11} className={cn(on ? "text-violet-300" : "text-fg-dim/50 [html[data-theme=light]_&]:text-fg-dim")} />
       </button>
     </th>
   );

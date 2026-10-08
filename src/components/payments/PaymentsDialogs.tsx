@@ -743,7 +743,7 @@ export function BulkConfirmDialog({
       <p className="text-[12.5px] text-fg-muted">{message}</p>
       <DialogFooter>
         <button type="button" onClick={onCancel} className="rounded-lg border border-line bg-card-hover px-3 py-1.5 text-[12.5px] font-medium text-fg hover:bg-white/[0.05]">Anulează</button>
-        <button type="button" onClick={onConfirm} className="rounded-lg bg-gradient-to-r from-emerald-600 to-emerald-500 px-4 py-1.5 text-[12.5px] font-semibold text-white">{confirmLabel}</button>
+        <button type="button" onClick={onConfirm} className="rounded-lg bg-gradient-to-r from-emerald-700 to-emerald-600 px-4 py-1.5 text-[12.5px] font-semibold text-white">{confirmLabel}</button>
       </DialogFooter>
     </Dialog>
   );
@@ -781,7 +781,7 @@ export function ClearWeekDialog({
         <div className="flex items-start gap-3 rounded-lg border border-rose-500/30 bg-rose-500/10 p-3 text-rose-200">
           <AlertTriangle size={20} className="shrink-0 text-rose-400 mt-0.5" />
           <div className="text-[12.5px] leading-relaxed">
-            <span className="font-semibold text-white">Atenție:</span> Această acțiune șterge plățile importate din Excel pentru a-ți permite să re-încarci fișierele de la zero.
+            <span className="font-semibold text-white [html[data-theme=light]_&]:text-fg">Atenție:</span> Această acțiune șterge plățile importate din Excel pentru a-ți permite să re-încarci fișierele de la zero.
           </div>
         </div>
 

@@ -36,7 +36,7 @@ export function RentProfitPanel({ value, onChange }: { value: Inputs; onChange: 
   );
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-violet-400/30 bg-gradient-to-br from-slate-950 via-[#14112e] to-slate-900 p-3.5 text-slate-100 shadow-[0_0_28px_-8px_rgba(139,92,246,0.6)]">
+    <div data-surface="dark" className="relative overflow-hidden rounded-2xl border border-violet-400/30 bg-gradient-to-br from-slate-950 via-[#14112e] to-slate-900 p-3.5 text-slate-100 shadow-[0_0_28px_-8px_rgba(139,92,246,0.6)]">
       <div aria-hidden className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-violet-500/25 blur-3xl" />
       <div aria-hidden className={`pointer-events-none absolute -bottom-12 -left-8 h-28 w-28 rounded-full blur-3xl ${loss ? "bg-rose-500/20" : "bg-emerald-500/20"}`} />
       <div aria-hidden className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(rgba(255,255,255,.9)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,.9)_1px,transparent_1px)] [background-size:18px_18px]" />

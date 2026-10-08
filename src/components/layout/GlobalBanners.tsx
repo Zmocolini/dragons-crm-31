@@ -37,7 +37,7 @@ export function GlobalBanners() {
             type="button"
             onClick={() => setDismissed(true)}
             aria-label="Închide anunțul"
-            className="shrink-0 rounded-md p-0.5 text-sky-300 hover:bg-white/[0.06] hover:text-white"
+            className="shrink-0 rounded-md p-0.5 text-sky-300 hover:bg-white/[0.06] hover:text-white [html[data-theme=light]_&]:hover:text-slate-900"
           >
             <X size={13} />
           </button>

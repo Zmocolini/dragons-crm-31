@@ -5,6 +5,16 @@ import { createPortal } from "react-dom";
 import { Check, ChevronDown, X } from "lucide-react";
 import { cn } from "@/lib/utils/cn";
 
+/** Text închis pe culori deschise (galben, mentă, albastru deschis), alb pe cele închise. */
+function readableOn(hex: string): string {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return "#ffffff";
+  const n = parseInt(m[1], 16);
+  const lin = (v: number) => { const c = v / 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
+  const L = 0.2126 * lin((n >> 16) & 255) + 0.7152 * lin((n >> 8) & 255) + 0.0722 * lin(n & 255);
+  return L > 0.3 ? "#0f172a" : "#ffffff";
+}
+
 // ── Popover (click-outside close) ────────────────────────────────────────────
 // Meniul se randează într-un portal cu poziționare `fixed` calculată din trigger,
 // ca să NU fie clipat de containere `overflow-x-auto`/`overflow-hidden` (ex. tabele).
@@ -135,7 +145,7 @@ export function Chip({
           ? "border-transparent text-white"
           : "border-line bg-card-hover text-fg-muted hover:text-fg",
       )}
-      style={active && color ? { backgroundColor: color } : undefined}
+      style={active && color ? { backgroundColor: color, color: readableOn(color) } : undefined}
     >
       {children}
       {active && onRemove && (

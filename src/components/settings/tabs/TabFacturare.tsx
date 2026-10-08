@@ -271,7 +271,7 @@ function PaymentMethodCard() {
         <p className="text-[11.5px] text-fg-muted">Card activ pentru abonament.</p>
       </header>
       <div className="p-5">
-        <div className="relative overflow-hidden rounded-2xl border border-line bg-gradient-to-br from-slate-900 via-indigo-950 to-violet-950 p-5 text-white">
+        <div data-surface="dark" className="relative overflow-hidden rounded-2xl border border-line bg-gradient-to-br from-slate-900 via-[#1e1b4b] to-[#2e1065] p-5 text-white">
           <div className="flex items-start justify-between">
             <div>
               <div className="text-[11px] uppercase tracking-widest text-white/60">

@@ -690,7 +690,7 @@ function IntegrareNotificariCard({
                 className={cn(
                   "inline-flex h-5 w-5 items-center justify-center rounded-full border transition-colors",
                   active
-                    ? "border-violet-400/60 bg-violet-500/30 text-white"
+                    ? "border-violet-400/60 bg-violet-500/30 text-white [html[data-theme=light]_&]:text-violet-800"
                     : "border-line bg-card-2",
                 )}
               >
