@@ -91,6 +91,8 @@ export function DragonsAllianceDivisions() {
               rel="noopener noreferrer"
               className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${d.gradient} p-5 shadow-lg shadow-black/30 transition-transform hover:scale-[1.02] hover:shadow-2xl`}
             >
+              {/* În tema light gradientul se închide, ca textul alb să treacă 4.5:1 */}
+              <div className="pointer-events-none absolute inset-0 bg-black/0 [html[data-theme=light]_&]:bg-black/50" />
               {/* Decorative background pattern */}
               <div className="pointer-events-none absolute -right-8 -top-8 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
               <div className="pointer-events-none absolute -bottom-10 -left-8 h-40 w-40 rounded-full bg-black/20 blur-2xl" />

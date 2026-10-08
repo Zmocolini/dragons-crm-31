@@ -74,7 +74,7 @@ function OrganizationCard({ org }: { org: OrganizationInfo }) {
 
 function LogoTile({ logo, name }: { logo: string | null; name: string }) {
   return (
-    <div className="relative flex h-[112px] w-full items-center justify-center overflow-hidden rounded-xl border border-line bg-gradient-to-br from-orange-500 to-red-600">
+    <div className="relative flex h-[112px] w-full items-center justify-center overflow-hidden rounded-xl border border-line bg-gradient-to-br from-orange-500 to-red-600 [html[data-theme=light]_&]:from-orange-700 [html[data-theme=light]_&]:to-red-700">
       {logo ? (
         <Image src={logo} alt={name} width={160} height={112} className="h-full w-full object-cover" unoptimized />
       ) : (
@@ -372,7 +372,7 @@ function LogoIdentityCard({ org }: { org: OrganizationInfo }) {
 
         <div className="rounded-xl border border-line/60 bg-card-2/50 p-4">
           <div className="mb-2 text-[11px] font-semibold text-fg-muted">Previzualizare</div>
-          <div className="flex h-[92px] items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-red-600 text-center">
+          <div className="flex h-[92px] items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-red-600 [html[data-theme=light]_&]:from-orange-700 [html[data-theme=light]_&]:to-red-700 text-center">
             {org.logoDataUrl ? (
               <Image src={org.logoDataUrl} alt={org.name} width={160} height={80} className="max-h-[80px] w-auto object-contain" unoptimized />
             ) : (

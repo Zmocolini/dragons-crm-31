@@ -152,7 +152,7 @@ export function PlanDialog({
                 )}
               >
                 {t.popular && (
-                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-violet-500 to-fuchsia-500 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white shadow">
+                  <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-gradient-to-r from-violet-600 to-fuchsia-700 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider text-white shadow">
                     Popular
                   </span>
                 )}

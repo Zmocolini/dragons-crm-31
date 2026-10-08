@@ -4,7 +4,8 @@ import { COURIER_STATUS_LABEL, type CourierStatus } from "@/lib/couriers/types";
 import { PAY_STATE_LABEL, PAY_STATE_COLOR, type CourierPayState } from "@/lib/reports/facts";
 import { cn } from "@/lib/utils/cn";
 
-const AVATAR_COLORS = ["#6366f1", "#8b5cf6", "#0ea5e9", "#22c55e", "#f59e0b", "#ec4899", "#14b8a6", "#ef4444"];
+// 600–700: textul alb de pe inițiale trece 4.5:1 (cu -500 pica la 2.1–3.8:1)
+const AVATAR_COLORS = ["#4f46e5", "#7c3aed", "#0369a1", "#15803d", "#b45309", "#be185d", "#0f766e", "#b91c1c"];
 
 function initials(name: string): string {
   const parts = name.trim().split(/\s+/);
