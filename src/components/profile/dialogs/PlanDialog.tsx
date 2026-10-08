@@ -128,7 +128,11 @@ export function PlanDialog({
               billing === "annual" ? "bg-violet-600 text-white" : "text-fg-muted hover:text-fg",
             )}
           >
-            Anual <span className="ml-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9.5px] font-bold text-emerald-200">-25%</span>
+            Anual <span className={cn(
+              "ml-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[9.5px] font-bold text-emerald-200",
+              // în light, butonul activ e violet intens: insigna devine albă ca să rămână lizibilă
+              billing === "annual" && "[html[data-theme=light]_&]:bg-white/20 [html[data-theme=light]_&]:text-white",
+            )}>-25%</span>
           </button>
         </div>
 
