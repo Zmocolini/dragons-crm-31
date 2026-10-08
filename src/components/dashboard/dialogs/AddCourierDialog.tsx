@@ -8,7 +8,7 @@ import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { IdCardScan, type ScannedIdDoc } from "@/components/couriers/IdCardScan";
-import { RentProfitPanel, VehicleCostCalculator } from "@/components/couriers/VehicleCostCalculator";
+import { RentProfitPanel } from "@/components/couriers/VehicleCostCalculator";
 import { PlatformLogo } from "@/components/ui/PlatformLogo";
 import { useToast } from "@/components/ui/Toast";
 import { useCandidates } from "@/lib/candidates/context";
@@ -653,18 +653,6 @@ export function AddCourierDialog({
               )}
             </FormCard>
           </div>
-
-          {/* Evidență vehicul — doar la închiriat; la „propriu" nu se ține nimic. */}
-          {form.vehicleOwnership === "rented" && <FormCard title={`Evidență vehicul · ${VEHICLE_TYPE_LABEL[form.vehicleType]} (${VEHICLE_OWNERSHIP_LABEL[form.vehicleOwnership].toLowerCase()})`} icon={Car}>
-            <VehicleCostCalculator
-              ownership={form.vehicleOwnership}
-              type={form.vehicleType}
-              value={form.vehicleCost}
-              onChange={(vehicleCost) => setForm({ ...form, vehicleCost })}
-              commissionPct={form.commissionPct}
-              contractFeeRon={Number(form.weeklyContractFeeRon) || 0}
-            />
-          </FormCard>}
 
           {/* Documente (opțional) */}
           <FormCard title="Documente" icon={FileText}>
