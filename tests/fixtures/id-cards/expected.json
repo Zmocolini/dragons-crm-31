@@ -1,0 +1,234 @@
+{
+ "up-00": {
+  "fullName": "Andrei-Mihai Popescu",
+  "cnp": "1800101400008",
+  "expiryIso": "2029-05-13",
+  "note": "clean"
+ },
+ "up-01": {
+  "fullName": "Maria Ionescu",
+  "cnp": "2810202400012",
+  "expiryIso": "2029-05-13",
+  "note": "rot"
+ },
+ "up-02": {
+  "fullName": "Ștefan Ștefănescu",
+  "cnp": "1820303400023",
+  "expiryIso": "2029-05-13",
+  "note": "blur"
+ },
+ "up-03": {
+  "fullName": "Md Rahim Hossein",
+  "cnp": "2830404400038",
+  "expiryIso": "2029-05-13",
+  "note": "small"
+ },
+ "up-04": {
+  "fullName": "Elena-Ioana Dumitru",
+  "cnp": "1840505400049",
+  "expiryIso": "2029-05-13",
+  "note": "rot+blur"
+ },
+ "up-05": {
+  "fullName": "Tudor Rădulescu",
+  "cnp": "2850606400053",
+  "expiryIso": "2029-05-13",
+  "note": "noise"
+ },
+ "up-06": {
+  "fullName": "Elen Popa",
+  "cnp": "1860707400064",
+  "expiryIso": "2029-05-13",
+  "note": "clean"
+ },
+ "up-07": {
+  "fullName": "Alexandru Constantinescu",
+  "cnp": "2870808400079",
+  "expiryIso": "2029-05-13",
+  "note": "rot"
+ },
+ "up-08": {
+  "fullName": "Mohammad Ahsan",
+  "cnp": "1880909400081",
+  "expiryIso": "2029-05-13",
+  "note": "blur"
+ },
+ "up-09": {
+  "fullName": "Iulian Neagu",
+  "cnp": "2891010400097",
+  "expiryIso": "2029-05-13",
+  "note": "small"
+ },
+ "up-10": {
+  "fullName": "Cristina Munteanu",
+  "cnp": "1901111400107",
+  "expiryIso": "2029-05-13",
+  "note": "rot+blur"
+ },
+ "up-11": {
+  "fullName": "Mihail Țăranu",
+  "cnp": "2911212400111",
+  "expiryIso": "2029-05-13",
+  "note": "noise"
+ },
+ "up-12": {
+  "fullName": "Andrei-Mihai Popescu",
+  "cnp": "1920113400124",
+  "expiryIso": "2029-05-13",
+  "note": "clean"
+ },
+ "up-13": {
+  "fullName": "Maria Ionescu",
+  "cnp": "2930214400139",
+  "expiryIso": "2029-05-13",
+  "note": "rot"
+ },
+ "up-14": {
+  "fullName": "Ștefan Ștefănescu",
+  "cnp": "1940315400141",
+  "expiryIso": "2029-05-13",
+  "note": "blur"
+ },
+ "up-15": {
+  "fullName": "Md Rahim Hossein",
+  "cnp": "2950416400154",
+  "expiryIso": "2029-05-13",
+  "note": "small"
+ },
+ "up-16": {
+  "fullName": "Elena-Ioana Dumitru",
+  "cnp": "1960517400165",
+  "expiryIso": "2029-05-13",
+  "note": "rot+blur"
+ },
+ "up-17": {
+  "fullName": "Tudor Rădulescu",
+  "cnp": "2970618400171",
+  "expiryIso": "2029-05-13",
+  "note": "noise"
+ },
+ "up-18": {
+  "fullName": "Elen Popa",
+  "cnp": "1980719400180",
+  "expiryIso": "2029-05-13",
+  "note": "clean"
+ },
+ "up-19": {
+  "fullName": "Alexandru Constantinescu",
+  "cnp": "2800820400193",
+  "expiryIso": "2029-05-13",
+  "note": "rot"
+ },
+ "up-20": {
+  "fullName": "Mohammad Ahsan",
+  "cnp": "1810921400209",
+  "expiryIso": "2029-05-13",
+  "note": "blur"
+ },
+ "up-21": {
+  "fullName": "Iulian Neagu",
+  "cnp": "2821022400218",
+  "expiryIso": "2029-05-13",
+  "note": "small"
+ },
+ "up-22": {
+  "fullName": "Cristina Munteanu",
+  "cnp": "1831123400229",
+  "expiryIso": "2029-05-13",
+  "note": "rot+blur"
+ },
+ "up-23": {
+  "fullName": "Mihail Țăranu",
+  "cnp": "2841224400233",
+  "expiryIso": "2029-05-13",
+  "note": "noise"
+ },
+ "ang-00-ci-76.1": {
+  "fullName": "Adrian Costel Neagu",
+  "cnp": "1780819400122",
+  "expiryIso": "2030-10-27",
+  "note": "unghi 76.1°"
+ },
+ "ang-01-ci-152.5": {
+  "fullName": "Adrian Costel Neagu",
+  "cnp": "1780819400122",
+  "expiryIso": "2030-10-27",
+  "note": "unghi 152.5°"
+ },
+ "ang-02-ci-197.3": {
+  "fullName": "Adrian Costel Neagu",
+  "cnp": "1780819400122",
+  "expiryIso": "2030-10-27",
+  "note": "unghi 197.3°"
+ },
+ "ang-03-ci-283.0": {
+  "fullName": "Adrian Costel Neagu",
+  "cnp": "1780819400122",
+  "expiryIso": "2030-10-27",
+  "note": "unghi 283.0°"
+ },
+ "ang-04-ci-287.8": {
+  "fullName": "Roxana Vasilescu",
+  "cnp": "2960202123497",
+  "expiryIso": "2034-02-02",
+  "note": "unghi 287.8°"
+ },
+ "ang-05-ci-78.1": {
+  "fullName": "Roxana Vasilescu",
+  "cnp": "2960202123497",
+  "expiryIso": "2034-02-02",
+  "note": "unghi 78.1°"
+ },
+ "ang-06-ci-169.5": {
+  "fullName": "Roxana Vasilescu",
+  "cnp": "2960202123497",
+  "expiryIso": "2034-02-02",
+  "note": "unghi 169.5°"
+ },
+ "ang-07-ci-194.5": {
+  "fullName": "Roxana Vasilescu",
+  "cnp": "2960202123497",
+  "expiryIso": "2034-02-02",
+  "note": "unghi 194.5°"
+ },
+ "ang-08-permit-268.4": {
+  "fullName": "Salah Uddin",
+  "cnp": "7950505400079",
+  "note": "unghi 268.4°"
+ },
+ "ang-09-permit-100.2": {
+  "fullName": "Salah Uddin",
+  "cnp": "7950505400079",
+  "note": "unghi 100.2°"
+ },
+ "ang-10-permit-209.5": {
+  "fullName": "Salah Uddin",
+  "cnp": "7950505400079",
+  "note": "unghi 209.5°"
+ },
+ "ang-11-permit-78.4": {
+  "fullName": "Salah Uddin",
+  "cnp": "7950505400079",
+  "note": "unghi 78.4°"
+ },
+ "ang-12-permit-238.2": {
+  "fullName": "Suresh Kumar Magar",
+  "cnp": "8970909400216",
+  "note": "unghi 238.2°"
+ },
+ "ang-13-permit--17.0": {
+  "fullName": "Suresh Kumar Magar",
+  "cnp": "8970909400216",
+  "note": "unghi 17.0°"
+ },
+ "ang-14-permit-34.3": {
+  "fullName": "Suresh Kumar Magar",
+  "cnp": "8970909400216",
+  "note": "unghi 34.3°"
+ },
+ "ang-15-permit-199.9": {
+  "fullName": "Suresh Kumar Magar",
+  "cnp": "8970909400216",
+  "note": "unghi 199.9°"
+ }
+}

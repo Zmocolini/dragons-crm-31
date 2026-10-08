@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "tsx tests/payment-fee.test.ts && tsx tests/vat.test.ts && tsx tests/rbac.test.ts && tsx tests/courier-status.test.ts && tsx tests/fleet-tasks.test.ts && tsx tests/test-data.test.ts && tsx tests/sub-net.test.ts && tsx tests/team-status.test.ts && tsx tests/sync-ownership.test.ts && tsx --conditions=react-server tests/sync-integration.test.mts && tsx tests/payment-owner.test.ts && tsx tests/activation.test.ts && tsx tests/id-card.test.ts && tsx tests/id-scan.test.mts && tsx tests/vehicle-cost.test.ts && tsx tests/backup-blobs.test.ts"
+    "test:ocr": "tsx tests/id-scan-ocr.bench.mts",
+    "test": "tsx tests/payment-fee.test.ts && tsx tests/vat.test.ts && tsx tests/rbac.test.ts && tsx tests/courier-status.test.ts && tsx tests/fleet-tasks.test.ts && tsx tests/test-data.test.ts && tsx tests/sub-net.test.ts && tsx tests/team-status.test.ts && tsx tests/sync-ownership.test.ts && tsx --conditions=react-server tests/sync-integration.test.mts && tsx tests/payment-owner.test.ts && tsx tests/activation.test.ts && tsx tests/id-card.test.ts && tsx tests/id-scan.test.mts && tsx tests/vehicle-cost.test.ts && tsx tests/backup-blobs.test.ts && tsx tests/id-scan-ocr.bench.mts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1137.0",
@@ -29,6 +30,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "sharp": "0.35.4",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^20",

@@ -1,0 +1,210 @@
+{
+ "fixturesHash": "10f51c54c3b4ef8e",
+ "totals": {
+  "name": 38,
+  "cnp": 40,
+  "expiry": 38
+ },
+ "images": {
+  "ang-00-ci-76.1": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "ang-01-ci-152.5": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "ang-02-ci-197.3": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "ang-03-ci-283.0": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "ang-04-ci-287.8": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "ang-05-ci-78.1": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "ang-06-ci-169.5": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "ang-07-ci-194.5": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "ang-08-permit-268.4": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "ang-09-permit-100.2": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "ang-10-permit-209.5": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "ang-11-permit-78.4": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "ang-12-permit-238.2": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "ang-13-permit--17.0": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "ang-14-permit-34.3": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "ang-15-permit-199.9": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-00": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-01": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-02": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-03": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-04": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-05": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-06": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-07": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-08": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-09": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-10": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-11": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-12": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-13": {
+   "name": true,
+   "cnp": true,
+   "expiry": false
+  },
+  "up-14": {
+   "name": true,
+   "cnp": true,
+   "expiry": false
+  },
+  "up-15": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-16": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-17": {
+   "name": false,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-18": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-19": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-20": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-21": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-22": {
+   "name": true,
+   "cnp": true,
+   "expiry": true
+  },
+  "up-23": {
+   "name": false,
+   "cnp": true,
+   "expiry": true
+  }
+ }
+}
